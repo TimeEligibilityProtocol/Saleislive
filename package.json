@@ -1,0 +1,13 @@
+{
+  "name": "saleis-live-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build:packages": "npm run build --if-present --workspace packages/domain --workspace packages/ui --workspace packages/platform --workspace packages/api-client",
+    "typecheck": "npm run typecheck --if-present --workspaces"
+  }
+}

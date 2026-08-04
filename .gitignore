@@ -1,0 +1,30 @@
+node_modules/
+dist/
+build/
+coverage/
+
+# Imported catalog files and staged media — dev/test artifacts, not source
+apps/api/public/assets/uploads/*
+!apps/api/public/assets/uploads/.gitkeep
+apps/api/public/assets/cutouts/*
+!apps/api/public/assets/cutouts/.gitkeep
+
+# Expo
+.expo/
+.expo-shared/
+web-build/
+
+# Env files — never commit real secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# OS / editor
+.DS_Store
+*.log
+.vscode/
+.idea/
+
+# TypeScript build info
+*.tsbuildinfo
