@@ -18,7 +18,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use("/assets", express.static(path.join(__dirname, "..", "public", "assets")));
-app.use(tenantRouter(env.platformRootDomain));
+app.use(tenantRouter(env.platformRootDomain, env.defaultBrandSlug));
 app.use(healthRouter());
 app.use(brandsRouter());
 app.use(storefrontRouter());

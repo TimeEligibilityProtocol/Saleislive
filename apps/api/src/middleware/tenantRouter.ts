@@ -19,7 +19,7 @@ declare global {
  * with req.brand left unset, since not every route is brand-scoped
  * (auth, platform admin, health).
  */
-export function tenantRouter(rootDomain: string) {
+export function tenantRouter(rootDomain: string, defaultBrandSlug: string | null = null) {
   return function resolveTenant(req: Request, _res: Response, next: NextFunction): void {
     const host = (req.header("host") ?? "").split(":")[0];
     const suffix = `.${rootDomain}`;
@@ -28,6 +28,11 @@ export function tenantRouter(rootDomain: string) {
       if (slug && slug !== "www" && slug !== "admin") {
         req.brand = getBrandBySlug(slug);
       }
+    } else if (defaultBrandSlug) {
+      // Host isn't a *.{rootDomain} subdomain at all (e.g. a bare Render
+      // preview URL before wildcard DNS is wired up) — fall back to a
+      // fixed demo brand instead of resolving nothing.
+      req.brand = getBrandBySlug(defaultBrandSlug);
     }
     next();
   };
