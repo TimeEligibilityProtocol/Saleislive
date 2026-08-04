@@ -1,4 +1,4 @@
-import { Brand, Product } from "@saleis-live/domain";
+import { Brand, ImportBatch, Product } from "@saleis-live/domain";
 
 export interface ApiClientConfig {
   baseUrl: string;
@@ -61,5 +61,30 @@ export class ApiClient {
 
   resolveAssetUrl(relativeUrl: string): string {
     return `${this.config.baseUrl}${relativeUrl}`;
+  }
+
+  /** Stage a file — parses it and returns a row-by-row diff, but writes nothing yet. */
+  async uploadImport(brandId: string, file: File): Promise<{ batch: ImportBatch }> {
+    const token = await this.config.getAuthToken?.();
+    const form = new FormData();
+    form.append("brandId", brandId);
+    form.append("file", file);
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`${this.config.baseUrl}/api/imports`, { method: "POST", body: form, headers });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new ApiError(res.status, text);
+    }
+    return res.json() as Promise<{ batch: ImportBatch }>;
+  }
+
+  async commitImport(batchId: string): Promise<{ batch: ImportBatch; summary: { created: number; updated: number; skipped: number } }> {
+    return this.request(`/api/imports/${batchId}/commit`, { method: "POST" });
+  }
+
+  async listBrandProducts(brandId: string): Promise<Product[]> {
+    const { products } = await this.request<{ products: Product[] }>(`/api/brands/${brandId}/products`);
+    return products;
   }
 }

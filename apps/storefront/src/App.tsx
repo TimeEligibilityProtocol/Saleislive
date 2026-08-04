@@ -79,7 +79,7 @@ export function App() {
 
       <footer style={styles.footer}>
         <div style={styles.footerBrand}>
-          <Asterisk />
+          <Logo />
           <span>
             saleis<span style={{ color: colors.ultramarine }}>.live</span>
           </span>
@@ -97,7 +97,7 @@ function ProductCard({ product }: { product: Product }) {
       <div style={styles.cardImageWrap}>
         <img src={apiClient.resolveAssetUrl(product.images[0]?.url ?? "")} alt={product.images[0]?.alt ?? ""} style={styles.cardImage} />
       </div>
-      <p style={styles.cardName}>{product.name.approvedValue}</p>
+      <p style={styles.cardName}>{product.name.value}</p>
       <p style={styles.cardPriceRow}>
         <span style={styles.cardPriceStrike}>{formatMoney(product.price)}</span>
         <span style={styles.cardPrice}>{formatMoney(product.salePrice)}</span>
@@ -107,12 +107,14 @@ function ProductCard({ product }: { product: Product }) {
   );
 }
 
-function Asterisk() {
+function Logo() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ marginRight: 6 }}>
-      {[0, 60, 120].map((deg) => (
-        <rect key={deg} x="10.5" y="2" width="3" height="20" rx="1.5" fill={colors.ink} transform={`rotate(${deg} 12 12)`} />
-      ))}
+    <svg width="16" height="16" viewBox="-14 -14 28 28" style={{ marginRight: 6 }}>
+      <g fill={colors.navy}>
+        {[0, 60, 120, 180, 240, 300].map((deg) => (
+          <rect key={deg} x="-2.1" y="-11.6" width="4.2" height="9.3" rx="2.1" transform={`rotate(${deg})`} />
+        ))}
+      </g>
     </svg>
   );
 }

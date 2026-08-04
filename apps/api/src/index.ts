@@ -7,6 +7,8 @@ import { loadEnv } from "./config/env.js";
 import { tenantRouter } from "./middleware/tenantRouter.js";
 import { brandsRouter } from "./routes/brands.js";
 import { healthRouter } from "./routes/health.js";
+import { importsRouter } from "./routes/imports.js";
+import { adminProductsRouter } from "./routes/products.js";
 import { storefrontRouter } from "./routes/storefront.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -20,6 +22,8 @@ app.use(tenantRouter(env.platformRootDomain));
 app.use(healthRouter());
 app.use(brandsRouter());
 app.use(storefrontRouter());
+app.use(importsRouter());
+app.use(adminProductsRouter());
 
 app.listen(env.port, "0.0.0.0", () => {
   console.log(`saleis.live api listening on :${env.port} (${env.nodeEnv})`);

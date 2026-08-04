@@ -8,13 +8,22 @@
 export const colors = {
   ink: "#111111",
   ivory: "#F5F2EB",
+  paper: "#FBFAF7",
   white: "#FFFFFF",
   stone: "#D8D4CC",
+  line: "#DDD8CE",
+  muted: "#716E68",
   ultramarine: "#173B8F",
+  navy: "#173B8F",
+  pale: "#ECE8DF",
+  bluepale: "#E9EDF7",
+  success: "#327A54",
+  warning: "#A36A26",
+  error: "#A7463E",
   text: "#111111",
   background: "#F5F2EB",
   surface: "#FFFFFF",
-  border: "#D8D4CC",
+  border: "#DDD8CE",
 };
 
 export const typography = {

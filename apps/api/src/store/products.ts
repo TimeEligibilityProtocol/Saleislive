@@ -48,6 +48,23 @@ function seed(): void {
 }
 seed();
 
+/** Public storefront view — published products only. */
 export function listProductsForBrand(brandId: string): Product[] {
   return products.filter((p) => p.brandId === brandId && p.status === "active");
+}
+
+/** Admin/catalogue view — every status, so a merchandiser can see what an import just staged. */
+export function listAllProductsForBrand(brandId: string): Product[] {
+  return products.filter((p) => p.brandId === brandId);
+}
+
+export function getProductBySku(brandId: string, sku: string): Product | undefined {
+  return products.find((p) => p.brandId === brandId && p.sku === sku);
+}
+
+/** Insert or replace by id — the import commit step is the only writer besides seed(). */
+export function upsertProduct(product: Product): void {
+  const i = products.findIndex((p) => p.id === product.id);
+  if (i === -1) products.push(product);
+  else products[i] = product;
 }

@@ -1,0 +1,6 @@
+sku,name,category,price,stock,image
+DEMO-001,Sculptural Hoop Earrings,Jewellery,200,10,
+NEW-100,Silk Slip Dress,Fashion,320,4,https://images.saleis.live/silk-slip-dress.jpg
+NEW-101,Woven Raffia Tote,Bags,210,0,
+,Mystery Item,Home,50,5,
+NEW-100,Silk Slip Dress (duplicate row),Fashion,299,6,https://images.saleis.live/silk-slip-dress.jpg
