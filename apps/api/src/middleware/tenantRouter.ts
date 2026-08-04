@@ -21,6 +21,16 @@ declare global {
  */
 export function tenantRouter(rootDomain: string, defaultBrandSlug: string | null = null) {
   return function resolveTenant(req: Request, _res: Response, next: NextFunction): void {
+    // An explicit X-Brand-Slug header (set by the storefront from its own
+    // ?brand= query param) always wins — it's how a shared preview host
+    // (no wildcard DNS yet) can still show any brand, not just the default.
+    const explicitSlug = req.header("x-brand-slug");
+    if (explicitSlug) {
+      req.brand = getBrandBySlug(explicitSlug);
+      next();
+      return;
+    }
+
     const host = (req.header("host") ?? "").split(":")[0];
     const suffix = `.${rootDomain}`;
     if (host.endsWith(suffix)) {

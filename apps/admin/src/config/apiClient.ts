@@ -9,4 +9,17 @@ function resolveApiBaseUrl(): string {
   return "http://localhost:4100";
 }
 
+/**
+ * Where the buyer-facing storefront lives — used only to build a "preview
+ * your store" link right after brand creation. Real per-brand subdomains
+ * (chanel.saleis.live) need wildcard DNS that isn't wired up yet, so
+ * until then the link points at the shared storefront with ?brand=slug,
+ * which actually works today instead of 404ing.
+ */
+export function resolveStorefrontPreviewUrl(slug: string): string {
+  const override = import.meta.env.VITE_STOREFRONT_BASE_URL;
+  const base = override || (typeof window !== "undefined" && window.location?.hostname ? `http://${window.location.hostname}:5274` : "http://localhost:5274");
+  return `${base}/?brand=${encodeURIComponent(slug)}`;
+}
+
 export const apiClient = new ApiClient({ baseUrl: resolveApiBaseUrl() });

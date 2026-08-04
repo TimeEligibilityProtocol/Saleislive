@@ -3,6 +3,14 @@ import { Brand, ImportBatch, Product } from "@saleis-live/domain";
 export interface ApiClientConfig {
   baseUrl: string;
   getAuthToken?: () => Promise<string | null>;
+  /**
+   * Explicit brand slug to send as X-Brand-Slug — lets the storefront
+   * resolve a brand via ?brand=slug when it isn't actually running on
+   * that brand's real subdomain (e.g. a shared Render preview URL before
+   * wildcard DNS for *.saleis.live exists). Ignored server-side once a
+   * real Host-header subdomain match is found.
+   */
+  brandSlug?: string | null;
 }
 
 export class ApiError extends Error {
@@ -25,6 +33,7 @@ export class ApiClient {
       ...(init.headers as Record<string, string> | undefined),
     };
     if (token) headers.Authorization = `Bearer ${token}`;
+    if (this.config.brandSlug) headers["X-Brand-Slug"] = this.config.brandSlug;
 
     const res = await fetch(`${this.config.baseUrl}${path}`, { ...init, headers });
     if (!res.ok) throw new ApiError(res.status, await res.text());

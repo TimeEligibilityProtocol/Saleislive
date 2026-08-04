@@ -1,10 +1,23 @@
 import { colors, typography } from "@saleis-live/ui";
 import { ImportBatch, ImportRowDiff, Product } from "@saleis-live/domain";
 import { useEffect, useState } from "react";
-import { apiClient } from "./config/apiClient";
+import { apiClient, resolveStorefrontPreviewUrl } from "./config/apiClient";
 
 const ROOT_DOMAIN = "saleis.live";
 const DEMO_TENANT_ID = "t_demo";
+
+/** Matches the left sidebar in the delivered screens (render_screens.py's NAV list) — only Catalogue is wired up so far. */
+const NAV_ITEMS = [
+  { label: "Dashboard", route: null },
+  { label: "Campaigns", route: null },
+  { label: "Catalogue", route: "#/import" },
+  { label: "AI review", route: null },
+  { label: "Orders", route: null },
+  { label: "Returns", route: null },
+  { label: "Analytics", route: null },
+  { label: "Brand & theme", route: null },
+  { label: "Settings", route: null },
+] as const;
 
 function slugify(input: string): string {
   return input
@@ -28,25 +41,65 @@ function useHashRoute(): string {
 export function App() {
   const hash = useHashRoute();
 
+  if (hash === "#/import") {
+    return (
+      <AdminShell active="Catalogue">
+        <ImportPage />
+      </AdminShell>
+    );
+  }
+
+  // Brand creation is onboarding, before any brand/catalogue exists — the
+  // delivered screens all assume a brand is already set up, so there's no
+  // sidebar reference for this one; it stays a plain centered card.
   return (
-    <div style={styles.shell}>
-      <nav style={styles.nav}>
+    <div style={styles.onboardingPage}>
+      <div style={styles.logoRow}>
+        <Logo />
+        <span style={styles.wordmark}>
+          saleis<span style={{ color: colors.navy }}>.live</span>
+        </span>
+      </div>
+      <CreateBrandPage />
+    </div>
+  );
+}
+
+function AdminShell({ active, children }: { active: (typeof NAV_ITEMS)[number]["label"]; children: React.ReactNode }) {
+  return (
+    <div style={styles.shellRoot}>
+      <div style={styles.topbar}>
         <div style={styles.logoRow}>
           <Logo />
           <span style={styles.wordmark}>
             saleis<span style={{ color: colors.navy }}>.live</span>
           </span>
         </div>
-        <div style={styles.navLinks}>
-          <a href="#/" style={{ ...styles.navLink, ...(hash === "#/" || hash === "" ? styles.navLinkActive : {}) }}>
-            Create brand
-          </a>
-          <a href="#/import" style={{ ...styles.navLink, ...(hash === "#/import" ? styles.navLinkActive : {}) }}>
-            Import products
-          </a>
-        </div>
-      </nav>
-      <div style={styles.body}>{hash === "#/import" ? <ImportPage /> : <CreateBrandPage />}</div>
+        <a href="#/" style={styles.newBrandLink}>
+          + New brand
+        </a>
+      </div>
+      <div style={styles.shellBody}>
+        <aside style={styles.sidebar}>
+          {NAV_ITEMS.map((item) => {
+            const isActive = item.label === active;
+            const content = (
+              <span style={{ ...styles.navItem, ...(isActive ? styles.navItemActive : {}), ...(item.route ? {} : styles.navItemDisabled) }}>
+                {item.label}
+                {!item.route ? <span style={styles.soonTag}>Soon</span> : null}
+              </span>
+            );
+            return item.route ? (
+              <a key={item.label} href={item.route} style={{ textDecoration: "none" }}>
+                {content}
+              </a>
+            ) : (
+              <span key={item.label}>{content}</span>
+            );
+          })}
+        </aside>
+        <main style={styles.main}>{children}</main>
+      </div>
     </div>
   );
 }
@@ -61,6 +114,7 @@ function CreateBrandPage() {
   const [checking, setChecking] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [createdUrl, setCreatedUrl] = useState<string | null>(null);
+  const [createdSlug, setCreatedSlug] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -101,7 +155,8 @@ function CreateBrandPage() {
     setError(null);
     try {
       const brand = await apiClient.createBrand({ tenantId: DEMO_TENANT_ID, name: name.trim(), slug, country, currency });
-      setCreatedUrl(`https://${brand.slug}.${ROOT_DOMAIN}`);
+      setCreatedUrl(resolveStorefrontPreviewUrl(brand.slug));
+      setCreatedSlug(brand.slug);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -115,8 +170,11 @@ function CreateBrandPage() {
         <h1 style={styles.h1}>Your brand workspace is live.</h1>
         <p style={styles.sub}>No support needed — it's ready right now.</p>
         <a href={createdUrl} target="_blank" rel="noreferrer" style={styles.urlPill}>
-          {createdUrl}
+          Preview your store →
         </a>
+        <p style={{ fontSize: 11, color: colors.muted, marginTop: 12 }}>
+          Once {createdSlug}.{ROOT_DOMAIN} is connected, your store moves there — same catalogue, same theme.
+        </p>
       </div>
     );
   }
@@ -247,13 +305,15 @@ function ImportPage() {
   const blockingCount = batch?.rows.filter((r) => r.blocking).length ?? 0;
 
   return (
-    <div style={styles.wideCard}>
+    <div>
+      <p style={styles.eyebrow}>CATALOGUE</p>
       <h1 style={styles.h1}>Import products</h1>
       <p style={styles.sub}>Upload an Excel or CSV file. Nothing changes in your catalogue until you review and commit.</p>
 
+    <div style={styles.sectionCard}>
       <label style={styles.label}>Brand ID</label>
       <div style={styles.row}>
-        <input style={styles.input} value={brandId} onChange={(e) => setBrandId(e.target.value)} placeholder="b_demo" />
+        <input style={{ ...styles.input, flex: 1 }} value={brandId} onChange={(e) => setBrandId(e.target.value)} placeholder="b_demo" />
         <button style={{ ...styles.button, ...styles.buttonSecondary, width: "auto", marginTop: 0, padding: "10px 16px" }} onClick={() => loadProducts(brandId)}>
           Load products
         </button>
@@ -335,8 +395,10 @@ function ImportPage() {
           Done — {summary.created} added, {summary.updated} updated, {summary.skipped} skipped.
         </p>
       ) : null}
+    </div>
 
-      <h2 style={{ ...styles.h1, fontSize: 18, marginTop: 40 }}>Catalogue ({products?.length ?? 0})</h2>
+    <div style={{ ...styles.sectionCard, marginTop: 24 }}>
+      <h2 style={{ ...styles.h1, fontSize: 18 }}>Catalogue ({products?.length ?? 0})</h2>
       {products && products.length > 0 ? (
         <div style={{ overflowX: "auto" }}>
           <table style={styles.table}>
@@ -368,6 +430,7 @@ function ImportPage() {
         <p style={{ fontSize: 13, color: colors.muted }}>No products yet for this brand.</p>
       )}
     </div>
+    </div>
   );
 }
 
@@ -384,23 +447,64 @@ function Logo() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  shell: { minHeight: "100vh", background: colors.background, fontFamily: typography.fontFamily.ui, color: colors.ink },
-  nav: {
+  // Onboarding (no brand yet — plain centered card, no sidebar reference exists for this step)
+  onboardingPage: {
+    minHeight: "100vh",
+    background: colors.background,
+    fontFamily: typography.fontFamily.ui,
+    color: colors.ink,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    padding: "48px 24px",
+    gap: 32,
+  },
+  card: { width: 420, background: colors.surface, borderRadius: 16, padding: 32, boxShadow: "0 1px 3px rgba(17,17,17,0.08)", height: "fit-content" },
+
+  // Shell chrome — matches render_screens.py's admin() helper: 70px paper
+  // topbar, 232px paper sidebar with a bluepale active pill, ivory content.
+  shellRoot: { minHeight: "100vh", background: colors.ivory, fontFamily: typography.fontFamily.ui, color: colors.ink },
+  topbar: {
+    height: 70,
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: "16px 32px",
-    background: colors.surface,
-    borderBottom: `1px solid ${colors.border}`,
+    padding: "0 28px",
+    background: colors.paper,
+    borderBottom: `1px solid ${colors.line}`,
   },
+  newBrandLink: { fontSize: 12, fontWeight: 700, color: colors.navy, textDecoration: "none" },
+  shellBody: { display: "flex", alignItems: "flex-start" },
+  sidebar: {
+    width: 232,
+    flexShrink: 0,
+    background: colors.paper,
+    borderRight: `1px solid ${colors.line}`,
+    minHeight: "calc(100vh - 70px)",
+    padding: "24px 16px",
+    display: "flex",
+    flexDirection: "column",
+    gap: 4,
+  },
+  navItem: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "10px 16px",
+    borderRadius: 9,
+    fontSize: 13,
+    fontWeight: 600,
+    color: colors.muted,
+  },
+  navItemActive: { background: colors.bluepale, color: colors.navy },
+  navItemDisabled: { color: colors.stone },
+  soonTag: { fontSize: 9, fontWeight: 700, color: colors.muted, textTransform: "uppercase", letterSpacing: 0.4 },
+  main: { flex: 1, padding: "40px 40px 64px", minWidth: 0 },
+  eyebrow: { fontSize: 10, fontWeight: 700, color: colors.navy, letterSpacing: 0.6, textTransform: "uppercase", margin: "0 0 10px" },
+  sectionCard: { background: colors.paper, border: `1px solid ${colors.line}`, borderRadius: 14, padding: 28 },
+
   logoRow: { display: "flex", alignItems: "center", gap: 8 },
   wordmark: { fontSize: 16, fontWeight: 700 },
-  navLinks: { display: "flex", gap: 24 },
-  navLink: { fontSize: 13, fontWeight: 600, color: colors.muted, textDecoration: "none" },
-  navLinkActive: { color: colors.navy },
-  body: { display: "flex", justifyContent: "center", padding: "48px 24px" },
-  card: { width: 420, background: colors.surface, borderRadius: 16, padding: 32, boxShadow: "0 1px 3px rgba(17,17,17,0.08)", height: "fit-content" },
-  wideCard: { width: 880, maxWidth: "100%", background: colors.surface, borderRadius: 16, padding: 32, boxShadow: "0 1px 3px rgba(17,17,17,0.08)", height: "fit-content" },
   h1: { fontFamily: typography.fontFamily.ui, fontSize: 28, fontWeight: 600, margin: "0 0 8px" },
   sub: { fontSize: 14, color: colors.muted, margin: "0 0 24px", lineHeight: 1.5 },
   label: { display: "block", fontSize: 12, fontWeight: 600, marginBottom: 6, marginTop: 16 },
