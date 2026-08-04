@@ -1,17 +1,21 @@
 import cors from "cors";
 import "dotenv/config";
 import express from "express";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { loadEnv } from "./config/env.js";
 import { tenantRouter } from "./middleware/tenantRouter.js";
 import { brandsRouter } from "./routes/brands.js";
 import { healthRouter } from "./routes/health.js";
 import { storefrontRouter } from "./routes/storefront.js";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const env = loadEnv();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use("/assets", express.static(path.join(__dirname, "..", "public", "assets")));
 app.use(tenantRouter(env.platformRootDomain));
 app.use(healthRouter());
 app.use(brandsRouter());

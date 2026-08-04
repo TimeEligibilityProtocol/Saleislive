@@ -101,8 +101,8 @@ export function App() {
             saleis<span style={{ color: colors.ultramarine }}>.live</span>
           </span>
         </div>
-        <h1 style={styles.h1}>Create your brand workspace</h1>
-        <p style={styles.sub}>Name your brand, pick your address, and you're live — no developer needed.</p>
+        <h1 style={styles.h1}>Launch your own marketplace</h1>
+        <p style={styles.sub}>Name your brand, choose your address, and start selling — no developer needed.</p>
 
         <label style={styles.label}>Brand name</label>
         <input style={styles.input} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Chanel" />

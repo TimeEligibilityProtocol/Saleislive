@@ -1,4 +1,4 @@
-import { Brand } from "@saleis-live/domain";
+import { Brand, Product } from "@saleis-live/domain";
 
 export interface ApiClientConfig {
   baseUrl: string;
@@ -52,5 +52,14 @@ export class ApiClient {
   async getCurrentStorefrontBrand(): Promise<Brand> {
     const { brand } = await this.request<{ brand: Brand }>("/api/storefront/me");
     return brand;
+  }
+
+  async listStorefrontProducts(): Promise<Product[]> {
+    const { products } = await this.request<{ products: Product[] }>("/api/storefront/products");
+    return products;
+  }
+
+  resolveAssetUrl(relativeUrl: string): string {
+    return `${this.config.baseUrl}${relativeUrl}`;
   }
 }

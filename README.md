@@ -10,7 +10,8 @@ White-label multi-tenant SaaS for launching branded live sales in minutes. See `
 - `packages/ui` — platform chrome design tokens from the brand kit (ink `#111111`, ivory `#F5F2EB`, ultramarine `#173B8F`, Inter + Instrument Serif). This is the Saleis.live platform's own look, not a tenant's storefront theme — those are data-driven via `ThemeTokens`.
 - `packages/api-client`, `packages/platform` — thin API client and platform-capability interfaces, same pattern as wearto.you.
 - `apps/api` — Express API with a working **tenant router**: resolves which brand a request belongs to from its `Host` header (`chanel.saleis.live` → brand `chanel`), a brand-creation endpoint with live slug-availability checking, and a `/api/storefront/me` endpoint the storefront will call to know which brand it's rendering. Seeded with one demo brand so we can self-test without waiting on real client files (see blueprint §13 note — Discovery is step 1, but Import can be built and tested against files we create ourselves in parallel).
-- `apps/admin` — working "Create your brand workspace" screen (name → live slug check → create), built to satisfy the blueprint §12 acceptance criterion: *"Pracownik tworzy brand workspace, dodaje logo i otrzymuje podgląd bez kontaktu z supportem."*
+- `apps/admin` — working "Launch your own marketplace" screen (name → live slug check → create), built to satisfy the blueprint §12 acceptance criterion: *"Pracownik tworzy brand workspace, dodaje logo i otrzymuje podgląd bez kontaktu z supportem."*
+- `apps/storefront` — working buyer-facing storefront: resolves its brand from the page's own Host header (same tenant router as the API — `demo.localhost:5274` renders "Demo Brand" the same way `demo.saleis.live` will in production) and renders that brand's live product grid from `/api/storefront/products`. Seeded with 4 demo products (placeholder SVG images, not real photos) so there's something real to look at before Import exists.
 
 ## Reused from wearto.you (proven, not rebuilt from scratch)
 
@@ -21,13 +22,19 @@ White-label multi-tenant SaaS for launching branded live sales in minutes. See `
 
 ## Not built yet (see blueprint §9 MVP scope and §13 build order)
 
-Excel/CSV import pipeline, AI orchestration beyond background removal, Theme Studio UI, storefront app, campaigns/checkout/inventory-lock, payment/delivery adapter implementations, RBAC beyond the type definitions, wildcard DNS + real subdomain hosting.
+Excel/CSV import pipeline (the *standard* way products enter the system — a single-photo flow like wearto.you's Magic Listing is optional/secondary here, not primary), AI orchestration beyond background removal (not yet ported), Theme Studio UI, campaigns/checkout/inventory-lock, payment/delivery adapter implementations, RBAC beyond the type definitions, real wildcard DNS + production subdomain hosting.
 
 ## Getting started
 
 ```bash
 npm install
 npm run build:packages
-cd apps/api && npm run dev     # http://localhost:4100
-cd apps/admin && npm run dev   # http://localhost:5273
+
+# API — PLATFORM_ROOT_DOMAIN=localhost makes brand.localhost resolve
+# the same way brand.saleis.live will in production (browsers treat
+# *.localhost as loopback automatically, no /etc/hosts editing needed).
+cd apps/api && PORT=4100 PLATFORM_ROOT_DOMAIN=localhost npm run dev
+
+cd apps/admin && npm run dev        # http://localhost:5273
+cd apps/storefront && npm run dev   # http://demo.localhost:5274 (or any other seeded brand slug)
 ```
