@@ -15,6 +15,8 @@ function seed(): void {
     sku: string,
     name: string,
     category: string,
+    color: string,
+    material: string,
     priceMinor: number,
     saleMinor: number,
     stock: number,
@@ -28,9 +30,9 @@ function seed(): void {
     name: approvedField(name),
     description: approvedField(`${name} — part of this season's selection.`),
     category: approvedField(category),
-    color: approvedField("Ivory"),
+    color: approvedField(color),
     size: approvedField("One size"),
-    material: approvedField("Mixed"),
+    material: approvedField(material),
     images: [{ url: imageUrl, alt: name, isMain: true }],
     price: { amountMinor: priceMinor, currency: "AED" },
     salePrice: { amountMinor: saleMinor, currency: "AED" },
@@ -40,10 +42,14 @@ function seed(): void {
   });
 
   products = [
-    base("p1", "DEMO-001", "Sculptural Hoop Earrings", "Jewellery", 18000, 12600, 6, "/assets/demo/earrings.svg"),
-    base("p2", "DEMO-002", "Leather Shoulder Bag", "Fashion", 45000, 31500, 3, "/assets/demo/bag.svg"),
-    base("p3", "DEMO-003", "Hand Wash — Cedar", "Beauty", 4200, 2940, 12, "/assets/demo/handwash.svg"),
-    base("p4", "DEMO-004", "Ceramic Form Vase", "Home", 8800, 6160, 5, "/assets/demo/vase.svg"),
+    base("p1", "DEMO-001", "Pleated Wrap Dress", "Fashion", "Ivory", "Viscose blend", 46000, 32200, 6, "/assets/products/product-01.jpg"),
+    base("p2", "DEMO-002", "Tailored Wool Blazer", "Fashion", "Camel", "Wool blend", 89000, 62300, 4, "/assets/products/product-02.jpg"),
+    base("p3", "DEMO-003", "Slingback Heels", "Shoes", "Ivory / Black", "Leather", 78000, 54600, 5, "/assets/products/product-03.jpg"),
+    base("p4", "DEMO-004", "Leather Penny Loafers", "Shoes", "Brown", "Leather", 65000, 45500, 7, "/assets/products/product-04.jpg"),
+    base("p5", "DEMO-005", "Structured Leather Tote", "Bags", "Tan", "Leather", 185000, 129500, 3, "/assets/products/product-05.jpg"),
+    base("p6", "DEMO-006", "Quilted Chain Bag", "Bags", "Ivory", "Leather", 165000, 115500, 2, "/assets/products/product-06.jpg"),
+    base("p7", "DEMO-007", "Suede Hobo Bag", "Bags", "Burgundy", "Suede", 142000, 99400, 4, "/assets/products/product-07.jpg"),
+    base("p8", "DEMO-008", "Silk-Blend Blouse", "Fashion", "Ivory", "Silk blend", 38000, 26600, 9, "/assets/products/product-08.jpg"),
   ];
 }
 seed();
