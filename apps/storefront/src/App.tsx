@@ -115,10 +115,11 @@ export function App() {
   return (
     <div style={styles.page}>
       <style>{`
-        .storefront-brand-placeholder { display: inline-block; }
+        .storefront-brand-placeholder-short { display: none; }
         @media (max-width: 480px) {
           .storefront-logo svg { height: 32px; width: auto; }
-          .storefront-brand-placeholder { display: none; }
+          .storefront-brand-placeholder-full { display: none; }
+          .storefront-brand-placeholder-short { display: inline-block; }
         }
       `}</style>
       <header style={styles.header}>
@@ -126,8 +127,11 @@ export function App() {
           <span className="storefront-logo" style={{ display: "inline-flex" }}>
             <Logo height={55} />
           </span>
-          <span className="storefront-brand-placeholder" style={styles.brandPlaceholder}>
+          <span className="storefront-brand-placeholder-full" style={styles.brandPlaceholder}>
             Your brand goes here
+          </span>
+          <span className="storefront-brand-placeholder-short" style={styles.brandPlaceholder}>
+            Your brand
           </span>
         </a>
         <a href="#/bag" style={{ ...styles.bagLink, flexShrink: 0 }}>
@@ -137,12 +141,6 @@ export function App() {
 
       {body}
 
-      <footer style={styles.footer}>
-        <div style={styles.footerBrand}>
-          <Logo height={16} />
-        </div>
-        <span style={{ fontSize: 12, color: "#8A8578" }}>Powered by saleis.live</span>
-      </footer>
     </div>
   );
 }
@@ -622,15 +620,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     cursor: "pointer",
   },
-  footer: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "24px 32px",
-    borderTop: `1px solid ${colors.border}`,
-  },
-  footerBrand: { display: "flex", alignItems: "center" },
-
   detailLabel: { fontSize: 11, fontWeight: 700, color: "#8A8578", letterSpacing: 0.4, margin: "0 0 4px" },
   detailValue: { fontSize: 14, fontWeight: 600, margin: 0 },
 
