@@ -342,7 +342,7 @@ function HomePage() {
       <Reveal>
         <section id="how-it-works" style={{ ...styles.howSection, background: colors.paper }}>
           <h2 style={styles.h2}>
-            How <span className="heading-logo"><Logo height={40} /></span> works
+            How <span className="heading-logo"><Logo height={52} /></span> works
           </h2>
           <p style={styles.sectionSub}>Three simple steps from stock to sale.</p>
           <div className="marketing-steps-row" style={{ marginTop: 56 }}>
@@ -373,7 +373,7 @@ function HomePage() {
       <Reveal>
         <section id="demo" style={styles.actionSection}>
           <h2 style={styles.h2}>
-            See <span className="heading-logo"><Logo height={40} /></span> in action
+            See <span className="heading-logo"><Logo height={52} /></span> in action
           </h2>
           <p style={styles.sectionSub}>Real screenshots of the actual product — your own store, on your own subdomain, is what you get after "Get saleis.live".</p>
           <div style={styles.actionFrame}>
@@ -406,31 +406,33 @@ function HomePage() {
       {/* Systems bridge: any existing system already speaks Excel — that's the on-ramp into saleis.live. */}
       <Reveal>
         <section style={{ ...styles.section, textAlign: "center" }}>
-          <p className="systems-flow-row" style={styles.systemsFlow}>
-            <span className="systems-flow-node">YOUR EXISTING SYSTEM</span>
-            <span className="systems-flow-arrow">→</span>
-            <span className="systems-flow-node">EXCEL / CSV</span>
-            <span className="systems-flow-arrow">→</span>
-            <span className="systems-flow-node systems-flow-logo">
-              <Logo height={24} />
-            </span>
-            <span className="systems-flow-arrow">→</span>
-            <span className="systems-flow-node">LIVE SALE</span>
-          </p>
-          <h2 style={{ ...styles.h2, marginTop: 64 }}>What do all these systems have in common?</h2>
-          <div style={styles.tickerBandLight}>
-            <div className="marketing-ticker-track">
-              {[...SYSTEMS, ...SYSTEMS].map((sys, i) => (
-                <span key={sys + i} style={styles.systemsTickerItem}>
-                  {sys}
-                  <span style={styles.systemsTickerDot}>·</span>
-                </span>
-              ))}
+          <div style={styles.systemsCard}>
+            <p className="systems-flow-row" style={styles.systemsFlow}>
+              <span className="systems-flow-node">YOUR EXISTING SYSTEM</span>
+              <span className="systems-flow-arrow">→</span>
+              <span className="systems-flow-node">EXCEL / CSV</span>
+              <span className="systems-flow-arrow">→</span>
+              <span className="systems-flow-node systems-flow-logo">
+                <Logo height={30} />
+              </span>
+              <span className="systems-flow-arrow">→</span>
+              <span className="systems-flow-node">LIVE SALE</span>
+            </p>
+            <h2 style={{ ...styles.h2, marginTop: 56 }}>What do all these systems have in common?</h2>
+            <div style={styles.tickerBandLight}>
+              <div className="marketing-ticker-track">
+                {[...SYSTEMS, ...SYSTEMS].map((sys, i) => (
+                  <span key={sys + i} style={styles.systemsTickerItem}>
+                    {sys}
+                    <span style={styles.systemsTickerDot}>·</span>
+                  </span>
+                ))}
+              </div>
             </div>
+            <p className="systems-payoff" style={styles.systemsPayoff}>
+              They all speak Excel. <span className="heading-logo"><Logo height={40} /></span> starts there.
+            </p>
           </div>
-          <p className="systems-payoff" style={styles.systemsPayoff}>
-            They all speak Excel. <span className="heading-logo"><Logo height={32} /></span> starts there.
-          </p>
         </section>
       </Reveal>
 
@@ -464,7 +466,7 @@ function HomePage() {
       <Reveal>
         <section id="why" style={styles.whySection}>
           <h2 style={styles.h2}>
-            Why <span className="heading-logo"><Logo height={40} /></span>
+            Why <span className="heading-logo"><Logo height={52} /></span>
           </h2>
           <div className="marketing-why-grid">
             {TRUST_BAR.map((t) => (
@@ -707,7 +709,7 @@ const styles: Record<string, React.CSSProperties> = {
   secondaryButton: { display: "inline-block", background: "transparent", color: colors.ink, fontSize: 14, fontWeight: 700, padding: "15px 28px", borderRadius: 999, textDecoration: "none", border: `1px solid ${colors.border}` },
 
   miniStepItem: { flex: 1, minWidth: 160 },
-  miniStepIcon: { width: 40, height: 40, borderRadius: 12, background: colors.paper, border: `1px solid ${colors.border}`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10 },
+  miniStepIcon: { width: 40, height: 40, borderRadius: 12, background: colors.bluepale, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10 },
   miniStepTitle: { fontSize: 14, fontWeight: 700, color: colors.navy, margin: "0 0 4px" },
   miniStepBody: { fontSize: 13, color: colors.muted, margin: 0, lineHeight: 1.5 },
 
@@ -715,6 +717,7 @@ const styles: Record<string, React.CSSProperties> = {
   tickerItem: { display: "inline-flex", alignItems: "center", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 16, fontWeight: 500, color: colors.white, padding: "0 28px", whiteSpace: "nowrap" },
   tickerDot: { marginLeft: 28, color: "rgba(255,255,255,0.35)" },
 
+  systemsCard: { border: `1px solid ${colors.border}`, borderRadius: 16, padding: "56px 40px", background: colors.surface },
   systemsFlow: { fontFamily: typography.fontFamily.ui, fontWeight: 700, fontSize: "clamp(14px, 2.2vw, 22px)", letterSpacing: 0.5, color: colors.navy, textTransform: "uppercase", margin: 0 },
   systemsArrow: { color: colors.stone, margin: "0 4px" },
   systemsPayoff: {
@@ -753,7 +756,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
     fontVariantNumeric: "lining-nums tabular-nums",
   },
-  stepIconBox: { width: 56, height: 56, borderRadius: 14, background: colors.paper, border: `1px solid ${colors.border}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  stepIconBox: { width: 56, height: 56, borderRadius: 14, background: colors.bluepale, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
   stepRowTitle: { fontSize: 19, fontWeight: 600, margin: "0 0 8px", color: colors.navy },
   stepRowBody: { fontSize: 16, color: colors.muted, lineHeight: 1.6, margin: 0 },
 
@@ -779,7 +782,7 @@ const styles: Record<string, React.CSSProperties> = {
   specLabel: { display: "block", fontSize: 15, fontWeight: 600, color: colors.ink },
 
   devCard: { background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 16, padding: 32, textAlign: "center" },
-  devCardIcon: { width: 52, height: 52, borderRadius: 12, background: colors.paper, border: `1px solid ${colors.border}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" },
+  devCardIcon: { width: 52, height: 52, borderRadius: 12, background: colors.bluepale, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" },
   devCardTitle: { fontFamily: DISPLAY_FONT, fontSize: 26, color: colors.navy, fontWeight: 500, margin: "0 0 14px" },
   devCardBody: { fontSize: 14, color: colors.muted, lineHeight: 1.7, margin: "0 auto", maxWidth: 420, textAlign: "left" },
   codeBlock: { fontSize: 11, lineHeight: 1.6, background: colors.background, borderRadius: 8, padding: 14, marginTop: 14, overflowX: "auto", whiteSpace: "pre", textAlign: "left" },
