@@ -73,7 +73,7 @@ export function App() {
         @media (max-width: 900px) { .marketing-hero-grid { grid-template-columns: 1fr; } }
         .marketing-mini-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
         @media (max-width: 620px) { .marketing-mini-steps { grid-template-columns: 1fr; } }
-        .marketing-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items: start; }
+        .marketing-steps { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 16px; align-items: start; }
         @media (max-width: 780px) { .marketing-steps { grid-template-columns: 1fr; } }
         .marketing-step-arrow { display: flex; align-items: center; justify-content: center; padding-top: 20px; }
         @media (max-width: 780px) { .marketing-step-arrow { display: none; } }
