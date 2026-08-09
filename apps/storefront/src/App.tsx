@@ -162,11 +162,12 @@ function HomeView({ brand, products, onAddToBag }: { brand: Brand; products: Pro
   return (
     <>
       <style>{`
-        /* Frame matches the source images' own aspect ratio exactly, so the
-           browser never has to crop — height always scales with width. The
-           max-width just keeps it from growing absurdly tall on very wide
-           monitors; background fills any leftover side margin. */
-        .hero-frame { aspect-ratio: 1774 / 887; max-width: 1600px; margin: 0 auto; }
+        /* Mobile matches the source image's own aspect ratio exactly (no
+           crop needed there — Ola confirmed it looks right). Desktop is
+           deliberately shorter than the source photo's 1774:887 — crops
+           from the top only (empty background/drape, never the text or
+           products), via heroImage's "center bottom" object-position. */
+        .hero-frame { aspect-ratio: 1774 / 680; max-width: 1600px; margin: 0 auto; }
         @media (max-width: 700px) { .hero-frame { aspect-ratio: 1080 / 1290; max-width: 100%; } }
 
         /* These hero images are just the tagline baked into the photo — no
@@ -590,7 +591,7 @@ const styles: Record<string, React.CSSProperties> = {
   backLink: { display: "inline-block", fontSize: 13, fontWeight: 600, color: "#5C574C", textDecoration: "none", margin: "24px 0 0" },
 
   hero: { position: "relative", overflow: "hidden", background: colors.background },
-  heroImage: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center" },
+  heroImage: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center bottom" },
   eyebrowSmall: { fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: colors.ultramarine, margin: "0 0 8px" },
   h1: { fontFamily: typography.fontFamily.display, fontSize: 44, margin: "0 0 8px", lineHeight: 1.1 },
   heroCta: {
