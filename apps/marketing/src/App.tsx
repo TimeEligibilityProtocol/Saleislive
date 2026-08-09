@@ -11,7 +11,6 @@ import { ADMIN_URL, DEMO_STORE_URL } from "./config/links";
 const DISPLAY_FONT = "'Cormorant Garamond', 'Instrument Serif', Georgia, serif";
 
 const NAV_LINKS = [
-  { label: "Product", href: "#product" },
   { label: "How it works", href: "#how-it-works" },
   { label: "Demo", href: "#demo" },
   { label: "Developers", href: "#/developers" },
@@ -24,12 +23,19 @@ const MINI_STEPS = [
 ];
 
 const STEPS = [
-  { title: "Upload your stock", body: "Add inventory via Excel, CSV or product photos." },
-  { title: "AI prepares your catalogue", body: "saleis.live maps data, matches product images, cleans and enriches content and flags anything that needs review." },
-  { title: "Launch your branded sale", body: "Publish a complete branded storefront with products, payments, orders and delivery." },
+  { icon: "file", title: "Upload your stock", body: "Add inventory via Excel, CSV or product photos." },
+  { icon: "sparkle", title: "AI prepares your catalogue", body: "saleis.live maps data, matches product images, cleans and enriches content and flags anything that needs review." },
+  { icon: "store", title: "Launch your branded sale", body: "Publish a complete branded storefront with products, payments, orders and delivery." },
 ];
 
-const INTEGRATIONS = ["API-ready", "Multi-brand", "PWA", "Payments", "Delivery", "Data import"];
+const INTEGRATIONS = [
+  { icon: "code", label: "API-ready" },
+  { icon: "layers", label: "Multi-brand" },
+  { icon: "phone", label: "PWA" },
+  { icon: "card", label: "Payments" },
+  { icon: "truck", label: "Delivery" },
+  { icon: "db", label: "Data import" },
+];
 
 const TRUST_BAR = [
   { title: "Turn unsold stock", body: "Bring inventory sitting in storage or spreadsheets back to life and start selling it — without discounting your brand." },
@@ -138,9 +144,9 @@ export function App() {
           .marketing-spec-row > div:nth-child(2n) { border-right: none; }
         }
 
-        .marketing-why-row { display: flex; gap: 56px; align-items: baseline; padding: 44px 0; border-top: 1px solid ${colors.border}; }
-        .marketing-why-row:last-child { border-bottom: 1px solid ${colors.border}; }
-        @media (max-width: 700px) { .marketing-why-row { flex-direction: column; gap: 10px; padding: 32px 0; } }
+        .marketing-why-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; padding-top: 40px; border-top: 1px solid ${colors.border}; }
+        @media (max-width: 900px) { .marketing-why-grid { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 560px) { .marketing-why-grid { grid-template-columns: 1fr; } }
 
         .marketing-dev-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
         @media (max-width: 780px) { .marketing-dev-grid { grid-template-columns: 1fr; } }
@@ -291,7 +297,10 @@ function HomePage() {
               <div key={step.title} className="marketing-step-row">
                 <span style={styles.ghostNumeral}>{String(i + 1).padStart(2, "0")}</span>
                 <div>
-                  <h3 style={styles.stepRowTitle}>{step.title}</h3>
+                  <div style={styles.stepRowHead}>
+                    <StepIcon name={step.icon} />
+                    <h3 style={styles.stepRowTitle}>{step.title}</h3>
+                  </div>
                   <p style={styles.stepRowBody}>{step.body}</p>
                 </div>
               </div>
@@ -341,10 +350,13 @@ function HomePage() {
             </a>
           </div>
           <div className="marketing-spec-row" style={{ marginTop: 40 }}>
-            {INTEGRATIONS.map((label, i) => (
-              <div key={label} style={styles.specItem}>
-                <span style={styles.specIndex}>{String(i + 1).padStart(2, "0")}</span>
-                <span style={styles.specLabel}>{label}</span>
+            {INTEGRATIONS.map((item, i) => (
+              <div key={item.label} style={styles.specItem}>
+                <div style={styles.specTop}>
+                  <StepIcon name={item.icon} size={18} />
+                  <span style={styles.specIndex}>{String(i + 1).padStart(2, "0")}</span>
+                </div>
+                <span style={styles.specLabel}>{item.label}</span>
               </div>
             ))}
           </div>
@@ -363,12 +375,14 @@ function HomePage() {
       {/* 06 — Why saleis.live: editorial statements, typography and space do the work. */}
       <Reveal>
         <section id="why" style={styles.whySection}>
-          {TRUST_BAR.map((t) => (
-            <div key={t.title} className="marketing-why-row">
-              <h3 style={styles.whyTitle}>{t.title}</h3>
-              <p style={styles.whyBody}>{t.body}</p>
-            </div>
-          ))}
+          <div className="marketing-why-grid">
+            {TRUST_BAR.map((t) => (
+              <div key={t.title}>
+                <h3 style={styles.whyTitle}>{t.title}</h3>
+                <p style={styles.whyBody}>{t.body}</p>
+              </div>
+            ))}
+          </div>
         </section>
       </Reveal>
     </>
@@ -436,6 +450,30 @@ POST  https://saleis.live/api/webhooks/payment/{brandId}
         </div>
       </div>
     </section>
+  );
+}
+
+const STEP_ICON_PATHS = {
+  file: "M6 2h9l5 5v15H6z|M15 2v5h5",
+  sparkle: "M12 3v4M12 17v4M3 12h4M17 12h4|M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18",
+  store: "M4 9l1-5h14l1 5|M4 9a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0|M5 9v10h14V9|M10 19v-6h4v6",
+  code: "M8 6L2 12l6 6M16 6l6 6-6 6",
+  layers: "M12 3l9 5-9 5-9-5 9-5z|M3 13l9 5 9-5",
+  phone: "M6 2h12v20H6z|M11 18h2",
+  card: "M2 5h20v14H2z|M2 10h20M6 15h4",
+  truck: "M2 7h11v10H2zM13 10h5l3 3v4h-8z|M6 18a1.6 1.6 0 1 0 0-3.2 1.6 1.6 0 0 0 0 3.2z|M17 18a1.6 1.6 0 1 0 0-3.2 1.6 1.6 0 0 0 0 3.2z",
+  db: "M4 5c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3z|M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5|M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3",
+};
+
+function StepIcon({ name, size = 20 }: { name?: string; size?: number }) {
+  const paths = name ? STEP_ICON_PATHS[name as keyof typeof STEP_ICON_PATHS] : undefined;
+  if (!paths) return null;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={colors.navy} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      {paths.split("|").map((d) => (
+        <path key={d} d={d} />
+      ))}
+    </svg>
   );
 }
 
@@ -521,7 +559,8 @@ const styles: Record<string, React.CSSProperties> = {
     width: 150,
     fontVariantNumeric: "lining-nums tabular-nums",
   },
-  stepRowTitle: { fontSize: 22, fontWeight: 600, margin: "0 0 8px", color: colors.navy },
+  stepRowHead: { display: "flex", alignItems: "center", gap: 10, marginBottom: 8 },
+  stepRowTitle: { fontSize: 22, fontWeight: 600, margin: 0, color: colors.navy },
   stepRowBody: { fontSize: 15, color: colors.muted, lineHeight: 1.6, margin: 0, maxWidth: 460 },
 
   // 04 — see saleis.live in action
@@ -542,6 +581,7 @@ const styles: Record<string, React.CSSProperties> = {
   integrateBody: { fontSize: 15, color: colors.muted, lineHeight: 1.6, margin: "16px 0 14px" },
   integrateLink: { fontSize: 14, fontWeight: 700, color: colors.navy, textDecoration: "none" },
   specItem: { padding: "22px 20px", display: "flex", flexDirection: "column", gap: 10 },
+  specTop: { display: "flex", alignItems: "center", gap: 8 },
   specIndex: { fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, color: colors.muted },
   specLabel: { fontSize: 14, fontWeight: 600, color: colors.ink },
 
@@ -559,8 +599,8 @@ const styles: Record<string, React.CSSProperties> = {
 
   // 06 — why saleis.live (editorial statements)
   whySection: { padding: "40px 32px 140px", maxWidth: 1000, margin: "0 auto" },
-  whyTitle: { fontFamily: DISPLAY_FONT, fontWeight: 500, fontSize: 32, color: colors.navy, margin: 0, flex: "0 0 320px" },
-  whyBody: { fontSize: 15, color: colors.muted, lineHeight: 1.7, margin: 0, maxWidth: 480 },
+  whyTitle: { fontFamily: DISPLAY_FONT, fontWeight: 500, fontSize: 26, color: colors.navy, margin: "0 0 10px", lineHeight: 1.15 },
+  whyBody: { fontSize: 14, color: colors.muted, lineHeight: 1.6, margin: 0 },
 
   footer: { display: "flex", alignItems: "center", justifyContent: "center", gap: 16, padding: "32px", background: "#F7F2ED" },
 };
