@@ -295,12 +295,14 @@ function HomePage() {
           <div style={{ marginTop: 56 }}>
             {STEPS.map((step, i) => (
               <div key={step.title} className="marketing-step-row">
-                <span style={styles.ghostNumeral}>{String(i + 1).padStart(2, "0")}</span>
-                <div>
-                  <div style={styles.stepRowHead}>
-                    <StepIcon name={step.icon} />
-                    <h3 style={styles.stepRowTitle}>{step.title}</h3>
+                <div style={styles.stepBadgeGroup}>
+                  <span style={styles.stepNumberBadge}>{String(i + 1).padStart(2, "0")}</span>
+                  <div style={styles.stepIconBox}>
+                    <StepIcon name={step.icon} size={26} />
                   </div>
+                </div>
+                <div>
+                  <h3 style={styles.stepRowTitle}>{step.title}</h3>
                   <p style={styles.stepRowBody}>{step.body}</p>
                 </div>
               </div>
@@ -352,11 +354,13 @@ function HomePage() {
           <div className="marketing-spec-row" style={{ marginTop: 40 }}>
             {INTEGRATIONS.map((item, i) => (
               <div key={item.label} style={styles.specItem}>
-                <div style={styles.specTop}>
-                  <StepIcon name={item.icon} size={18} />
-                  <span style={styles.specIndex}>{String(i + 1).padStart(2, "0")}</span>
+                <div style={styles.stepIconBox}>
+                  <StepIcon name={item.icon} size={24} />
                 </div>
-                <span style={styles.specLabel}>{item.label}</span>
+                <div>
+                  <span style={styles.specIndex}>{String(i + 1).padStart(2, "0")}</span>
+                  <span style={styles.specLabel}>{item.label}</span>
+                </div>
               </div>
             ))}
           </div>
@@ -532,7 +536,7 @@ const styles: Record<string, React.CSSProperties> = {
 
   eyebrow: { fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: colors.navy, margin: "0 0 16px" },
   h1: { fontFamily: DISPLAY_FONT, fontWeight: 500, fontSize: 88, lineHeight: 1.02, margin: "0 0 22px", color: colors.navy, maxWidth: 560 },
-  h2: { fontFamily: DISPLAY_FONT, fontWeight: 500, fontSize: 44, lineHeight: 1.1, margin: 0, textAlign: "center", color: colors.navy },
+  h2: { fontFamily: DISPLAY_FONT, fontWeight: 500, fontSize: 40, lineHeight: 1.1, margin: 0, textAlign: "center", color: colors.navy },
   heroSub: { fontSize: 18, color: colors.muted, margin: 0, maxWidth: 420, lineHeight: 1.55 },
   primaryButton: { display: "inline-block", background: colors.navy, color: colors.white, fontSize: 14, fontWeight: 700, padding: "15px 28px", borderRadius: 999, textDecoration: "none" },
   secondaryButton: { display: "inline-block", background: "transparent", color: colors.ink, fontSize: 14, fontWeight: 700, padding: "15px 28px", borderRadius: 999, textDecoration: "none", border: `1px solid ${colors.border}` },
@@ -546,22 +550,28 @@ const styles: Record<string, React.CSSProperties> = {
   flowSection: { padding: "120px 32px", maxWidth: 1320, margin: "0 auto", textAlign: "center" },
   flowWord: { fontFamily: DISPLAY_FONT, fontWeight: 500, fontSize: 56, color: colors.navy },
   flowArrow: { fontFamily: DISPLAY_FONT, fontSize: 34, color: colors.stone },
-  flowSub: { fontSize: 15, color: colors.muted, marginTop: 24, maxWidth: 480, marginLeft: "auto", marginRight: "auto" },
+  flowSub: { fontSize: 16, color: colors.muted, marginTop: 24, maxWidth: 480, marginLeft: "auto", marginRight: "auto" },
 
-  // 03 — how it works
-  howSection: { padding: "140px 32px", maxWidth: 900, margin: "0 auto" },
-  ghostNumeral: {
-    fontFamily: DISPLAY_FONT,
-    fontSize: 108,
-    lineHeight: 1,
-    color: "rgba(23,59,143,0.32)",
+  // 03 — how it works — numeral badge + icon box, matching the approved board.
+  howSection: { padding: "128px 32px", maxWidth: 900, margin: "0 auto" },
+  stepBadgeGroup: { display: "flex", alignItems: "center", gap: 12, flexShrink: 0, width: 130 },
+  stepNumberBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: "50%",
+    background: colors.bluepale,
+    color: colors.navy,
+    fontWeight: 700,
+    fontSize: 15,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
     flexShrink: 0,
-    width: 150,
     fontVariantNumeric: "lining-nums tabular-nums",
   },
-  stepRowHead: { display: "flex", alignItems: "center", gap: 10, marginBottom: 8 },
-  stepRowTitle: { fontSize: 22, fontWeight: 600, margin: 0, color: colors.navy },
-  stepRowBody: { fontSize: 15, color: colors.muted, lineHeight: 1.6, margin: 0, maxWidth: 460 },
+  stepIconBox: { width: 56, height: 56, borderRadius: 14, background: colors.bluepale, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  stepRowTitle: { fontSize: 20, fontWeight: 600, margin: "0 0 6px", color: colors.navy },
+  stepRowBody: { fontSize: 16, color: colors.muted, lineHeight: 1.6, margin: 0, maxWidth: 460 },
 
   // 04 — see saleis.live in action
   actionSection: { padding: "140px 32px", maxWidth: 1320, margin: "0 auto" },
@@ -572,18 +582,17 @@ const styles: Record<string, React.CSSProperties> = {
   actionImage: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" },
   actionCaption: { paddingTop: 22, maxWidth: 460 },
   actionEyebrow: { fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: colors.navy, margin: "0 0 8px" },
-  actionText: { fontSize: 15, color: colors.muted, lineHeight: 1.6, margin: "0 0 10px" },
+  actionText: { fontSize: 16, color: colors.muted, lineHeight: 1.6, margin: "0 0 10px" },
   actionLink: { fontSize: 14, fontWeight: 700, color: colors.navy },
 
   // 05 — built to integrate
   integrateSection: { padding: "140px 32px", maxWidth: 1320, margin: "0 auto" },
   integrateHead: { maxWidth: 560 },
-  integrateBody: { fontSize: 15, color: colors.muted, lineHeight: 1.6, margin: "16px 0 14px" },
+  integrateBody: { fontSize: 16, color: colors.muted, lineHeight: 1.6, margin: "16px 0 14px" },
   integrateLink: { fontSize: 14, fontWeight: 700, color: colors.navy, textDecoration: "none" },
-  specItem: { padding: "22px 20px", display: "flex", flexDirection: "column", gap: 10 },
-  specTop: { display: "flex", alignItems: "center", gap: 8 },
-  specIndex: { fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, color: colors.muted },
-  specLabel: { fontSize: 14, fontWeight: 600, color: colors.ink },
+  specItem: { padding: "24px 20px", display: "flex", flexDirection: "column", gap: 14 },
+  specIndex: { display: "block", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, color: colors.muted, marginBottom: 4 },
+  specLabel: { display: "block", fontSize: 15, fontWeight: 600, color: colors.ink },
 
   devCard: { background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 14, padding: 32 },
   devCardIcon: { width: 52, height: 52, borderRadius: 12, background: colors.bluepale, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 },
@@ -599,8 +608,8 @@ const styles: Record<string, React.CSSProperties> = {
 
   // 06 — why saleis.live (editorial statements)
   whySection: { padding: "40px 32px 140px", maxWidth: 1000, margin: "0 auto" },
-  whyTitle: { fontFamily: DISPLAY_FONT, fontWeight: 500, fontSize: 26, color: colors.navy, margin: "0 0 10px", lineHeight: 1.15 },
-  whyBody: { fontSize: 14, color: colors.muted, lineHeight: 1.6, margin: 0 },
+  whyTitle: { fontFamily: DISPLAY_FONT, fontWeight: 500, fontSize: 24, color: colors.navy, margin: "0 0 10px", lineHeight: 1.2 },
+  whyBody: { fontSize: 16, color: colors.muted, lineHeight: 1.6, margin: 0 },
 
   footer: { display: "flex", alignItems: "center", justifyContent: "center", gap: 16, padding: "32px", background: "#F7F2ED" },
 };
