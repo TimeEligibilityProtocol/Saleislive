@@ -17,9 +17,9 @@ const MINI_STEPS = [
 ];
 
 const STEPS = [
-  { title: "Upload your stock", body: "Add inventory via Excel, CSV or photos. One upload is all it takes." },
-  { title: "AI prepares your catalogue", body: "Our AI cleans data, checks photos and enriches content — you review and approve, nothing publishes unverified." },
-  { title: "Launch your branded sale", body: "Go live with your own storefront on your own subdomain — payments and delivery connect through your own providers." },
+  { icon: <FileIcon />, title: "Upload your stock", body: "Add inventory via Excel, CSV or product photos." },
+  { icon: <SparkleIcon />, title: "AI prepares your catalogue", body: "saleis.live maps data, matches product images, cleans and enriches content and flags anything that needs review." },
+  { icon: <StoreIcon />, title: "Launch your branded sale", body: "Publish a complete branded storefront with products, payments, orders and delivery." },
 ];
 
 const INTEGRATIONS = [
@@ -32,10 +32,10 @@ const INTEGRATIONS = [
 ];
 
 const TRUST_BAR = [
-  { icon: <ShieldIcon />, title: "Isolated by design", body: "Every record carries a tenant and brand id — enforced at the data layer, not just the UI." },
-  { icon: <GlobeIcon />, title: "Multi-currency, multi-language", body: "Set both up front in Brand Setup — storefront copy and layout follow from day one." },
-  { icon: <CodeIcon />, title: "Bring your own integration", body: "Connect your own payment processor and courier through one open HTTP contract — see Developers." },
-  { icon: <SupportIcon />, title: "Honest by default", body: "Nothing shows as connected, published, or charged unless it actually is." },
+  { icon: <SparkleIcon size={28} />, title: "Turn unsold stock", body: "Bring inventory sitting in storage or spreadsheets back to life and start selling it — without discounting your brand." },
+  { icon: <ShieldCheckIcon />, title: "Secure, private & infrastructure-free", body: "Your data stays yours. We handle the technology, security and uptime — so you can focus on growth." },
+  { icon: <CodeIcon size={28} />, title: "Built for scale — from day one", body: "Whether it's 100 or 100,000 products, saleis.live is built to scale with your business." },
+  { icon: <StarIcon />, title: "Your brand. Fully owned.", body: "Your storefront, your domain, your rules. We power it, you own it — 100%." },
 ];
 
 function useHashRoute(): string {
@@ -81,6 +81,7 @@ export function App() {
         @media (max-width: 780px) { .marketing-demo-cards { grid-template-columns: 1fr; } }
         .marketing-integrate-row { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
         .marketing-trust-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; }
+        @media (min-width: 901px) { .marketing-trust-bar > div:not(:first-child) { border-left: 1px solid ${colors.border}; padding-left: 24px; } }
         @media (max-width: 900px) { .marketing-trust-bar { grid-template-columns: 1fr 1fr; } }
         @media (max-width: 560px) { .marketing-trust-bar { grid-template-columns: 1fr; } }
         .marketing-dev-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
@@ -155,7 +156,10 @@ function HomePage() {
           {STEPS.map((step, i) => (
             <Fragment key={step.title}>
               <div>
-                <div style={styles.stepNumber}>{i + 1}</div>
+                <div style={styles.stepHead}>
+                  <div style={styles.stepNumber}>{String(i + 1).padStart(2, "0")}</div>
+                  <div style={styles.stepIconBox}>{step.icon}</div>
+                </div>
                 <h3 style={styles.stepTitle}>{step.title}</h3>
                 <p style={styles.stepBody}>{step.body}</p>
               </div>
@@ -315,11 +319,38 @@ function UploadIcon() {
   );
 }
 
-function SparkleIcon() {
+function SparkleIcon({ size = 20 }: { size?: number }) {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={colors.navy} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={colors.navy} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 3v4M12 17v4M3 12h4M17 12h4" />
       <path d="M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18" />
+    </svg>
+  );
+}
+
+function FileIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={colors.navy} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 2h9l5 5v15H6z" />
+      <path d="M15 2v5h5" />
+      <path d="M9.5 12l2 4M11.5 12l-2 4M9 16h3" />
+    </svg>
+  );
+}
+
+function ShieldCheckIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={colors.navy} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />
+      <path d="M9 12l2 2 4-4" />
+    </svg>
+  );
+}
+
+function StarIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={colors.navy} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3l2.6 5.6 6.1.6-4.6 4.1 1.3 6-5.4-3.1-5.4 3.1 1.3-6-4.6-4.1 6.1-.6z" />
     </svg>
   );
 }
@@ -360,9 +391,9 @@ function GlobeIcon() {
   );
 }
 
-function CodeIcon() {
+function CodeIcon({ size = 22 }: { size?: number }) {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={colors.navy} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={colors.navy} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <path d="M8 6L2 12l6 6M16 6l6 6-6 6" />
     </svg>
   );
@@ -470,20 +501,22 @@ const styles: Record<string, React.CSSProperties> = {
   section: { padding: "80px 32px", maxWidth: 1200, margin: "0 auto" },
   sectionSub: { fontSize: 15, color: colors.muted, textAlign: "center", maxWidth: 620, margin: "12px auto 0" },
 
+  stepHead: { display: "flex", alignItems: "center", justifyContent: "center", gap: 14, marginBottom: 20 },
   stepNumber: {
     width: 40,
     height: 40,
     borderRadius: "50%",
-    background: colors.pale,
-    color: colors.ink,
+    background: colors.bluepale,
+    color: colors.navy,
     fontWeight: 700,
-    fontSize: 15,
+    fontSize: 14,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    margin: "0 auto 16px",
+    flexShrink: 0,
   },
-  stepTitle: { fontSize: 16, fontWeight: 700, margin: "0 0 8px", textAlign: "center", color: colors.navy },
+  stepIconBox: { width: 64, height: 64, borderRadius: 14, background: colors.bluepale, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  stepTitle: { fontSize: 17, fontWeight: 700, margin: "0 0 8px", textAlign: "center", color: colors.navy },
   stepBody: { fontSize: 13, color: colors.muted, lineHeight: 1.6, margin: 0, textAlign: "center" },
 
   demoCard: { display: "block", background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 16, overflow: "hidden", textDecoration: "none", color: colors.ink },
@@ -516,14 +549,14 @@ const styles: Record<string, React.CSSProperties> = {
   devCardBody: { fontSize: 14, color: colors.muted, lineHeight: 1.7, margin: 0 },
   codeBlock: { fontSize: 11, lineHeight: 1.6, background: colors.background, borderRadius: 8, padding: 14, marginTop: 14, overflowX: "auto", whiteSpace: "pre" },
 
-  ctaBand: { background: colors.ink, padding: "72px 32px", textAlign: "center" },
+  ctaBand: { background: colors.navy, padding: "72px 32px", textAlign: "center" },
   ctaTitle: { fontFamily: typography.fontFamily.display, fontSize: 32, color: colors.white, margin: "0 0 12px" },
   ctaSub: { fontSize: 15, color: colors.stone, margin: "0 0 28px", maxWidth: 480, marginLeft: "auto", marginRight: "auto" },
   ctaButton: { display: "inline-block", background: colors.white, color: colors.ink, fontSize: 14, fontWeight: 700, padding: "14px 28px", borderRadius: 999, textDecoration: "none" },
 
-  trustIcon: { marginBottom: 10 },
-  trustTitle: { fontSize: 14, fontWeight: 700, margin: "0 0 6px" },
-  trustBody: { fontSize: 12, color: colors.muted, lineHeight: 1.5, margin: 0 },
+  trustIcon: { marginBottom: 16 },
+  trustTitle: { fontFamily: typography.fontFamily.display, fontSize: 19, fontWeight: 400, color: colors.navy, margin: "0 0 10px" },
+  trustBody: { fontSize: 13, color: colors.muted, lineHeight: 1.6, margin: 0 },
 
   footer: { display: "flex", alignItems: "center", justifyContent: "center", gap: 16, padding: "32px", borderTop: `1px solid ${colors.border}` },
 };
