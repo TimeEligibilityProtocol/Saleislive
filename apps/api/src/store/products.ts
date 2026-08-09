@@ -68,6 +68,10 @@ export function getProductBySku(brandId: string, sku: string): Product | undefin
   return products.find((p) => p.brandId === brandId && p.sku === sku);
 }
 
+export function getProductById(id: string): Product | undefined {
+  return products.find((p) => p.id === id);
+}
+
 /** Insert or replace by id — the import commit step is the only writer besides seed(). */
 export function upsertProduct(product: Product): void {
   const i = products.findIndex((p) => p.id === product.id);

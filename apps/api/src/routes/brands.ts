@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createBrand, isSlugAvailable } from "../store/tenants.js";
+import { createBrand, getBrandById, isSlugAvailable } from "../store/tenants.js";
 
 const SLUG_PATTERN = /^[a-z0-9-]{2,32}$/;
 
@@ -21,15 +21,24 @@ export function brandsRouter(): Router {
     res.json({ slug, available: isSlugAvailable(slug) });
   });
 
+  // Must come after the literal /slug-available route above — :id is a wildcard and would otherwise shadow it.
+  router.get("/api/brands/:id", (req, res) => {
+    const brand = getBrandById(req.params.id);
+    if (!brand) return res.status(404).json({ error: "unknown_brand" });
+    res.json({ brand });
+  });
+
   router.post("/api/brands", (req, res) => {
-    const { tenantId, name, slug, country, currency } = req.body as {
+    const { tenantId, name, slug, country, currency, language, secondaryLanguage } = req.body as {
       tenantId?: string;
       name?: string;
       slug?: string;
       country?: string;
       currency?: string;
+      language?: string;
+      secondaryLanguage?: string | null;
     };
-    if (!tenantId || !name || !slug || !country || !currency) {
+    if (!tenantId || !name || !slug || !country || !currency || !language) {
       return res.status(400).json({ error: "missing_fields" });
     }
     const normalizedSlug = slug.toLowerCase();
@@ -39,7 +48,7 @@ export function brandsRouter(): Router {
     if (!isSlugAvailable(normalizedSlug)) {
       return res.status(409).json({ error: "slug_taken" });
     }
-    const brand = createBrand({ tenantId, name, slug: normalizedSlug, country, currency });
+    const brand = createBrand({ tenantId, name, slug: normalizedSlug, country, currency, language, secondaryLanguage: secondaryLanguage ?? null });
     res.status(201).json({ brand });
   });
 

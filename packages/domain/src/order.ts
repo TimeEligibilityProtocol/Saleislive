@@ -9,11 +9,20 @@ import { Money } from "./money.js";
  */
 export type OrderStatus = "reserved" | "paid" | "fulfilled" | "refunded" | "canceled";
 
+/** Tracked separately from OrderStatus — screen 09's own framing is "manage payment and fulfilment separately," since a paid order can sit at any point in packing/shipping independent of its payment state. */
+export type FulfilmentStatus = "not_started" | "ready_to_pack" | "packed" | "in_transit" | "delivered";
+export type DeliveryMethod = "courier" | "pickup";
+
 export interface OrderLine {
   productId: string;
   sku: string;
   quantity: number;
   unitPrice: Money;
+}
+
+export interface OrderTimelineEntry {
+  at: string;
+  label: string;
 }
 
 export interface Order {
@@ -26,6 +35,11 @@ export interface Order {
   total: Money;
   /** Payment happens through the brand's own connected payment adapter — Saleis.live never holds buyer funds. See blueprint §8. */
   paymentAdapterRef: string | null;
+  customerName: string;
+  customerLocation: string;
+  deliveryMethod: DeliveryMethod;
+  fulfilmentStatus: FulfilmentStatus;
+  timeline: OrderTimelineEntry[];
   createdAt: string;
   updatedAt: string;
 }

@@ -10,6 +10,8 @@ export interface Env {
    * *.saleis.live is wired up. Unset in real per-brand-subdomain hosting.
    */
   defaultBrandSlug: string | null;
+  /** Vision-capable LLM calls (Product Studio's "Suggest with AI") — unset means that feature 503s honestly instead of faking a result. */
+  anthropicApiKey: string | null;
 }
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
@@ -18,5 +20,6 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     port: Number(source.PORT ?? 4100),
     platformRootDomain: source.PLATFORM_ROOT_DOMAIN ?? "localhost",
     defaultBrandSlug: source.DEFAULT_BRAND_SLUG ?? null,
+    anthropicApiKey: source.ANTHROPIC_API_KEY ?? null,
   };
 }

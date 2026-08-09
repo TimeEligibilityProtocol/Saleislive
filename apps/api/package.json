@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "@saleis-live/domain": "*",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

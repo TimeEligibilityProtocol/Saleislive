@@ -30,11 +30,24 @@ export interface ColumnMapping {
   unmappedHeaders: string[];
 }
 
-export function detectColumnMapping(headers: string[]): ColumnMapping {
+/**
+ * Screen 03 ("Confirm import mapping") lets a merchant repoint a header
+ * that the alias table missed — overrides win over auto-detection, keyed
+ * by the literal header text as it appears in the file.
+ */
+export function detectColumnMapping(headers: string[], overrides: Partial<Record<string, keyof ParsedImportRow>> = {}): ColumnMapping {
   const fields: Partial<Record<keyof ParsedImportRow, string>> = {};
   const usedHeaders = new Set<string>();
 
   for (const header of headers) {
+    const field = overrides[header];
+    if (!field || fields[field]) continue;
+    fields[field] = header;
+    usedHeaders.add(header);
+  }
+
+  for (const header of headers) {
+    if (usedHeaders.has(header)) continue;
     const normalized = normalize(header);
     for (const [field, aliases] of Object.entries(COLUMN_ALIASES) as [keyof ParsedImportRow, string[]][]) {
       if (fields[field]) continue;
@@ -59,13 +72,13 @@ export interface ParsedSpreadsheet {
 }
 
 /** Reads .xlsx, .xls or .csv (SheetJS handles all three from a single buffer). */
-export function parseSpreadsheet(buffer: Buffer, filename: string): ParsedSpreadsheet {
+export function parseSpreadsheet(buffer: Buffer, filename: string, overrides: Partial<Record<string, keyof ParsedImportRow>> = {}): ParsedSpreadsheet {
   const workbook = XLSX.read(buffer, { type: "buffer" });
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
   const rawRows: Record<string, string>[] = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
   const headers: string[] = rawRows.length > 0 ? Object.keys(rawRows[0]) : [];
-  const mapping = detectColumnMapping(headers);
+  const mapping = detectColumnMapping(headers, overrides);
 
   const rows: ParsedImportRow[] = rawRows.map((raw) => {
     const get = (field: keyof ParsedImportRow): string | undefined => {

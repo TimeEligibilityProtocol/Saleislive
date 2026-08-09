@@ -25,9 +25,15 @@ export interface Brand {
   status: BrandStatus;
   country: string;
   currency: string;
+  /** BCP-47-ish language code (e.g. "en", "ar") — screen 01 asks for both up front so storefront copy/RTL are set from day one, not retrofitted. */
+  language: string;
+  secondaryLanguage: string | null;
   /** Verification is required before a slug matching a recognizable brand name goes live — see blueprint §3. */
   slugVerified: boolean;
   customDomain: string | null;
+  /** Store-wide policy text shown on the storefront (screen 06's "Policies" tab) — plain text, no template engine. */
+  returnPolicy: string | null;
+  shippingPolicy: string | null;
   createdAt: string;
 }
 

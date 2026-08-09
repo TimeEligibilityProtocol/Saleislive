@@ -202,6 +202,15 @@ export function isProductReadyToPublish(product: Product): boolean {
 
 export type ImportBatchStatus = "staged" | "committed" | "rolled_back";
 
+/** The 6 "Add stock" source tiles from the approved screen 02 mockup. Only "excel_csv" and "manual" run for real today — the rest are captured as merchant intent for the AI & Catalogue Center (screen 04) to pick up once that phase exists; see photoTreatment below for the same pattern. */
+export type IntakeMethod = "excel_csv" | "product_photos" | "photo_zip" | "images_in_spreadsheet" | "manual" | "phone_camera";
+
+/** What the merchant asked screen 02 to do to their product photos — recorded as intent, executed later by the AI pipeline (screen 04), never silently assumed done. */
+export type PhotoTreatment = "use_as_supplied" | "quality_check" | "crop_resize" | "remove_background" | "branded_background";
+
+/** How screen 02 was told to match photos to products. Only "sku" is actually implemented — computeRowDiff always matches by SKU regardless of this choice; the others are recorded as a Phase 2 preference for the AI & Catalogue Center. */
+export type MatchMethod = "sku" | "ean" | "filename" | "ai_suggest";
+
 export interface ImportBatch {
   id: string;
   tenantId: string;
@@ -213,6 +222,9 @@ export interface ImportBatch {
   committedAt: string | null;
   /** A committed batch can be rolled back once — this is the batch it reverts to the pre-commit state of. */
   rollbackOfBatchId: string | null;
+  intakeMethod: IntakeMethod;
+  photoTreatment: PhotoTreatment[];
+  matchMethod: MatchMethod;
 }
 
 export function summarizeImportBatch(batch: ImportBatch): {

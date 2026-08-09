@@ -57,6 +57,28 @@ export function approvedField<T>(value: T, updatedBy = "system", updatedAt = new
   };
 }
 
+/**
+ * Applies a manual edit from Product Studio (screen 05) — preserves the
+ * field's prior value in history (same discipline as import's row-by-row
+ * updates) rather than replacing it outright, and marks the field as
+ * merchant-owned so it's never mistaken for an AI guess.
+ */
+export function editField<T>(current: AiAssistedField<T>, newValue: T, opts: { updatedBy: string; now: string }): AiAssistedField<T> {
+  const changed = current.value !== newValue;
+  const history = current.value != null && current.updatedAt ? [...current.history, { value: current.value, updatedBy: current.updatedBy ?? "unknown", updatedAt: current.updatedAt }] : current.history;
+  return {
+    value: newValue,
+    aiSuggestion: current.aiSuggestion,
+    sourceType: "merchant_manual",
+    sourceReference: null,
+    confidenceScore: 1,
+    verificationState: changed ? "merchant_edited" : "merchant_confirmed",
+    updatedBy: opts.updatedBy,
+    updatedAt: opts.now,
+    history,
+  };
+}
+
 export type ProductStatus = "draft" | "active" | "archived";
 
 /** A single product image — url is server-relative; alt/isMain drive gallery + listing-card selection. */

@@ -1,4 +1,4 @@
-import { buildProductFromImportRow, computeRowDiff, flagDuplicateSkusInFile } from "@saleis-live/domain";
+import { buildProductFromImportRow, computeRowDiff, flagDuplicateSkusInFile, IntakeMethod, MatchMethod, ParsedImportRow, PhotoTreatment } from "@saleis-live/domain";
 import { Router } from "express";
 import multer from "multer";
 import { randomUUID } from "node:crypto";
@@ -17,8 +17,34 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
  * touching the catalogue; POST /api/imports/:id/commit is the separate,
  * explicit action that actually writes it (blueprint §10 Preview → Commit).
  */
+function parseFieldOverrides(raw: unknown): Partial<Record<string, keyof ParsedImportRow>> {
+  if (typeof raw !== "string" || !raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 export function importsRouter(): Router {
   const router = Router();
+
+  /**
+   * Screen 03 ("Confirm import mapping") — parses the file and returns
+   * just the header→field mapping and a sample row so the merchant can
+   * review/override before anything is staged. No batch is created here.
+   */
+  router.post("/api/imports/preview", upload.single("file"), (req, res) => {
+    if (!req.file) return res.status(400).json({ error: "missing_file" });
+    let parsed;
+    try {
+      parsed = parseSpreadsheet(req.file.buffer, req.file.originalname);
+    } catch {
+      return res.status(400).json({ error: "unreadable_file" });
+    }
+    res.json({ headers: parsed.headers, mapping: parsed.mapping, rowCount: parsed.rows.length, exampleRow: parsed.rawRows[0] ?? {} });
+  });
 
   router.post("/api/imports", upload.single("file"), (req, res) => {
     const brandId = String(req.body?.brandId ?? "");
@@ -26,9 +52,22 @@ export function importsRouter(): Router {
     if (!brand) return res.status(400).json({ error: "unknown_brand" });
     if (!req.file) return res.status(400).json({ error: "missing_file" });
 
+    // Recorded as merchant intent (screen 02), not executed here — only
+    // excel_csv actually runs today; see IntakeMethod's doc comment.
+    const intakeMethod = (String(req.body?.intakeMethod ?? "excel_csv") as IntakeMethod) || "excel_csv";
+    const photoTreatment: PhotoTreatment[] = (() => {
+      const raw = req.body?.photoTreatment;
+      const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
+      return list as PhotoTreatment[];
+    })();
+    // computeRowDiff below always matches by SKU regardless of this choice — see MatchMethod's doc comment.
+    const matchMethod = (String(req.body?.matchMethod ?? "sku") as MatchMethod) || "sku";
+    // Screen 03's user-picked overrides for headers the alias table missed.
+    const fieldOverrides = parseFieldOverrides(req.body?.fieldOverrides);
+
     let parsed;
     try {
-      parsed = parseSpreadsheet(req.file.buffer, req.file.originalname);
+      parsed = parseSpreadsheet(req.file.buffer, req.file.originalname, fieldOverrides);
     } catch {
       return res.status(400).json({ error: "unreadable_file" });
     }
@@ -42,8 +81,34 @@ export function importsRouter(): Router {
     let diffs = parsed.rows.map((row, i) => computeRowDiff(i + 2 /* header is row 1 */, row, getProductBySku(brand.id, row.sku), brand.currency));
     diffs = flagDuplicateSkusInFile(diffs);
 
-    const batch = createBatch({ tenantId: brand.tenantId, brandId: brand.id, fileName: req.file.originalname, rows: diffs });
+    const batch = createBatch({ tenantId: brand.tenantId, brandId: brand.id, fileName: req.file.originalname, rows: diffs, intakeMethod, photoTreatment, matchMethod });
     res.status(201).json({ batch, mapping: parsed.mapping });
+  });
+
+  /**
+   * Screen 02's 4 not-yet-processed intake tiles (product photos, ZIP,
+   * images-in-spreadsheet, phone/camera) have no file to stage, but the
+   * merchant's choice still needs to be real, not just UI state that
+   * vanishes on refresh — the AI & Catalogue Center (screen 04) reads
+   * these once it exists. A 0-row batch is the same record shape as a
+   * real import, just with nothing to commit yet.
+   */
+  router.post("/api/imports/intent", (req, res) => {
+    const brandId = String(req.body?.brandId ?? "");
+    const brand = getBrandById(brandId);
+    if (!brand) return res.status(400).json({ error: "unknown_brand" });
+
+    const intakeMethod = String(req.body?.intakeMethod ?? "") as IntakeMethod;
+    if (!intakeMethod) return res.status(400).json({ error: "missing_intake_method" });
+    const photoTreatment: PhotoTreatment[] = (() => {
+      const raw = req.body?.photoTreatment;
+      const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
+      return list as PhotoTreatment[];
+    })();
+    const matchMethod = (String(req.body?.matchMethod ?? "sku") as MatchMethod) || "sku";
+
+    const batch = createBatch({ tenantId: brand.tenantId, brandId: brand.id, fileName: "", rows: [], intakeMethod, photoTreatment, matchMethod });
+    res.status(201).json({ batch });
   });
 
   router.get("/api/imports/:id", (req, res) => {

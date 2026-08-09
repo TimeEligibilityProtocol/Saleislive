@@ -23,8 +23,12 @@ function seed(): void {
       status: "active",
       country: "AE",
       currency: "AED",
+      language: "en",
+      secondaryLanguage: "ar",
       slugVerified: true,
       customDomain: null,
+      returnPolicy: null,
+      shippingPolicy: null,
       createdAt: new Date(0).toISOString(),
     },
   ];
@@ -47,15 +51,26 @@ export function isSlugAvailable(slug: string): boolean {
   return !brands.some((b) => b.slug === slug);
 }
 
-export function createBrand(input: Omit<Brand, "id" | "createdAt" | "status" | "slugVerified" | "customDomain">): Brand {
+export function createBrand(input: Omit<Brand, "id" | "createdAt" | "status" | "slugVerified" | "customDomain" | "returnPolicy" | "shippingPolicy">): Brand {
   const brand: Brand = {
     ...input,
     id: `b_${randomUUID()}`,
     status: "active",
     slugVerified: false,
     customDomain: null,
+    returnPolicy: null,
+    shippingPolicy: null,
     createdAt: new Date().toISOString(),
   };
   brands = [...brands, brand];
+  return brand;
+}
+
+/** Screen 06's "Policies" tab — the only brand fields editable after creation today. */
+export function updateBrandPolicies(id: string, patch: Partial<{ returnPolicy: string; shippingPolicy: string }>): Brand | undefined {
+  const brand = getBrandById(id);
+  if (!brand) return undefined;
+  if (patch.returnPolicy !== undefined) brand.returnPolicy = patch.returnPolicy;
+  if (patch.shippingPolicy !== undefined) brand.shippingPolicy = patch.shippingPolicy;
   return brand;
 }
