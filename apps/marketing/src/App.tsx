@@ -169,7 +169,8 @@ export function App() {
         .icon-glow:nth-of-type(3) { animation-delay: 0.8s; }
         @media (prefers-reduced-motion: reduce) { .icon-glow { animation: none; } }
 
-        .systems-flow-row { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 14px; }
+        .systems-flow-row { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 10px; row-gap: 12px; }
+        @media (max-width: 700px) { .systems-flow-row { font-size: 13px !important; gap: 5px 8px; } }
         .systems-flow-node { display: inline-flex; align-items: center; }
         @keyframes flowArrowTravel { 0%, 100% { transform: translateX(0); opacity: 0.55; } 50% { transform: translateX(6px); opacity: 1; } }
         .systems-flow-arrow { display: inline-block; color: ${colors.navy}; font-size: 22px; animation: flowArrowTravel 1.2s ease-in-out infinite; }
@@ -341,7 +342,7 @@ function HomePage() {
       <Reveal>
         <section id="how-it-works" style={{ ...styles.howSection, background: colors.paper }}>
           <h2 style={styles.h2}>
-            How <span className="heading-logo"><Logo height={27} /></span> works
+            How <span className="heading-logo"><Logo height={40} /></span> works
           </h2>
           <p style={styles.sectionSub}>Three simple steps from stock to sale.</p>
           <div className="marketing-steps-row" style={{ marginTop: 56 }}>
@@ -372,7 +373,7 @@ function HomePage() {
       <Reveal>
         <section id="demo" style={styles.actionSection}>
           <h2 style={styles.h2}>
-            See <span className="heading-logo"><Logo height={27} /></span> in action
+            See <span className="heading-logo"><Logo height={40} /></span> in action
           </h2>
           <p style={styles.sectionSub}>Real screenshots of the actual product — your own store, on your own subdomain, is what you get after "Get saleis.live".</p>
           <div style={styles.actionFrame}>
@@ -411,7 +412,7 @@ function HomePage() {
             <span className="systems-flow-node">EXCEL / CSV</span>
             <span className="systems-flow-arrow">→</span>
             <span className="systems-flow-node systems-flow-logo">
-              <Logo height={22} />
+              <Logo height={24} />
             </span>
             <span className="systems-flow-arrow">→</span>
             <span className="systems-flow-node">LIVE SALE</span>
@@ -428,7 +429,7 @@ function HomePage() {
             </div>
           </div>
           <p className="systems-payoff" style={styles.systemsPayoff}>
-            They all speak Excel. <span className="heading-logo"><Logo height={26} /></span> starts there.
+            They all speak Excel. <span className="heading-logo"><Logo height={32} /></span> starts there.
           </p>
         </section>
       </Reveal>
@@ -463,7 +464,7 @@ function HomePage() {
       <Reveal>
         <section id="why" style={styles.whySection}>
           <h2 style={styles.h2}>
-            Why <span className="heading-logo"><Logo height={27} /></span>
+            Why <span className="heading-logo"><Logo height={40} /></span>
           </h2>
           <div className="marketing-why-grid">
             {TRUST_BAR.map((t) => (
