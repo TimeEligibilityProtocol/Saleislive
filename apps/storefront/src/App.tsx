@@ -162,17 +162,15 @@ function HomeView({ brand, products, onAddToBag }: { brand: Brand; products: Pro
            max-width just keeps it from growing absurdly tall on very wide
            monitors; background fills any leftover side margin. */
         .hero-frame { aspect-ratio: 1774 / 887; max-width: 1600px; margin: 0 auto; }
-        @media (max-width: 700px) { .hero-frame { aspect-ratio: 1147 / 1371; max-width: 100%; } }
+        @media (max-width: 700px) { .hero-frame { aspect-ratio: 1080 / 1290; max-width: 100%; } }
 
-        /* Both hero images bake "Shop the sale" into the picture itself —
-           this is just an invisible clickable hotspot over that button,
-           positioned by percentage so it tracks the image at any width. */
-        .hero-shop-cta {
-          left: 5.6%; top: 62.6%; width: 10.4%; height: 4.5%;
-          background: transparent; color: transparent; font-size: 0; padding: 0; border-radius: 0;
-        }
+        /* These hero images are just the tagline baked into the photo — no
+           button. This is a real, visible clickable button positioned by
+           percentage in the blank space below the text, so it tracks the
+           image at any width instead of drifting like a fixed-pixel value would. */
+        .hero-shop-cta { left: 4.5%; top: 68%; }
         @media (max-width: 700px) {
-          .hero-shop-cta { left: 8.5%; top: 62.6%; width: 24.9%; height: 4.7%; }
+          .hero-shop-cta { left: 6.5%; top: auto; bottom: 13%; }
         }
       `}</style>
       <section style={{ background: colors.background }}>
@@ -590,6 +588,11 @@ const styles: Record<string, React.CSSProperties> = {
     position: "absolute",
     zIndex: 1,
     display: "inline-block",
+    padding: "12px 24px",
+    borderRadius: 8,
+    background: colors.navy,
+    color: colors.white,
+    fontSize: 14,
     fontWeight: 600,
     textDecoration: "none",
   },
