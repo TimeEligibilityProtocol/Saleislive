@@ -512,7 +512,15 @@ const styles: Record<string, React.CSSProperties> = {
 
   // 03 — how it works
   howSection: { padding: "140px 32px", maxWidth: 900, margin: "0 auto" },
-  ghostNumeral: { fontFamily: DISPLAY_FONT, fontSize: 108, lineHeight: 1, color: "rgba(23,59,143,0.32)", flexShrink: 0, width: 150 },
+  ghostNumeral: {
+    fontFamily: DISPLAY_FONT,
+    fontSize: 108,
+    lineHeight: 1,
+    color: "rgba(23,59,143,0.32)",
+    flexShrink: 0,
+    width: 150,
+    fontVariantNumeric: "lining-nums tabular-nums",
+  },
   stepRowTitle: { fontSize: 22, fontWeight: 600, margin: "0 0 8px", color: colors.navy },
   stepRowBody: { fontSize: 15, color: colors.muted, lineHeight: 1.6, margin: 0, maxWidth: 460 },
 
