@@ -157,7 +157,7 @@ export function App() {
         .marketing-dev-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
         @media (max-width: 780px) { .marketing-dev-grid { grid-template-columns: 1fr; } }
 
-        .heading-logo { display: inline-flex; align-items: center; vertical-align: -4px; margin: 0 2px; }
+        .heading-logo { display: inline-block; vertical-align: middle; margin: 0 4px; position: relative; top: -0.08em; }
         @media (max-width: 620px) { .heading-logo svg { height: 22px !important; width: auto !important; } }
 
         @keyframes iconGlow {
@@ -169,9 +169,19 @@ export function App() {
         .icon-glow:nth-of-type(3) { animation-delay: 0.8s; }
         @media (prefers-reduced-motion: reduce) { .icon-glow { animation: none; } }
 
-        @keyframes systemsPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.03); } }
-        .systems-pulse { animation: systemsPulse 2.6s ease-in-out infinite; }
-        @media (prefers-reduced-motion: reduce) { .systems-pulse { animation: none; } }
+        .systems-flow-row { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 14px; }
+        .systems-flow-node { display: inline-flex; align-items: center; }
+        @keyframes flowArrowTravel { 0%, 100% { transform: translateX(0); opacity: 0.55; } 50% { transform: translateX(6px); opacity: 1; } }
+        .systems-flow-arrow { display: inline-block; color: ${colors.navy}; font-size: 22px; animation: flowArrowTravel 1.2s ease-in-out infinite; }
+        .systems-flow-arrow:nth-of-type(2) { animation-delay: 0.15s; }
+        .systems-flow-arrow:nth-of-type(4) { animation-delay: 0.3s; }
+        .systems-flow-arrow:nth-of-type(6) { animation-delay: 0.45s; }
+        @keyframes flowLogoGlow {
+          0%, 100% { filter: drop-shadow(0 0 0 rgba(23,59,143,0)); transform: scale(1); }
+          50% { filter: drop-shadow(0 0 10px rgba(23,59,143,0.55)); transform: scale(1.06); }
+        }
+        .systems-flow-logo svg { animation: flowLogoGlow 1.8s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) { .systems-flow-arrow, .systems-flow-logo svg { animation: none; } }
 
         @keyframes heroEnter { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: translateY(0); } }
         .hero-enter { animation: heroEnter 1s cubic-bezier(0.16, 1, 0.3, 1) both; }
@@ -315,7 +325,7 @@ function HomePage() {
       <Reveal>
         <section id="how-it-works" style={{ ...styles.howSection, background: colors.paper }}>
           <h2 style={styles.h2}>
-            How <span className="heading-logo"><Logo height={36} /></span> works
+            How <span className="heading-logo"><Logo height={27} /></span> works
           </h2>
           <p style={styles.sectionSub}>Three simple steps from stock to sale.</p>
           <div className="marketing-steps-row" style={{ marginTop: 56 }}>
@@ -346,7 +356,7 @@ function HomePage() {
       <Reveal>
         <section id="demo" style={styles.actionSection}>
           <h2 style={styles.h2}>
-            See <span className="heading-logo"><Logo height={36} /></span> in action
+            See <span className="heading-logo"><Logo height={27} /></span> in action
           </h2>
           <p style={styles.sectionSub}>Real screenshots of the actual product — your own store, on your own subdomain, is what you get after "Get saleis.live".</p>
           <div style={styles.actionFrame}>
@@ -379,8 +389,16 @@ function HomePage() {
       {/* Systems bridge: any existing system already speaks Excel — that's the on-ramp into saleis.live. */}
       <Reveal>
         <section style={{ ...styles.section, textAlign: "center" }}>
-          <p className="systems-pulse" style={styles.systemsFlow}>
-            YOUR EXISTING SYSTEM <span style={styles.systemsArrow}>→</span> EXCEL / CSV <span style={styles.systemsArrow}>→</span> SALEIS.LIVE <span style={styles.systemsArrow}>→</span> LIVE SALE
+          <p className="systems-flow-row" style={styles.systemsFlow}>
+            <span className="systems-flow-node">YOUR EXISTING SYSTEM</span>
+            <span className="systems-flow-arrow">→</span>
+            <span className="systems-flow-node">EXCEL / CSV</span>
+            <span className="systems-flow-arrow">→</span>
+            <span className="systems-flow-node systems-flow-logo">
+              <Logo height={22} />
+            </span>
+            <span className="systems-flow-arrow">→</span>
+            <span className="systems-flow-node">LIVE SALE</span>
           </p>
           <h2 style={{ ...styles.h2, marginTop: 64 }}>What do all these systems have in common?</h2>
           <div style={styles.tickerBandLight}>
@@ -393,7 +411,9 @@ function HomePage() {
               ))}
             </div>
           </div>
-          <p style={{ ...styles.sectionSub, marginTop: 32 }}>They all speak Excel. saleis.live starts there.</p>
+          <p style={{ ...styles.sectionSub, marginTop: 32, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+            They all speak Excel. <span className="heading-logo"><Logo height={16} /></span> starts there.
+          </p>
         </section>
       </Reveal>
 
@@ -427,7 +447,7 @@ function HomePage() {
       <Reveal>
         <section id="why" style={styles.whySection}>
           <h2 style={styles.h2}>
-            Why <span className="heading-logo"><Logo height={36} /></span>
+            Why <span className="heading-logo"><Logo height={27} /></span>
           </h2>
           <div className="marketing-why-grid">
             {TRUST_BAR.map((t) => (
