@@ -394,16 +394,7 @@ function HomePage() {
         </section>
       </Reveal>
 
-      {/* 05 — Final CTA: statement + button + space, nothing else. */}
-      <section id="cta" style={styles.ctaBand}>
-        <h2 style={styles.ctaTitle}>Your sale. Your brand. Our technology.</h2>
-        <p style={styles.ctaSub}>Join brands and retailers using saleis.live to unlock value from unsold stock.</p>
-        <a href={ADMIN_URL} className="marketing-cta-btn" style={styles.ctaButton}>
-          Get saleis.live
-        </a>
-      </section>
-
-      {/* 06 — Why saleis.live: titled, iconed, symmetric grid. */}
+      {/* 05 — Why saleis.live: titled, iconed, symmetric grid. */}
       <Reveal>
         <section id="why" style={styles.whySection}>
           <h2 style={styles.h2}>
@@ -422,6 +413,15 @@ function HomePage() {
           </div>
         </section>
       </Reveal>
+
+      {/* 06 — Final CTA: statement + button + space, nothing else. Last section before the footer. */}
+      <section id="cta" style={styles.ctaBand}>
+        <h2 style={styles.ctaTitle}>Your sale. Your brand. Our technology.</h2>
+        <p style={styles.ctaSub}>Join brands and retailers using saleis.live to unlock value from unsold stock.</p>
+        <a href={ADMIN_URL} className="marketing-cta-btn" style={styles.ctaButton}>
+          Get saleis.live
+        </a>
+      </section>
     </>
   );
 }
