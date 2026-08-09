@@ -1,11 +1,14 @@
 import { approvedField, Product } from "@saleis-live/domain";
 
 /**
- * In-memory only, same pragmatic starting point as tenants.ts. Seeded from
- * SALEIS.LIVE/fictional_product_catalog_EN.xlsx — the spec's own demo
- * catalog and product photography, not invented placeholder data. No
- * markup/"was" price is fabricated: the sheet gives one net price, so
- * price === salePrice here (no fake discount on real data).
+ * In-memory only, same pragmatic starting point as tenants.ts. P001-P006
+ * seeded from SALEIS.LIVE/fictional_product_catalog_EN.xlsx — the spec's
+ * own demo catalog, not invented placeholder data. No markup/"was" price
+ * is fabricated: the sheet gives one net price, so price === salePrice
+ * here (no fake discount on real data). P007 has no xlsx row — Ola asked
+ * for a Beauty-category demo item using the spec's own product-07.jpg
+ * photography, so its name/price/stock are a reasonable placeholder, same
+ * honesty rule (price === salePrice, no fake discount).
  */
 let products: Product[] = [];
 
@@ -48,7 +51,8 @@ function seed(): void {
     base("P003", "P003", "Two-Tone Slingback Heels", "Shoes", "Cream / Brown", "37–41", "Vegan Leather", 29900, 18, "/assets/products/product-03.jpg"),
     base("P004", "P004", "Leather Loafers", "Shoes", "Dark Brown", "40–44", "Genuine Leather", 39900, 15, "/assets/products/product-04.jpg"),
     base("P005", "P005", "Crescent Shoulder Bag", "Accessories", "Dark Brown", "One Size", "Vegan Leather", 27900, 12, "/assets/products/product-05.jpg"),
-    base("P006", "P006", "Sculptural Ceramic Vase", "Home", "Ivory", "One Size", "Ceramic", 15900, 30, "/assets/products/product-06.jpg"),
+    base("P006", "P006", "Sculptural Ceramic Vase", "Home", "Ivory", "One Size", "Ceramic", 15900, 30, "/assets/products/product-08.jpg"),
+    base("P007", "P007", "Repair Serum", "Beauty", "Amber", "30ml", "Glass", 18900, 20, "/assets/products/product-07.jpg"),
   ];
 }
 seed();
