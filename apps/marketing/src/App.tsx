@@ -39,6 +39,8 @@ const INTEGRATIONS = [
 
 const CATEGORY_TICKER = ["yourbrand", "clothes", "beauty", "shoes", "jewelry", "home", "cosmetics", "accessories"].map((slug) => `www.${slug}saleis.live`);
 
+const SYSTEMS = ["SAP", "Oracle", "Microsoft Dynamics", "Odoo", "NetSuite", "Shopify", "Magento", "WooCommerce", "WMS", "ERP", "PIM", "POS"];
+
 const TRUST_BAR = [
   { icon: "sparkle", title: "Turn unsold stock", body: "Bring inventory sitting in storage or spreadsheets back to life and start selling it — without discounting your brand." },
   { icon: "shield", title: "Secure, private & infrastructure-free", body: "Your data stays yours. We handle the technology, security and uptime — so you can focus on growth." },
@@ -167,6 +169,10 @@ export function App() {
         .icon-glow:nth-of-type(3) { animation-delay: 0.8s; }
         @media (prefers-reduced-motion: reduce) { .icon-glow { animation: none; } }
 
+        @keyframes systemsPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.03); } }
+        .systems-pulse { animation: systemsPulse 2.6s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) { .systems-pulse { animation: none; } }
+
         @keyframes heroEnter { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: translateY(0); } }
         .hero-enter { animation: heroEnter 1s cubic-bezier(0.16, 1, 0.3, 1) both; }
         @keyframes kenburns { from { transform: scale(1); } to { transform: scale(1.06); } }
@@ -218,6 +224,8 @@ export function App() {
 
       <footer style={styles.footer}>
         <span style={{ fontSize: 12, color: colors.muted }}>© {new Date().getFullYear()} saleis.live</span>
+        <span style={{ fontSize: 12, color: colors.muted }}>·</span>
+        <span style={{ fontSize: 12, color: colors.muted }}>Powered by Quanthio</span>
       </footer>
     </div>
   );
@@ -307,7 +315,7 @@ function HomePage() {
       <Reveal>
         <section id="how-it-works" style={{ ...styles.howSection, background: colors.paper }}>
           <h2 style={styles.h2}>
-            How <span className="heading-logo"><Logo height={30} /></span> works
+            How <span className="heading-logo"><Logo height={36} /></span> works
           </h2>
           <p style={styles.sectionSub}>Three simple steps from stock to sale.</p>
           <div className="marketing-steps-row" style={{ marginTop: 56 }}>
@@ -338,7 +346,7 @@ function HomePage() {
       <Reveal>
         <section id="demo" style={styles.actionSection}>
           <h2 style={styles.h2}>
-            See <span className="heading-logo"><Logo height={30} /></span> in action
+            See <span className="heading-logo"><Logo height={36} /></span> in action
           </h2>
           <p style={styles.sectionSub}>Real screenshots of the actual product — your own store, on your own subdomain, is what you get after "Get saleis.live".</p>
           <div style={styles.actionFrame}>
@@ -365,6 +373,30 @@ function HomePage() {
               </a>
             </div>
           </div>
+        </section>
+      </Reveal>
+
+      {/* Systems bridge: any existing system already speaks Excel — that's the on-ramp into saleis.live. */}
+      <Reveal>
+        <section style={{ ...styles.section, textAlign: "center" }}>
+          <p className="systems-pulse" style={styles.systemsFlow}>
+            YOUR EXISTING SYSTEM <span style={styles.systemsArrow}>→</span> EXCEL / CSV <span style={styles.systemsArrow}>→</span>{" "}
+            <span className="heading-logo"><Logo height={20} /></span> <span style={styles.systemsArrow}>→</span> LIVE SALE
+          </p>
+          <h2 style={{ ...styles.h2, marginTop: 64 }}>What do all these systems have in common?</h2>
+          <div style={styles.tickerBandLight}>
+            <div className="marketing-ticker-track">
+              {[...SYSTEMS, ...SYSTEMS].map((sys, i) => (
+                <span key={sys + i} style={styles.systemsTickerItem}>
+                  {sys}
+                  <span style={styles.systemsTickerDot}>·</span>
+                </span>
+              ))}
+            </div>
+          </div>
+          <p style={{ ...styles.sectionSub, marginTop: 32 }}>
+            They all speak Excel. <span className="heading-logo"><Logo height={16} /></span> starts there.
+          </p>
         </section>
       </Reveal>
 
@@ -398,7 +430,7 @@ function HomePage() {
       <Reveal>
         <section id="why" style={styles.whySection}>
           <h2 style={styles.h2}>
-            Why <span className="heading-logo"><Logo height={30} /></span>
+            Why <span className="heading-logo"><Logo height={36} /></span>
           </h2>
           <div className="marketing-why-grid">
             {TRUST_BAR.map((t) => (
@@ -552,7 +584,7 @@ function withLogo(text: string): React.ReactNode {
     if (i < parts.length - 1) {
       out.push(
         <span key={"l" + i} className="heading-logo">
-          <Logo height={15} />
+          <Logo height={13} />
         </span>,
       );
     }
@@ -648,6 +680,12 @@ const styles: Record<string, React.CSSProperties> = {
   tickerBand: { background: colors.navy, padding: "16px 0", overflow: "hidden" },
   tickerItem: { display: "inline-flex", alignItems: "center", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 16, fontWeight: 500, color: colors.white, padding: "0 28px", whiteSpace: "nowrap" },
   tickerDot: { marginLeft: 28, color: "rgba(255,255,255,0.35)" },
+
+  systemsFlow: { fontFamily: typography.fontFamily.ui, fontWeight: 700, fontSize: "clamp(14px, 2.2vw, 22px)", letterSpacing: 0.5, color: colors.navy, textTransform: "uppercase", margin: 0 },
+  systemsArrow: { color: colors.stone, margin: "0 4px" },
+  tickerBandLight: { marginTop: 40, background: colors.navy, borderRadius: 16, padding: "18px 0", overflow: "hidden" },
+  systemsTickerItem: { display: "inline-flex", alignItems: "center", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 16, fontWeight: 600, color: colors.white, padding: "0 24px", whiteSpace: "nowrap" },
+  systemsTickerDot: { marginLeft: 24, color: "rgba(255,255,255,0.35)" },
 
   section: { padding: "96px 32px", maxWidth: 1320, margin: "0 auto" },
   sectionSub: { fontSize: 16, color: colors.muted, textAlign: "center", maxWidth: 560, margin: "16px auto 0" },
