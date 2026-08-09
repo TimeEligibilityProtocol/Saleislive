@@ -251,6 +251,9 @@ function DevelopersPage() {
       <h1 style={{ ...styles.h2Center, textAlign: "left", marginTop: 16 }}>Built as a platform, not a one-off shop build.</h1>
       <div className="marketing-dev-grid" style={{ marginTop: 40 }}>
         <div style={styles.devCard}>
+          <div style={styles.devCardIcon}>
+            <ShieldIcon />
+          </div>
           <h3 style={styles.devCardTitle}>Architecture</h3>
           <p style={styles.devCardBody}>
             A typed monorepo: shared domain types, a design-token package, an Express API, and separate React apps for the admin panel and each brand's storefront. Every business record carries a tenant and brand
@@ -258,6 +261,9 @@ function DevelopersPage() {
           </p>
         </div>
         <div style={styles.devCard}>
+          <div style={styles.devCardIcon}>
+            <CodeIcon />
+          </div>
           <h3 style={styles.devCardTitle}>Payments &amp; delivery — bring your own integration</h3>
           <p style={styles.devCardBody}>
             Saleis.live never holds buyer funds and never sees a card number. Connect your own payment processor or courier by standing up a small bridge service against one fixed HTTP contract — no
@@ -276,6 +282,9 @@ POST  https://saleis.live/api/webhooks/payment/{brandId}
           </pre>
         </div>
         <div style={styles.devCard}>
+          <div style={styles.devCardIcon}>
+            <MonitorIcon />
+          </div>
           <h3 style={styles.devCardTitle}>Installable admin panel</h3>
           <p style={styles.devCardBody}>
             A per-brand installable app for the merchant side (your own name, icon, and colors on your home screen) is in progress. The buyer-facing storefront stays link-based by design — no install friction
@@ -283,6 +292,9 @@ POST  https://saleis.live/api/webhooks/payment/{brandId}
           </p>
         </div>
         <div style={styles.devCard}>
+          <div style={styles.devCardIcon}>
+            <CloudIcon />
+          </div>
           <h3 style={styles.devCardTitle}>Deployment</h3>
           <p style={styles.devCardBody}>
             One Node API service, and one static site per app (admin, storefront, marketing), each independently deployable. Every brand resolves via its own subdomain, wildcard-routed to the same storefront
@@ -361,6 +373,23 @@ function SupportIcon() {
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={colors.ink} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 12a7.4 7.4 0 0 0-.1-1l2-1.6-2-3.5-2.4 1a7.4 7.4 0 0 0-1.7-1L14.8 3H9.2l-.4 2.4a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.5 2 1.6a7.4 7.4 0 0 0 0 2l-2 1.6 2 3.5 2.4-1a7.4 7.4 0 0 0 1.7 1l.4 2.4h5.6l.4-2.4a7.4 7.4 0 0 0 1.7-1l2.4 1 2-3.5-2-1.6c.07-.33.1-.66.1-1z" />
+    </svg>
+  );
+}
+
+function MonitorIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={colors.navy} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="4" width="20" height="13" rx="2" />
+      <path d="M8 21h8M12 17v4" />
+    </svg>
+  );
+}
+
+function CloudIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={colors.navy} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 18a4.5 4.5 0 0 1-1-8.9A5 5 0 0 1 15.5 8a4 4 0 0 1 1.5 7.9M7 18h10" />
     </svg>
   );
 }
@@ -481,10 +510,10 @@ const styles: Record<string, React.CSSProperties> = {
   integrateIcon: { width: 44, height: 44, borderRadius: 10, background: colors.bluepale, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 8 },
   integrateIconLabel: { fontSize: 11, color: colors.muted, margin: 0 },
 
-  devGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginTop: 40 },
-  devCard: { background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 14, padding: 28 },
-  devCardTitle: { fontSize: 16, fontWeight: 700, margin: "0 0 10px" },
-  devCardBody: { fontSize: 13, color: colors.muted, lineHeight: 1.6, margin: 0 },
+  devCard: { background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 14, padding: 32 },
+  devCardIcon: { width: 52, height: 52, borderRadius: 12, background: colors.bluepale, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 },
+  devCardTitle: { fontFamily: typography.fontFamily.display, fontSize: 26, color: colors.navy, fontWeight: 400, margin: "0 0 14px" },
+  devCardBody: { fontSize: 14, color: colors.muted, lineHeight: 1.7, margin: 0 },
   codeBlock: { fontSize: 11, lineHeight: 1.6, background: colors.background, borderRadius: 8, padding: 14, marginTop: 14, overflowX: "auto", whiteSpace: "pre" },
 
   ctaBand: { background: colors.ink, padding: "72px 32px", textAlign: "center" },
