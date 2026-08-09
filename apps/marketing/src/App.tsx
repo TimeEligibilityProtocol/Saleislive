@@ -181,7 +181,23 @@ export function App() {
           50% { filter: drop-shadow(0 0 10px rgba(23,59,143,0.55)); transform: scale(1.06); }
         }
         .systems-flow-logo svg { animation: flowLogoGlow 1.8s ease-in-out infinite; }
-        @media (prefers-reduced-motion: reduce) { .systems-flow-arrow, .systems-flow-logo svg { animation: none; } }
+
+        .systems-payoff { position: relative; padding-bottom: 14px; }
+        .systems-payoff::after {
+          content: "";
+          position: absolute;
+          left: 50%;
+          bottom: 0;
+          width: 64px;
+          height: 3px;
+          background: ${colors.navy};
+          border-radius: 999px;
+          transform: translateX(-50%);
+          animation: payoffUnderline 2.2s ease-in-out infinite;
+        }
+        @keyframes payoffUnderline { 0%, 100% { width: 64px; opacity: 0.5; } 50% { width: 140px; opacity: 1; } }
+
+        @media (prefers-reduced-motion: reduce) { .systems-flow-arrow, .systems-flow-logo svg, .systems-payoff::after { animation: none; } }
 
         @keyframes heroEnter { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: translateY(0); } }
         .hero-enter { animation: heroEnter 1s cubic-bezier(0.16, 1, 0.3, 1) both; }
@@ -411,8 +427,8 @@ function HomePage() {
               ))}
             </div>
           </div>
-          <p style={{ ...styles.sectionSub, marginTop: 32, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-            They all speak Excel. <span className="heading-logo"><Logo height={16} /></span> starts there.
+          <p className="systems-payoff" style={styles.systemsPayoff}>
+            They all speak Excel. <span className="heading-logo"><Logo height={26} /></span> starts there.
           </p>
         </section>
       </Reveal>
@@ -700,6 +716,18 @@ const styles: Record<string, React.CSSProperties> = {
 
   systemsFlow: { fontFamily: typography.fontFamily.ui, fontWeight: 700, fontSize: "clamp(14px, 2.2vw, 22px)", letterSpacing: 0.5, color: colors.navy, textTransform: "uppercase", margin: 0 },
   systemsArrow: { color: colors.stone, margin: "0 4px" },
+  systemsPayoff: {
+    fontFamily: DISPLAY_FONT,
+    fontWeight: 500,
+    fontSize: "clamp(24px, 3.4vw, 36px)",
+    color: colors.navy,
+    marginTop: 40,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  },
   tickerBandLight: { marginTop: 40, background: colors.navy, borderRadius: 16, padding: "18px 0", overflow: "hidden" },
   systemsTickerItem: { display: "inline-flex", alignItems: "center", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 16, fontWeight: 600, color: colors.white, padding: "0 24px", whiteSpace: "nowrap" },
   systemsTickerDot: { marginLeft: 24, color: "rgba(255,255,255,0.35)" },
