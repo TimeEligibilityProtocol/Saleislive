@@ -163,8 +163,22 @@ function HomeView({ brand, products, onAddToBag }: { brand: Brand; products: Pro
            monitors; background fills any leftover side margin. */
         .hero-frame { aspect-ratio: 1774 / 887; max-width: 1600px; margin: 0 auto; }
         @media (max-width: 700px) { .hero-frame { aspect-ratio: 1149 / 1369; max-width: 100%; } }
-        .hero-shop-cta { bottom: 18%; }
-        @media (max-width: 700px) { .hero-shop-cta { bottom: 6%; } }
+
+        /* Desktop hero has "Shop the sale" baked into the image itself —
+           this is just an invisible clickable hotspot over that button,
+           positioned by percentage so it tracks the image at any width. */
+        .hero-shop-cta {
+          left: 5.6%; top: 62.6%; width: 10.4%; height: 4.5%;
+          background: transparent; color: transparent; font-size: 0; padding: 0; border-radius: 0;
+        }
+        /* Mobile hero doesn't have a baked-in button yet, so this stays a real visible pill. */
+        @media (max-width: 700px) {
+          .hero-shop-cta {
+            left: 4.5%; top: auto; bottom: 6%; width: auto; height: auto;
+            padding: 12px 24px; border-radius: 8px;
+            background: ${colors.navy}; color: ${colors.white}; font-size: 14px;
+          }
+        }
       `}</style>
       <section style={{ background: colors.background }}>
         <div className="hero-frame" style={styles.hero}>
@@ -580,13 +594,7 @@ const styles: Record<string, React.CSSProperties> = {
   heroCta: {
     position: "absolute",
     zIndex: 1,
-    left: "4.5%",
     display: "inline-block",
-    padding: "12px 24px",
-    borderRadius: 8,
-    background: colors.navy,
-    color: colors.white,
-    fontSize: 14,
     fontWeight: 600,
     textDecoration: "none",
   },
