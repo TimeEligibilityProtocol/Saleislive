@@ -114,12 +114,23 @@ export function App() {
 
   return (
     <div style={styles.page}>
+      <style>{`
+        .storefront-brand-placeholder { display: inline-block; }
+        @media (max-width: 480px) {
+          .storefront-logo svg { height: 32px; width: auto; }
+          .storefront-brand-placeholder { display: none; }
+        }
+      `}</style>
       <header style={styles.header}>
-        <a href="#/" style={styles.brandLockup}>
-          <Logo height={55} />
-          <span style={styles.brandPlaceholder}>Your brand goes here</span>
+        <a href="#/" style={{ ...styles.brandLockup, minWidth: 0 }}>
+          <span className="storefront-logo" style={{ display: "inline-flex" }}>
+            <Logo height={55} />
+          </span>
+          <span className="storefront-brand-placeholder" style={styles.brandPlaceholder}>
+            Your brand goes here
+          </span>
         </a>
-        <a href="#/bag" style={styles.bagLink}>
+        <a href="#/bag" style={{ ...styles.bagLink, flexShrink: 0 }}>
           Bag ({cartCount})
         </a>
       </header>
@@ -147,16 +158,18 @@ function HomeView({ brand, products, onAddToBag }: { brand: Brand; products: Pro
 
   return (
     <>
+      <style>{`
+        .hero-shop-cta { bottom: 18%; }
+        @media (max-width: 700px) { .hero-shop-cta { bottom: 6%; } }
+      `}</style>
       <section style={styles.hero}>
-        <img src={apiClient.resolveAssetUrl("/assets/hero/hero-approved.png")} alt="" style={styles.heroImage} />
-        <div style={styles.heroText}>
-          <p style={styles.eyebrow}>PRIVATE SALE · LIVE NOW</p>
-          <h1 style={styles.h1}>The private sale is live.</h1>
-          <p style={styles.heroSub}>Selected pieces. Limited time.</p>
-          <a href="#products-grid" style={styles.heroCta}>
-            Shop the sale
-          </a>
-        </div>
+        <picture>
+          <source media="(max-width: 700px)" srcSet={apiClient.resolveAssetUrl("/assets/hero/hero-mobile.png")} />
+          <img src={apiClient.resolveAssetUrl("/assets/hero/hero-laptop.png")} alt="Stock in. Sale live. A new AI-powered way to turn your catalogue into a complete branded sale." style={styles.heroImage} />
+        </picture>
+        <a href="#products-grid" className="hero-shop-cta" style={styles.heroCta}>
+          Shop the sale
+        </a>
       </section>
 
       <div style={styles.pillRow}>
@@ -211,6 +224,9 @@ function ProductDetailView({ product, onAddToBag }: { product: Product; onAddToB
 
   return (
     <section style={{ maxWidth: 640, margin: "0 auto", padding: "0 32px 56px" }}>
+      <a href="#/" style={{ ...styles.backLink, margin: "16px 0 16px" }}>
+        ← Back
+      </a>
       <div style={{ ...styles.cardImageWrap, aspectRatio: "1/1", marginBottom: 24 }}>
         <img src={apiClient.resolveAssetUrl(product.images[0]?.url ?? "")} alt={product.images[0]?.alt ?? ""} style={styles.cardImage} />
       </div>
@@ -264,7 +280,10 @@ function BagView({
 
   return (
     <section style={{ maxWidth: 640, margin: "0 auto", padding: "0 32px 56px" }}>
-      <h1 style={{ ...styles.h1, fontSize: 26, margin: "32px 0 24px" }}>Your bag</h1>
+      <a href="#/" style={{ ...styles.backLink, margin: "16px 0 0" }}>
+        ← Continue shopping
+      </a>
+      <h1 style={{ ...styles.h1, fontSize: 26, margin: "16px 0 24px" }}>Your bag</h1>
 
       {items.length === 0 ? (
         <p style={{ fontSize: 14, color: "#5C574C" }}>
@@ -325,7 +344,10 @@ function DeliveryView({ info, setInfo, hasItems }: { info: CheckoutInfo; setInfo
 
   return (
     <section style={{ maxWidth: 480, margin: "0 auto", padding: "0 32px 56px" }}>
-      <h1 style={{ ...styles.h1, fontSize: 26, margin: "32px 0 24px" }}>Delivery or pickup</h1>
+      <a href="#/bag" style={{ ...styles.backLink, margin: "16px 0 0" }}>
+        ← Back to bag
+      </a>
+      <h1 style={{ ...styles.h1, fontSize: 26, margin: "16px 0 24px" }}>Delivery or pickup</h1>
 
       {!hasItems ? (
         <p style={{ fontSize: 14 }}>
@@ -437,7 +459,10 @@ function PaymentView({
 
   return (
     <section style={{ maxWidth: 480, margin: "0 auto", padding: "0 32px 56px" }}>
-      <h1 style={{ ...styles.h1, fontSize: 26, margin: "32px 0 16px" }}>Payment</h1>
+      <a href="#/checkout/delivery" style={{ ...styles.backLink, margin: "16px 0 0" }}>
+        ← Back
+      </a>
+      <h1 style={{ ...styles.h1, fontSize: 26, margin: "16px 0 16px" }}>Payment</h1>
       <div style={styles.noticeCard}>
         <p style={{ fontSize: 13, fontWeight: 700, color: colors.navy, margin: 0 }}>
           TEST MODE — no real payment method is collected here. Clicking "Pay" below simply confirms the order for testing.
@@ -540,15 +565,16 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "3px 10px",
   },
   bagLink: { fontSize: 13, fontWeight: 700, color: colors.navy, textDecoration: "none" },
+  backLink: { display: "inline-block", fontSize: 13, fontWeight: 600, color: "#5C574C", textDecoration: "none", margin: "24px 0 0" },
 
-  hero: { position: "relative", minHeight: 420, display: "flex", alignItems: "center", overflow: "hidden", background: colors.background },
-  heroImage: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "right center" },
-  heroText: { position: "relative", zIndex: 1, padding: "56px 32px", maxWidth: 460 },
-  eyebrow: { fontSize: 12, fontWeight: 700, letterSpacing: 1, color: colors.ultramarine, margin: "0 0 12px" },
+  hero: { position: "relative", height: "clamp(340px, 32vw, 460px)", overflow: "hidden", background: colors.background },
+  heroImage: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center" },
   eyebrowSmall: { fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: colors.ultramarine, margin: "0 0 8px" },
   h1: { fontFamily: typography.fontFamily.display, fontSize: 44, margin: "0 0 8px", lineHeight: 1.1 },
-  heroSub: { fontSize: 15, color: "#5C574C", margin: "0 0 20px" },
   heroCta: {
+    position: "absolute",
+    zIndex: 1,
+    left: "4.5%",
     display: "inline-block",
     padding: "12px 24px",
     borderRadius: 8,
