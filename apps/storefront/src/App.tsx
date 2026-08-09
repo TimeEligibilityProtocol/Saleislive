@@ -114,10 +114,10 @@ export function App() {
 
   return (
     <div style={styles.page}>
-      <div style={styles.testBanner}>TEST STOREFRONT — orders placed here don't charge real money or book a real courier.</div>
       <header style={styles.header}>
-        <a href="#/" style={styles.brandName}>
-          {brand.name}
+        <a href="#/" style={styles.brandLockup}>
+          <Logo height={18} />
+          <span style={styles.brandPlaceholder}>Your brand goes here</span>
         </a>
         <a href="#/bag" style={styles.bagLink}>
           Bag ({cartCount})
@@ -522,15 +522,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: typography.fontFamily.ui,
     color: colors.ink,
   },
-  testBanner: {
-    background: colors.navy,
-    color: colors.white,
-    fontSize: 12,
-    fontWeight: 700,
-    textAlign: "center",
-    padding: "8px 16px",
-    letterSpacing: 0.3,
-  },
   header: {
     display: "flex",
     alignItems: "center",
@@ -539,7 +530,15 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: `1px solid ${colors.border}`,
     background: colors.surface,
   },
-  brandName: { fontSize: 18, fontWeight: 700, color: colors.ink, textDecoration: "none" },
+  brandLockup: { display: "flex", alignItems: "center", gap: 10, textDecoration: "none" },
+  brandPlaceholder: {
+    fontSize: 11,
+    fontWeight: 600,
+    color: "#8A8578",
+    border: "1px dashed #C9C2B2",
+    borderRadius: 999,
+    padding: "3px 10px",
+  },
   bagLink: { fontSize: 13, fontWeight: 700, color: colors.navy, textDecoration: "none" },
 
   hero: { position: "relative", minHeight: 420, display: "flex", alignItems: "center", overflow: "hidden", background: colors.background },
