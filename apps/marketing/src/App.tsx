@@ -37,7 +37,7 @@ const INTEGRATIONS = [
   { icon: "db", label: "Data import" },
 ];
 
-const CATEGORY_TICKER = ["yourbrand", "clothes", "beauty", "shoes", "jewelry", "home", "cosmetics", "accessories"].map((slug) => `${slug}.saleis.live`);
+const CATEGORY_TICKER = ["yourbrand", "clothes", "beauty", "shoes", "jewelry", "home", "cosmetics", "accessories"].map((slug) => `www.${slug}saleis.live`);
 
 const TRUST_BAR = [
   { icon: "sparkle", title: "Turn unsold stock", body: "Bring inventory sitting in storage or spreadsheets back to life and start selling it — without discounting your brand." },
