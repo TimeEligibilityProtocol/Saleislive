@@ -1,5 +1,5 @@
 import { colors, typography } from "@saleis-live/ui";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Logo } from "./components/Logo";
 import { ADMIN_URL, DEMO_STORE_URL } from "./config/links";
 
@@ -17,9 +17,9 @@ const NAV_LINKS = [
 ];
 
 const MINI_STEPS = [
-  { title: "Upload any stock", body: "Excel, CSV or photos." },
-  { title: "AI prepares catalogue", body: "Clean, enrich, translate." },
-  { title: "Launch your sale", body: "Storefront, payments, delivery." },
+  { icon: "upload", title: "Upload any stock", body: "Excel, CSV or photos." },
+  { icon: "sparkle", title: "AI prepares catalogue", body: "Clean, enrich, translate." },
+  { icon: "store", title: "Launch your sale", body: "Storefront, payments, delivery." },
 ];
 
 const STEPS = [
@@ -37,11 +37,13 @@ const INTEGRATIONS = [
   { icon: "db", label: "Data import" },
 ];
 
+const CATEGORY_TICKER = ["Fashion", "Footwear", "Cosmetics", "Jewelry", "Home & Living", "Beauty", "Accessories", "Lifestyle"];
+
 const TRUST_BAR = [
-  { title: "Turn unsold stock", body: "Bring inventory sitting in storage or spreadsheets back to life and start selling it — without discounting your brand." },
-  { title: "Secure, private & infrastructure-free", body: "Your data stays yours. We handle the technology, security and uptime — so you can focus on growth." },
-  { title: "Built for scale — from day one", body: "Whether it's 100 or 100,000 products, saleis.live is built to scale with your business." },
-  { title: "Your brand. Fully owned.", body: "Your storefront, your domain, your rules. We power it, you own it — 100%." },
+  { icon: "sparkle", title: "Turn unsold stock", body: "Bring inventory sitting in storage or spreadsheets back to life and start selling it — without discounting your brand." },
+  { icon: "shield", title: "Secure, private & infrastructure-free", body: "Your data stays yours. We handle the technology, security and uptime — so you can focus on growth." },
+  { icon: "code", title: "Built for scale — from day one", body: "Whether it's 100 or 100,000 products, saleis.live is built to scale with your business." },
+  { icon: "star", title: "Your brand. Fully owned.", body: "Your storefront, your domain, your rules. We power it, you own it — 100%." },
 ];
 
 function useHashRoute(): string {
@@ -121,19 +123,17 @@ export function App() {
           .hero-mobile { display: block; }
         }
 
-        .marketing-mini-steps { display: flex; flex-wrap: wrap; gap: 8px 28px; }
+        .marketing-mini-steps { display: flex; gap: 24px; }
+        .marketing-mini-steps > div:not(:first-child) { border-left: 1px solid rgba(23,59,143,0.18); padding-left: 24px; }
+        @media (max-width: 620px) { .marketing-mini-steps { flex-direction: column; gap: 16px; } .marketing-mini-steps > div:not(:first-child) { border-left: none; padding-left: 0; } }
 
-        .marketing-flow-row { display: flex; align-items: center; justify-content: center; gap: 28px; flex-wrap: wrap; }
-        @media (max-width: 620px) { .marketing-flow-row { flex-direction: column; gap: 6px; } }
-        .marketing-flow-arrow-mobile { display: none; }
-        @media (max-width: 620px) { .marketing-flow-arrow-mobile { display: block; } .marketing-flow-arrow-desktop { display: none; } }
+        .marketing-steps-row { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 20px; align-items: start; }
+        @media (max-width: 900px) { .marketing-steps-row { grid-template-columns: 1fr; } }
+        .marketing-step-arrow { display: flex; align-items: center; justify-content: center; padding-top: 28px; }
+        @media (max-width: 900px) { .marketing-step-arrow { display: none; } }
 
-        .marketing-step-row { display: flex; align-items: center; gap: 40px; padding: 40px 0; border-top: 1px solid ${colors.border}; }
-        .marketing-step-row:last-child { border-bottom: 1px solid ${colors.border}; }
-        @media (max-width: 620px) { .marketing-step-row { gap: 20px; padding: 28px 0; } }
-
-        .marketing-action-grid { display: grid; grid-template-columns: 1.55fr 1fr; gap: 64px; align-items: start; }
-        @media (max-width: 900px) { .marketing-action-grid { grid-template-columns: 1fr; } }
+        .marketing-action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; }
+        @media (max-width: 900px) { .marketing-action-grid { grid-template-columns: 1fr; gap: 32px; } }
 
         .marketing-spec-row { display: flex; border-top: 1px solid ${colors.border}; border-bottom: 1px solid ${colors.border}; }
         .marketing-spec-row > div { flex: 1; border-left: 1px solid ${colors.border}; }
@@ -144,7 +144,7 @@ export function App() {
           .marketing-spec-row > div:nth-child(2n) { border-right: none; }
         }
 
-        .marketing-why-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; padding-top: 40px; border-top: 1px solid ${colors.border}; }
+        .marketing-why-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; margin-top: 56px; text-align: center; justify-items: center; }
         @media (max-width: 900px) { .marketing-why-grid { grid-template-columns: 1fr 1fr; } }
         @media (max-width: 560px) { .marketing-why-grid { grid-template-columns: 1fr; } }
 
@@ -156,6 +156,10 @@ export function App() {
         @keyframes kenburns { from { transform: scale(1); } to { transform: scale(1.06); } }
         .hero-kenburns { animation: kenburns 18s ease-out both; }
         @media (prefers-reduced-motion: reduce) { .hero-enter, .hero-kenburns { animation: none; } }
+
+        .marketing-ticker-track { display: flex; width: max-content; animation: ticker 26s linear infinite; }
+        @keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+        @media (prefers-reduced-motion: reduce) { .marketing-ticker-track { animation: none; } }
 
         a { transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease; }
         .marketing-nav-links a { position: relative; }
@@ -225,11 +229,15 @@ function HomePage() {
                 View demo
               </a>
             </div>
-            <div style={{ marginTop: 48, display: "flex", flexDirection: "column", gap: 10 }}>
+            <div className="marketing-mini-steps" style={{ marginTop: 48 }}>
               {MINI_STEPS.map((s) => (
-                <span key={s.title} style={styles.miniStepItem}>
-                  <strong style={{ color: colors.navy }}>{s.title}</strong> — {s.body}
-                </span>
+                <div key={s.title} style={styles.miniStepItem}>
+                  <div style={styles.miniStepIcon}>
+                    <StepIcon name={s.icon} size={20} />
+                  </div>
+                  <p style={styles.miniStepTitle}>{s.title}</p>
+                  <p style={styles.miniStepBody}>{s.body}</p>
+                </div>
               ))}
             </div>
           </div>
@@ -253,101 +261,100 @@ function HomePage() {
               View demo
             </a>
           </div>
-          <div style={{ marginTop: 32, display: "flex", flexDirection: "column", gap: 10 }}>
+          <div className="marketing-mini-steps" style={{ marginTop: 32 }}>
             {MINI_STEPS.map((s) => (
-              <span key={s.title} style={styles.miniStepItem}>
-                <strong style={{ color: colors.navy }}>{s.title}</strong> — {s.body}
-              </span>
+              <div key={s.title} style={styles.miniStepItem}>
+                <div style={styles.miniStepIcon}>
+                  <StepIcon name={s.icon} size={20} />
+                </div>
+                <p style={styles.miniStepTitle}>{s.title}</p>
+                <p style={styles.miniStepBody}>{s.body}</p>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* 02 — Product idea: one flow statement, not three cards. */}
-      <Reveal>
-        <section id="flow" style={styles.flowSection}>
-          <div className="marketing-flow-row">
-            <span style={styles.flowWord}>Stock</span>
-            <span className="marketing-flow-arrow-desktop" style={styles.flowArrow}>
-              →
+      {/* Category ticker — honest: retail categories saleis.live serves, not fabricated client logos. */}
+      <div style={styles.tickerBand}>
+        <div className="marketing-ticker-track">
+          {[...CATEGORY_TICKER, ...CATEGORY_TICKER].map((cat, i) => (
+            <span key={cat + i} style={styles.tickerItem}>
+              {cat}
+              <span style={styles.tickerDot}>•</span>
             </span>
-            <span className="marketing-flow-arrow-mobile" style={styles.flowArrow}>
-              ↓
-            </span>
-            <span style={styles.flowWord}>AI</span>
-            <span className="marketing-flow-arrow-desktop" style={styles.flowArrow}>
-              →
-            </span>
-            <span className="marketing-flow-arrow-mobile" style={styles.flowArrow}>
-              ↓
-            </span>
-            <span style={styles.flowWord}>Branded sale</span>
-          </div>
-          <p style={styles.flowSub}>Unsold inventory becomes a live, branded storefront — saleis.live handles everything in between.</p>
-        </section>
-      </Reveal>
+          ))}
+        </div>
+      </div>
 
-      {/* 03 — How it works: sequence, not a feature grid. */}
+      {/* 02 — How it works: horizontal 3-column sequence, matching the approved board. */}
       <Reveal>
-        <section id="how-it-works" style={styles.howSection}>
+        <section id="how-it-works" style={{ ...styles.howSection, background: colors.paper }}>
           <h2 style={styles.h2}>How saleis.live works</h2>
           <p style={styles.sectionSub}>Three simple steps from stock to sale.</p>
-          <div style={{ marginTop: 56 }}>
+          <div className="marketing-steps-row" style={{ marginTop: 56 }}>
             {STEPS.map((step, i) => (
-              <div key={step.title} className="marketing-step-row">
-                <div style={styles.stepBadgeGroup}>
-                  <span style={styles.stepNumberBadge}>{String(i + 1).padStart(2, "0")}</span>
-                  <div style={styles.stepIconBox}>
-                    <StepIcon name={step.icon} size={26} />
-                  </div>
-                </div>
+              <Fragment key={step.title}>
                 <div>
+                  <div style={styles.stepColHead}>
+                    <span style={styles.stepNumberBadge}>{String(i + 1).padStart(2, "0")}</span>
+                    <div style={styles.stepIconBox}>
+                      <StepIcon name={step.icon} size={28} />
+                    </div>
+                  </div>
                   <h3 style={styles.stepRowTitle}>{step.title}</h3>
                   <p style={styles.stepRowBody}>{step.body}</p>
                 </div>
-              </div>
+                {i < STEPS.length - 1 ? (
+                  <div className="marketing-step-arrow">
+                    <ArrowIcon />
+                  </div>
+                ) : null}
+              </Fragment>
             ))}
           </div>
         </section>
       </Reveal>
 
-      {/* 04 — See saleis.live in action: asymmetric hierarchy, product as the hero of the section. */}
+      {/* 03 — See saleis.live in action: equal-weight panels inside one bordered frame, so the section reads as one unit. */}
       <Reveal>
         <section id="demo" style={styles.actionSection}>
           <h2 style={styles.h2}>See saleis.live in action</h2>
           <p style={styles.sectionSub}>Real screenshots of the actual product — your own store, on your own subdomain, is what you get after "Get saleis.live".</p>
-          <div className="marketing-action-grid" style={{ marginTop: 56 }}>
-            <a href={ADMIN_URL} style={styles.actionPrimary}>
-              <div className="marketing-action-visual" style={styles.actionPrimaryImageFrame}>
-                <img src="/images/admin-demo.jpg" alt="The real saleis.live admin panel" style={styles.actionImage} />
-              </div>
-              <div style={styles.actionCaption}>
-                <p style={styles.actionEyebrow}>FOR SELLERS</p>
-                <p style={styles.actionText}>Upload stock, edit with AI, and launch a branded sale — from one admin panel.</p>
-                <span className="marketing-arrow-link" style={styles.actionLink}>View admin demo <span className="arrow-glyph">→</span></span>
-              </div>
-            </a>
-            <a href={DEMO_STORE_URL} style={styles.actionSecondary}>
-              <div className="marketing-action-visual" style={styles.actionSecondaryImageFrame}>
-                <img src="/images/demo-store.jpg" alt="The real saleis.live demo storefront" style={styles.actionImage} />
-              </div>
-              <div style={styles.actionCaption}>
-                <p style={styles.actionEyebrow}>FOR BUYERS</p>
-                <p style={styles.actionText}>A branded storefront your customers browse, bag and check out from.</p>
-                <span className="marketing-arrow-link" style={styles.actionLink}>View demo store <span className="arrow-glyph">→</span></span>
-              </div>
-            </a>
+          <div style={styles.actionFrame}>
+            <div className="marketing-action-grid" style={{ marginTop: 0 }}>
+              <a href={ADMIN_URL} style={styles.actionPanel}>
+                <div className="marketing-action-visual" style={styles.actionImageFrame}>
+                  <img src="/images/admin-demo.jpg" alt="The real saleis.live admin panel" style={styles.actionImage} />
+                </div>
+                <div style={styles.actionCaption}>
+                  <p style={styles.actionEyebrow}>FOR SELLERS</p>
+                  <p style={styles.actionText}>Upload stock, edit with AI, and launch a branded sale — from one admin panel.</p>
+                  <span className="marketing-arrow-link" style={styles.actionLink}>View admin demo <span className="arrow-glyph">→</span></span>
+                </div>
+              </a>
+              <a href={DEMO_STORE_URL} style={styles.actionPanel}>
+                <div className="marketing-action-visual" style={styles.actionImageFrame}>
+                  <img src="/images/demo-store.jpg" alt="The real saleis.live demo storefront" style={styles.actionImage} />
+                </div>
+                <div style={styles.actionCaption}>
+                  <p style={styles.actionEyebrow}>FOR BUYERS</p>
+                  <p style={styles.actionText}>A branded storefront your customers browse, bag and check out from.</p>
+                  <span className="marketing-arrow-link" style={styles.actionLink}>View demo store <span className="arrow-glyph">→</span></span>
+                </div>
+              </a>
+            </div>
           </div>
         </section>
       </Reveal>
 
-      {/* 05 — Built to integrate: technical register, spec-sheet row instead of icon tiles. */}
+      {/* 04 — Built to integrate: technical register, tinted band. */}
       <Reveal>
-        <section id="integrate" style={styles.integrateSection}>
+        <section id="integrate" style={{ ...styles.integrateSection, background: colors.bluepale }}>
           <div style={styles.integrateHead}>
-            <h2 style={{ ...styles.h2, textAlign: "left" }}>Built to integrate</h2>
-            <p style={styles.integrateBody}>saleis.live is designed as a platform, not a closed storefront. Connect product data, payments, fulfilment and existing commerce infrastructure.</p>
-            <a href="#/developers" className="marketing-arrow-link" style={styles.integrateLink}>
+            <h2 style={styles.h2}>Built to integrate</h2>
+            <p style={{ ...styles.integrateBody, textAlign: "center", marginLeft: "auto", marginRight: "auto" }}>saleis.live is designed as a platform, not a closed storefront. Connect product data, payments, fulfilment and existing commerce infrastructure.</p>
+            <a href="#/developers" className="marketing-arrow-link" style={{ ...styles.integrateLink, display: "flex", justifyContent: "center" }}>
               Developers <span className="arrow-glyph">→</span>
             </a>
           </div>
@@ -367,7 +374,7 @@ function HomePage() {
         </section>
       </Reveal>
 
-      {/* 07 — Final CTA: statement + button + space, nothing else. */}
+      {/* 05 — Final CTA: statement + button + space, nothing else. */}
       <section id="cta" style={styles.ctaBand}>
         <h2 style={styles.ctaTitle}>Your sale. Your brand. Our technology.</h2>
         <p style={styles.ctaSub}>Join brands and retailers using saleis.live to unlock value from unsold stock.</p>
@@ -376,12 +383,16 @@ function HomePage() {
         </a>
       </section>
 
-      {/* 06 — Why saleis.live: editorial statements, typography and space do the work. */}
+      {/* 06 — Why saleis.live: titled, iconed, symmetric grid. */}
       <Reveal>
         <section id="why" style={styles.whySection}>
+          <h2 style={styles.h2}>Why saleis.live</h2>
           <div className="marketing-why-grid">
             {TRUST_BAR.map((t) => (
               <div key={t.title}>
+                <div style={styles.stepIconBox}>
+                  <StepIcon name={t.icon} size={24} />
+                </div>
                 <h3 style={styles.whyTitle}>{t.title}</h3>
                 <p style={styles.whyBody}>{t.body}</p>
               </div>
@@ -467,6 +478,9 @@ const STEP_ICON_PATHS = {
   card: "M2 5h20v14H2z|M2 10h20M6 15h4",
   truck: "M2 7h11v10H2zM13 10h5l3 3v4h-8z|M6 18a1.6 1.6 0 1 0 0-3.2 1.6 1.6 0 0 0 0 3.2z|M17 18a1.6 1.6 0 1 0 0-3.2 1.6 1.6 0 0 0 0 3.2z",
   db: "M4 5c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3z|M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5|M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3",
+  upload: "M12 15V4M12 4l-4.5 4.5M12 4l4.5 4.5|M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2",
+  shield: "M12 3l7.5 3.2v5.8c0 4.8-3.2 8-7.5 9.5-4.3-1.5-7.5-4.7-7.5-9.5V6.2L12 3z|M8.5 12l2.3 2.3L15.5 9.5",
+  star: "M12 3l2.6 5.6 6.1.6-4.6 4.1 1.3 6-5.4-3.1-5.4 3.1 1.3-6-4.6-4.1 6.1-.6z",
 };
 
 function StepIcon({ name, size = 20 }: { name?: string; size?: number }) {
@@ -477,6 +491,14 @@ function StepIcon({ name, size = 20 }: { name?: string; size?: number }) {
       {paths.split("|").map((d) => (
         <path key={d} d={d} />
       ))}
+    </svg>
+  );
+}
+
+function ArrowIcon() {
+  return (
+    <svg width="28" height="16" viewBox="0 0 28 16" fill="none" stroke={colors.stone} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 8h24M20 2l6 6-6 6" />
     </svg>
   );
 }
@@ -541,25 +563,26 @@ const styles: Record<string, React.CSSProperties> = {
   primaryButton: { display: "inline-block", background: colors.navy, color: colors.white, fontSize: 14, fontWeight: 700, padding: "15px 28px", borderRadius: 999, textDecoration: "none" },
   secondaryButton: { display: "inline-block", background: "transparent", color: colors.ink, fontSize: 14, fontWeight: 700, padding: "15px 28px", borderRadius: 999, textDecoration: "none", border: `1px solid ${colors.border}` },
 
-  miniStepItem: { fontSize: 13, color: colors.muted, lineHeight: 1.5 },
+  miniStepItem: { flex: 1, minWidth: 160 },
+  miniStepIcon: { width: 40, height: 40, borderRadius: 10, background: colors.bluepale, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10 },
+  miniStepTitle: { fontSize: 14, fontWeight: 700, color: colors.navy, margin: "0 0 4px" },
+  miniStepBody: { fontSize: 13, color: colors.muted, margin: 0, lineHeight: 1.5 },
+
+  tickerBand: { background: colors.navy, padding: "16px 0", overflow: "hidden" },
+  tickerItem: { display: "inline-flex", alignItems: "center", fontFamily: DISPLAY_FONT, fontSize: 20, color: colors.white, padding: "0 28px", whiteSpace: "nowrap" },
+  tickerDot: { marginLeft: 28, color: "rgba(255,255,255,0.35)" },
 
   section: { padding: "140px 32px", maxWidth: 1320, margin: "0 auto" },
   sectionSub: { fontSize: 16, color: colors.muted, textAlign: "center", maxWidth: 560, margin: "16px auto 0" },
 
-  // 02 — product idea flow statement
-  flowSection: { padding: "120px 32px", maxWidth: 1320, margin: "0 auto", textAlign: "center" },
-  flowWord: { fontFamily: DISPLAY_FONT, fontWeight: 500, fontSize: 56, color: colors.navy },
-  flowArrow: { fontFamily: DISPLAY_FONT, fontSize: 34, color: colors.stone },
-  flowSub: { fontSize: 16, color: colors.muted, marginTop: 24, maxWidth: 480, marginLeft: "auto", marginRight: "auto" },
-
-  // 03 — how it works — numeral badge + icon box, matching the approved board.
-  howSection: { padding: "128px 32px", maxWidth: 900, margin: "0 auto" },
-  stepBadgeGroup: { display: "flex", alignItems: "center", gap: 12, flexShrink: 0, width: 130 },
+  // 02 — how it works — horizontal 3-column sequence, numeral badge + icon box, matching the approved board.
+  howSection: { padding: "128px 32px", maxWidth: 1200, margin: "0 auto" },
+  stepColHead: { display: "flex", alignItems: "center", gap: 12, marginBottom: 20 },
   stepNumberBadge: {
     width: 44,
     height: 44,
     borderRadius: "50%",
-    background: colors.bluepale,
+    background: colors.surface,
     color: colors.navy,
     fontWeight: 700,
     fontSize: 15,
@@ -570,27 +593,26 @@ const styles: Record<string, React.CSSProperties> = {
     fontVariantNumeric: "lining-nums tabular-nums",
   },
   stepIconBox: { width: 56, height: 56, borderRadius: 14, background: colors.bluepale, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  stepRowTitle: { fontSize: 20, fontWeight: 600, margin: "0 0 6px", color: colors.navy },
-  stepRowBody: { fontSize: 16, color: colors.muted, lineHeight: 1.6, margin: 0, maxWidth: 460 },
+  stepRowTitle: { fontSize: 19, fontWeight: 600, margin: "0 0 8px", color: colors.navy },
+  stepRowBody: { fontSize: 16, color: colors.muted, lineHeight: 1.6, margin: 0 },
 
-  // 04 — see saleis.live in action
+  // 03 — see saleis.live in action — equal panels inside one bordered frame
   actionSection: { padding: "140px 32px", maxWidth: 1320, margin: "0 auto" },
-  actionPrimary: { display: "block", textDecoration: "none", color: colors.ink },
-  actionPrimaryImageFrame: { position: "relative", aspectRatio: "1280 / 620", borderRadius: 4, overflow: "hidden", background: colors.paper, boxShadow: "0 30px 70px rgba(17,17,17,0.12)" },
-  actionSecondary: { display: "block", textDecoration: "none", color: colors.ink, marginTop: 8 },
-  actionSecondaryImageFrame: { position: "relative", aspectRatio: "1280 / 620", borderRadius: 4, overflow: "hidden", background: colors.paper },
+  actionFrame: { marginTop: 56, border: `1px solid ${colors.border}`, borderRadius: 16, padding: 40, background: colors.surface },
+  actionPanel: { display: "block", textDecoration: "none", color: colors.ink },
+  actionImageFrame: { position: "relative", aspectRatio: "1280 / 620", borderRadius: 6, overflow: "hidden", background: colors.paper },
   actionImage: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" },
-  actionCaption: { paddingTop: 22, maxWidth: 460 },
-  actionEyebrow: { fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: colors.navy, margin: "0 0 8px" },
+  actionCaption: { paddingTop: 22 },
+  actionEyebrow: { fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: colors.navy, margin: "0 0 8px" },
   actionText: { fontSize: 16, color: colors.muted, lineHeight: 1.6, margin: "0 0 10px" },
-  actionLink: { fontSize: 14, fontWeight: 700, color: colors.navy },
+  actionLink: { fontSize: 15, fontWeight: 700, color: colors.navy },
 
-  // 05 — built to integrate
-  integrateSection: { padding: "140px 32px", maxWidth: 1320, margin: "0 auto" },
-  integrateHead: { maxWidth: 560 },
+  // 04 — built to integrate
+  integrateSection: { padding: "140px 32px", maxWidth: 1320, margin: "0 auto", textAlign: "center" },
+  integrateHead: { maxWidth: 640, margin: "0 auto" },
   integrateBody: { fontSize: 16, color: colors.muted, lineHeight: 1.6, margin: "16px 0 14px" },
-  integrateLink: { fontSize: 14, fontWeight: 700, color: colors.navy, textDecoration: "none" },
-  specItem: { padding: "24px 20px", display: "flex", flexDirection: "column", gap: 14 },
+  integrateLink: { fontSize: 15, fontWeight: 700, color: colors.navy, textDecoration: "none" },
+  specItem: { padding: "24px 20px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 14 },
   specIndex: { display: "block", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, color: colors.muted, marginBottom: 4 },
   specLabel: { display: "block", fontSize: 15, fontWeight: 600, color: colors.ink },
 
@@ -607,9 +629,9 @@ const styles: Record<string, React.CSSProperties> = {
   ctaButton: { display: "inline-block", background: colors.white, color: colors.ink, fontSize: 14, fontWeight: 700, padding: "16px 32px", borderRadius: 999, textDecoration: "none" },
 
   // 06 — why saleis.live (editorial statements)
-  whySection: { padding: "40px 32px 140px", maxWidth: 1000, margin: "0 auto" },
-  whyTitle: { fontFamily: DISPLAY_FONT, fontWeight: 500, fontSize: 24, color: colors.navy, margin: "0 0 10px", lineHeight: 1.2 },
-  whyBody: { fontSize: 16, color: colors.muted, lineHeight: 1.6, margin: 0 },
+  whySection: { padding: "140px 32px", maxWidth: 1200, margin: "0 auto" },
+  whyTitle: { fontFamily: DISPLAY_FONT, fontWeight: 500, fontSize: 21, color: colors.navy, margin: "16px 0 8px", lineHeight: 1.25 },
+  whyBody: { fontSize: 15, color: colors.muted, lineHeight: 1.6, margin: 0 },
 
   footer: { display: "flex", alignItems: "center", justifyContent: "center", gap: 16, padding: "32px", background: "#F7F2ED" },
 };
