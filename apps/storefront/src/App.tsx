@@ -159,17 +159,25 @@ function HomeView({ brand, products, onAddToBag }: { brand: Brand; products: Pro
   return (
     <>
       <style>{`
+        /* Frame matches the source images' own aspect ratio exactly, so the
+           browser never has to crop — height always scales with width. The
+           max-width just keeps it from growing absurdly tall on very wide
+           monitors; background fills any leftover side margin. */
+        .hero-frame { aspect-ratio: 1774 / 887; max-width: 1600px; margin: 0 auto; }
+        @media (max-width: 700px) { .hero-frame { aspect-ratio: 1149 / 1369; max-width: 100%; } }
         .hero-shop-cta { bottom: 18%; }
         @media (max-width: 700px) { .hero-shop-cta { bottom: 6%; } }
       `}</style>
-      <section style={styles.hero}>
-        <picture>
-          <source media="(max-width: 700px)" srcSet={apiClient.resolveAssetUrl("/assets/hero/hero-mobile.png")} />
-          <img src={apiClient.resolveAssetUrl("/assets/hero/hero-laptop.png")} alt="Stock in. Sale live. A new AI-powered way to turn your catalogue into a complete branded sale." style={styles.heroImage} />
-        </picture>
-        <a href="#products-grid" className="hero-shop-cta" style={styles.heroCta}>
-          Shop the sale
-        </a>
+      <section style={{ background: colors.background }}>
+        <div className="hero-frame" style={styles.hero}>
+          <picture>
+            <source media="(max-width: 700px)" srcSet={apiClient.resolveAssetUrl("/assets/hero/hero-mobile.png")} />
+            <img src={apiClient.resolveAssetUrl("/assets/hero/hero-laptop.png")} alt="Stock in. Sale live. A new AI-powered way to turn your catalogue into a complete branded sale." style={styles.heroImage} />
+          </picture>
+          <a href="#products-grid" className="hero-shop-cta" style={styles.heroCta}>
+            Shop the sale
+          </a>
+        </div>
       </section>
 
       <div style={styles.pillRow}>
@@ -567,7 +575,7 @@ const styles: Record<string, React.CSSProperties> = {
   bagLink: { fontSize: 13, fontWeight: 700, color: colors.navy, textDecoration: "none" },
   backLink: { display: "inline-block", fontSize: 13, fontWeight: 600, color: "#5C574C", textDecoration: "none", margin: "24px 0 0" },
 
-  hero: { position: "relative", height: "clamp(340px, 32vw, 460px)", overflow: "hidden", background: colors.background },
+  hero: { position: "relative", overflow: "hidden", background: colors.background },
   heroImage: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center" },
   eyebrowSmall: { fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: colors.ultramarine, margin: "0 0 8px" },
   h1: { fontFamily: typography.fontFamily.display, fontSize: 44, margin: "0 0 8px", lineHeight: 1.1 },
