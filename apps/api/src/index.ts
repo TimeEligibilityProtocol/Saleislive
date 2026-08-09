@@ -8,6 +8,7 @@ import { tenantRouter } from "./middleware/tenantRouter.js";
 import { analyzeProductRouter } from "./routes/analyzeProduct.js";
 import { brandsRouter } from "./routes/brands.js";
 import { campaignsRouter } from "./routes/campaigns.js";
+import { checkoutRouter } from "./routes/checkout.js";
 import { healthRouter } from "./routes/health.js";
 import { importsRouter } from "./routes/imports.js";
 import { ordersRouter } from "./routes/orders.js";
@@ -30,6 +31,7 @@ app.use(adminProductsRouter());
 app.use(analyzeProductRouter(env.anthropicApiKey));
 app.use(campaignsRouter());
 app.use(ordersRouter());
+app.use(checkoutRouter());
 
 app.listen(env.port, "0.0.0.0", () => {
   console.log(`saleis.live api listening on :${env.port} (${env.nodeEnv})`);

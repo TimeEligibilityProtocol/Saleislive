@@ -1,4 +1,4 @@
-import { Brand, Campaign, ImportBatch, IntakeMethod, MatchMethod, Order, ParsedImportRow, PhotoTreatment, Product } from "@saleis-live/domain";
+import { Brand, Campaign, DeliveryMethod, ImportBatch, IntakeMethod, MatchMethod, Order, ParsedImportRow, PhotoTreatment, Product } from "@saleis-live/domain";
 
 export interface ApiClientConfig {
   baseUrl: string;
@@ -222,6 +222,24 @@ export class ApiClient {
 
   async cancelOrder(id: string): Promise<Order> {
     const { order } = await this.request<{ order: Order }>(`/api/orders/${id}/cancel`, { method: "POST" });
+    return order;
+  }
+
+  /** Storefront's test checkout — creates a real Order, no real payment/courier involved. See routes/checkout.ts's doc comment. */
+  async startCheckout(input: {
+    brandId: string;
+    productId: string;
+    quantity: number;
+    customerName: string;
+    customerLocation: string;
+    deliveryMethod: DeliveryMethod;
+  }): Promise<Order> {
+    const { order } = await this.request<{ order: Order }>("/api/checkout/start", { method: "POST", body: JSON.stringify(input) });
+    return order;
+  }
+
+  async confirmTestPayment(orderId: string): Promise<Order> {
+    const { order } = await this.request<{ order: Order }>(`/api/checkout/${orderId}/confirm-test-payment`, { method: "POST" });
     return order;
   }
 }
