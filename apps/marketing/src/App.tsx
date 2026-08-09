@@ -641,7 +641,7 @@ const styles: Record<string, React.CSSProperties> = {
   secondaryButton: { display: "inline-block", background: "transparent", color: colors.ink, fontSize: 14, fontWeight: 700, padding: "15px 28px", borderRadius: 999, textDecoration: "none", border: `1px solid ${colors.border}` },
 
   miniStepItem: { flex: 1, minWidth: 160 },
-  miniStepIcon: { width: 40, height: 40, borderRadius: 12, background: colors.pale, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10 },
+  miniStepIcon: { width: 40, height: 40, borderRadius: 12, background: colors.paper, border: `1px solid ${colors.border}`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10 },
   miniStepTitle: { fontSize: 14, fontWeight: 700, color: colors.navy, margin: "0 0 4px" },
   miniStepBody: { fontSize: 13, color: colors.muted, margin: 0, lineHeight: 1.5 },
 
@@ -669,7 +669,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
     fontVariantNumeric: "lining-nums tabular-nums",
   },
-  stepIconBox: { width: 56, height: 56, borderRadius: 14, background: colors.pale, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  stepIconBox: { width: 56, height: 56, borderRadius: 14, background: colors.paper, border: `1px solid ${colors.border}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
   stepRowTitle: { fontSize: 19, fontWeight: 600, margin: "0 0 8px", color: colors.navy },
   stepRowBody: { fontSize: 16, color: colors.muted, lineHeight: 1.6, margin: 0 },
 
@@ -695,7 +695,7 @@ const styles: Record<string, React.CSSProperties> = {
   specLabel: { display: "block", fontSize: 15, fontWeight: 600, color: colors.ink },
 
   devCard: { background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 16, padding: 32, textAlign: "center" },
-  devCardIcon: { width: 52, height: 52, borderRadius: 12, background: colors.pale, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" },
+  devCardIcon: { width: 52, height: 52, borderRadius: 12, background: colors.paper, border: `1px solid ${colors.border}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" },
   devCardTitle: { fontFamily: DISPLAY_FONT, fontSize: 26, color: colors.navy, fontWeight: 500, margin: "0 0 14px" },
   devCardBody: { fontSize: 14, color: colors.muted, lineHeight: 1.7, margin: "0 auto", maxWidth: 420, textAlign: "left" },
   codeBlock: { fontSize: 11, lineHeight: 1.6, background: colors.background, borderRadius: 8, padding: 14, marginTop: 14, overflowX: "auto", whiteSpace: "pre", textAlign: "left" },
