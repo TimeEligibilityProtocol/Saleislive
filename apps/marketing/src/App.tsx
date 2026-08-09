@@ -122,7 +122,6 @@ export function App() {
       {onDevelopers ? <DevelopersPage /> : <HomePage />}
 
       <footer style={styles.footer}>
-        <Logo height={16} />
         <span style={{ fontSize: 12, color: colors.muted }}>© {new Date().getFullYear()} saleis.live</span>
       </footer>
     </div>
@@ -148,11 +147,13 @@ function BoardImage({
 }) {
   return (
     <>
-      <div className="board-desktop" style={{ position: "relative" }}>
-        <img src={desktopSrc} alt={alt} style={{ width: "100%", display: "block", aspectRatio: desktopRatio }} />
-        {desktopHotspots?.map((h) => (
-          <a key={h.label} href={h.href} aria-label={h.label} style={hotspotStyle(h.box)} />
-        ))}
+      <div className="board-desktop" style={{ maxWidth: 1264, margin: "0 auto", padding: "0 32px", boxSizing: "border-box" }}>
+        <div style={{ position: "relative" }}>
+          <img src={desktopSrc} alt={alt} style={{ width: "100%", display: "block", aspectRatio: desktopRatio }} />
+          {desktopHotspots?.map((h) => (
+            <a key={h.label} href={h.href} aria-label={h.label} style={hotspotStyle(h.box)} />
+          ))}
+        </div>
       </div>
       {mobileSrc ? (
         <div className="board-mobile" style={{ position: "relative" }}>
@@ -195,7 +196,7 @@ function HomePage() {
         <BoardImage
           alt="How saleis.live works — three simple steps from stock to sale."
           desktopSrc="/images/boards/02-how-it-works-laptop.png"
-          desktopRatio="3548 / 1774"
+          desktopRatio="3282 / 1396"
           mobileSrc="/images/boards/02-how-it-works-mobile.png"
           mobileRatio="1148 / 1371"
         />
@@ -205,12 +206,12 @@ function HomePage() {
         <BoardImage
           alt="See saleis.live in action — for sellers, for buyers, and the sales dashboard."
           desktopSrc="/images/boards/03-in-action-laptop.png"
-          desktopRatio="3072 / 2048"
+          desktopRatio="2945 / 1388"
           mobileSrc="/images/boards/03-in-action-mobile.png"
           mobileRatio="1147 / 1371"
           desktopHotspots={[
-            { href: ADMIN_URL, label: "Start selling now", box: [2.6, 63.5, 12.5, 5.6] },
-            { href: DEMO_STORE_URL, label: "Shop sales live", box: [33.7, 63.5, 11.9, 5.6] },
+            { href: ADMIN_URL, label: "Start selling now", box: [0.71, 80.3, 13.04, 8.26] },
+            { href: DEMO_STORE_URL, label: "Shop sales live", box: [33.14, 80.3, 12.39, 8.26] },
           ]}
         />
       </section>
@@ -501,5 +502,5 @@ const styles: Record<string, React.CSSProperties> = {
   trustTitle: { fontFamily: typography.fontFamily.display, fontSize: 19, fontWeight: 400, color: colors.navy, margin: "0 0 10px" },
   trustBody: { fontSize: 13, color: colors.muted, lineHeight: 1.6, margin: 0 },
 
-  footer: { display: "flex", alignItems: "center", justifyContent: "center", gap: 16, padding: "32px", borderTop: `1px solid ${colors.border}` },
+  footer: { display: "flex", alignItems: "center", justifyContent: "center", gap: 16, padding: "32px", background: "#F7F2ED" },
 };
