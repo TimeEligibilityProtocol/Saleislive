@@ -158,6 +158,15 @@ export function App() {
         .heading-logo { display: inline-flex; align-items: center; vertical-align: -4px; margin: 0 2px; }
         @media (max-width: 620px) { .heading-logo svg { height: 22px !important; width: auto !important; } }
 
+        @keyframes iconGlow {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(23,59,143,0); }
+          50% { box-shadow: 0 0 18px 3px rgba(23,59,143,0.35); }
+        }
+        .icon-glow { animation: iconGlow 3.2s ease-in-out infinite; }
+        .icon-glow:nth-of-type(2) { animation-delay: 0.4s; }
+        .icon-glow:nth-of-type(3) { animation-delay: 0.8s; }
+        @media (prefers-reduced-motion: reduce) { .icon-glow { animation: none; } }
+
         @keyframes heroEnter { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: translateY(0); } }
         .hero-enter { animation: heroEnter 1s cubic-bezier(0.16, 1, 0.3, 1) both; }
         @keyframes kenburns { from { transform: scale(1); } to { transform: scale(1.06); } }
@@ -239,7 +248,7 @@ function HomePage() {
             <div className="marketing-mini-steps" style={{ marginTop: 48 }}>
               {MINI_STEPS.map((s) => (
                 <div key={s.title} style={styles.miniStepItem}>
-                  <div style={styles.miniStepIcon}>
+                  <div className="icon-glow" style={styles.miniStepIcon}>
                     <StepIcon name={s.icon} size={20} />
                   </div>
                   <p style={styles.miniStepTitle}>{s.title}</p>
@@ -271,7 +280,7 @@ function HomePage() {
           <div className="marketing-mini-steps" style={{ marginTop: 32 }}>
             {MINI_STEPS.map((s) => (
               <div key={s.title} style={styles.miniStepItem}>
-                <div style={styles.miniStepIcon}>
+                <div className="icon-glow" style={styles.miniStepIcon}>
                   <StepIcon name={s.icon} size={20} />
                 </div>
                 <p style={styles.miniStepTitle}>{s.title}</p>
@@ -307,12 +316,12 @@ function HomePage() {
                 <div>
                   <div style={styles.stepColHead}>
                     <span style={styles.stepNumberBadge}>{String(i + 1).padStart(2, "0")}</span>
-                    <div style={styles.stepIconBox}>
+                    <div className="icon-glow" style={styles.stepIconBox}>
                       <StepIcon name={step.icon} size={28} />
                     </div>
                   </div>
                   <h3 style={styles.stepRowTitle}>{step.title}</h3>
-                  <p style={styles.stepRowBody}>{step.body}</p>
+                  <p style={styles.stepRowBody}>{withLogo(step.body)}</p>
                 </div>
                 {i < STEPS.length - 1 ? (
                   <div className="marketing-step-arrow">
@@ -335,21 +344,21 @@ function HomePage() {
           <div style={styles.actionFrame}>
             <div className="marketing-action-grid" style={{ marginTop: 0 }}>
               <a href={ADMIN_URL} style={styles.actionPanel}>
+                <span style={styles.actionBadge}>FOR SELLERS</span>
                 <div className="marketing-action-visual" style={styles.actionImageFrame}>
                   <img src="/images/admin-demo.jpg" alt="The real saleis.live admin panel" style={styles.actionImage} />
                 </div>
                 <div style={styles.actionCaption}>
-                  <p style={styles.actionEyebrow}>FOR SELLERS</p>
                   <p style={styles.actionText}>Upload stock, edit with AI, and launch a branded sale — from one admin panel.</p>
                   <span className="marketing-arrow-link" style={styles.actionLink}>View admin demo <span className="arrow-glyph">→</span></span>
                 </div>
               </a>
               <a href={DEMO_STORE_URL} style={styles.actionPanel}>
+                <span style={styles.actionBadge}>FOR BUYERS</span>
                 <div className="marketing-action-visual" style={styles.actionImageFrame}>
                   <img src="/images/demo-store.jpg" alt="The real saleis.live demo storefront" style={styles.actionImage} />
                 </div>
                 <div style={styles.actionCaption}>
-                  <p style={styles.actionEyebrow}>FOR BUYERS</p>
                   <p style={styles.actionText}>A branded storefront your customers browse, bag and check out from.</p>
                   <span className="marketing-arrow-link" style={styles.actionLink}>View demo store <span className="arrow-glyph">→</span></span>
                 </div>
@@ -364,7 +373,7 @@ function HomePage() {
         <section id="integrate" style={{ ...styles.integrateSection, background: colors.paper }}>
           <div style={styles.integrateHead}>
             <h2 style={styles.h2}>Built to integrate</h2>
-            <p style={{ ...styles.integrateBody, textAlign: "center", marginLeft: "auto", marginRight: "auto" }}>saleis.live is designed as a platform, not a closed storefront. Connect product data, payments, fulfilment and existing commerce infrastructure.</p>
+            <p style={{ ...styles.integrateBody, textAlign: "center", marginLeft: "auto", marginRight: "auto" }}>{withLogo("saleis.live is designed as a platform, not a closed storefront. Connect product data, payments, fulfilment and existing commerce infrastructure.")}</p>
             <a href="#/developers" className="marketing-arrow-link" style={{ ...styles.integrateLink, display: "flex", justifyContent: "center" }}>
               Developers <span className="arrow-glyph">→</span>
             </a>
@@ -372,7 +381,7 @@ function HomePage() {
           <div className="marketing-spec-row" style={{ marginTop: 40 }}>
             {INTEGRATIONS.map((item, i) => (
               <div key={item.label} style={styles.specItem}>
-                <div style={styles.stepIconBox}>
+                <div className="icon-glow" style={styles.stepIconBox}>
                   <StepIcon name={item.icon} size={24} />
                 </div>
                 <div>
@@ -403,11 +412,11 @@ function HomePage() {
           <div className="marketing-why-grid">
             {TRUST_BAR.map((t) => (
               <div key={t.title}>
-                <div style={styles.stepIconBox}>
+                <div className="icon-glow" style={styles.stepIconBox}>
                   <StepIcon name={t.icon} size={24} />
                 </div>
                 <h3 style={styles.whyTitle}>{t.title}</h3>
-                <p style={styles.whyBody}>{t.body}</p>
+                <p style={styles.whyBody}>{withLogo(t.body)}</p>
               </div>
             ))}
           </div>
@@ -426,7 +435,7 @@ function DevelopersPage() {
       <h1 style={{ ...styles.h2, textAlign: "left", marginTop: 16 }}>Built as a platform, not a one-off shop build.</h1>
       <div className="marketing-dev-grid" style={{ marginTop: 40 }}>
         <div style={styles.devCard}>
-          <div style={styles.devCardIcon}>
+          <div className="icon-glow" style={styles.devCardIcon}>
             <ShieldIcon />
           </div>
           <h3 style={styles.devCardTitle}>Architecture</h3>
@@ -436,7 +445,7 @@ function DevelopersPage() {
           </p>
         </div>
         <div style={styles.devCard}>
-          <div style={styles.devCardIcon}>
+          <div className="icon-glow" style={styles.devCardIcon}>
             <CodeIcon />
           </div>
           <h3 style={styles.devCardTitle}>Payments &amp; delivery — bring your own integration</h3>
@@ -457,7 +466,7 @@ POST  https://saleis.live/api/webhooks/payment/{brandId}
           </pre>
         </div>
         <div style={styles.devCard}>
-          <div style={styles.devCardIcon}>
+          <div className="icon-glow" style={styles.devCardIcon}>
             <MonitorIcon />
           </div>
           <h3 style={styles.devCardTitle}>Installable admin panel</h3>
@@ -467,7 +476,7 @@ POST  https://saleis.live/api/webhooks/payment/{brandId}
           </p>
         </div>
         <div style={styles.devCard}>
-          <div style={styles.devCardIcon}>
+          <div className="icon-glow" style={styles.devCardIcon}>
             <CloudIcon />
           </div>
           <h3 style={styles.devCardTitle}>Deployment</h3>
@@ -533,6 +542,23 @@ const STEP_ICON_PATHS: Record<string, string[]> = {
     "M12.971 1.816A5.23 5.23 0 0 1 14.25 5.25v1.875c0 .207.168.375.375.375H16.5a5.23 5.23 0 0 1 3.434 1.279 9.768 9.768 0 0 0-6.963-6.963Z",
   ],
 };
+
+function withLogo(text: string): React.ReactNode {
+  const parts = text.split("saleis.live");
+  if (parts.length === 1) return text;
+  const out: React.ReactNode[] = [];
+  parts.forEach((part, i) => {
+    out.push(<Fragment key={"t" + i}>{part}</Fragment>);
+    if (i < parts.length - 1) {
+      out.push(
+        <span key={"l" + i} className="heading-logo">
+          <Logo height={15} />
+        </span>,
+      );
+    }
+  });
+  return out;
+}
 
 function StepIcon({ name, size = 20 }: { name?: string; size?: number }) {
   const paths = name ? STEP_ICON_PATHS[name] : undefined;
@@ -615,7 +641,7 @@ const styles: Record<string, React.CSSProperties> = {
   secondaryButton: { display: "inline-block", background: "transparent", color: colors.ink, fontSize: 14, fontWeight: 700, padding: "15px 28px", borderRadius: 999, textDecoration: "none", border: `1px solid ${colors.border}` },
 
   miniStepItem: { flex: 1, minWidth: 160 },
-  miniStepIcon: { width: 40, height: 40, borderRadius: 12, background: colors.bluepale, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10 },
+  miniStepIcon: { width: 40, height: 40, borderRadius: 12, background: colors.pale, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10 },
   miniStepTitle: { fontSize: 14, fontWeight: 700, color: colors.navy, margin: "0 0 4px" },
   miniStepBody: { fontSize: 13, color: colors.muted, margin: 0, lineHeight: 1.5 },
 
@@ -623,12 +649,12 @@ const styles: Record<string, React.CSSProperties> = {
   tickerItem: { display: "inline-flex", alignItems: "center", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 16, fontWeight: 500, color: colors.white, padding: "0 28px", whiteSpace: "nowrap" },
   tickerDot: { marginLeft: 28, color: "rgba(255,255,255,0.35)" },
 
-  section: { padding: "140px 32px", maxWidth: 1320, margin: "0 auto" },
+  section: { padding: "96px 32px", maxWidth: 1320, margin: "0 auto" },
   sectionSub: { fontSize: 16, color: colors.muted, textAlign: "center", maxWidth: 560, margin: "16px auto 0" },
 
   // 02 — how it works — horizontal 3-column sequence, numeral badge + icon box, matching the approved board.
-  howSection: { padding: "128px 32px", maxWidth: 1200, margin: "0 auto" },
-  stepColHead: { display: "flex", alignItems: "center", gap: 12, marginBottom: 20 },
+  howSection: { padding: "88px 32px", maxWidth: 1200, margin: "0 auto" },
+  stepColHead: { display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginBottom: 20 },
   stepNumberBadge: {
     width: 44,
     height: 44,
@@ -643,23 +669,24 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
     fontVariantNumeric: "lining-nums tabular-nums",
   },
-  stepIconBox: { width: 56, height: 56, borderRadius: 14, background: colors.bluepale, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  stepIconBox: { width: 56, height: 56, borderRadius: 14, background: colors.pale, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
   stepRowTitle: { fontSize: 19, fontWeight: 600, margin: "0 0 8px", color: colors.navy },
   stepRowBody: { fontSize: 16, color: colors.muted, lineHeight: 1.6, margin: 0 },
 
   // 03 — see saleis.live in action — equal panels inside one bordered frame
-  actionSection: { padding: "140px 32px", maxWidth: 1320, margin: "0 auto" },
+  actionSection: { padding: "96px 32px", maxWidth: 1320, margin: "0 auto" },
   actionFrame: { marginTop: 56, border: `1px solid ${colors.border}`, borderRadius: 16, padding: 40, background: colors.surface },
   actionPanel: { display: "block", textDecoration: "none", color: colors.ink },
   actionImageFrame: { position: "relative", aspectRatio: "1280 / 620", borderRadius: 16, overflow: "hidden", background: colors.paper },
   actionImage: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" },
   actionCaption: { paddingTop: 22 },
   actionEyebrow: { fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: colors.navy, margin: "0 0 8px" },
+  actionBadge: { display: "inline-block", fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: colors.navy, background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 999, padding: "6px 14px", margin: "0 0 14px" },
   actionText: { fontSize: 16, color: colors.muted, lineHeight: 1.6, margin: "0 0 10px" },
   actionLink: { fontSize: 15, fontWeight: 700, color: colors.navy },
 
   // 04 — built to integrate
-  integrateSection: { padding: "140px 32px", maxWidth: 1320, margin: "0 auto", textAlign: "center" },
+  integrateSection: { padding: "96px 32px", maxWidth: 1320, margin: "0 auto", textAlign: "center" },
   integrateHead: { maxWidth: 640, margin: "0 auto" },
   integrateBody: { fontSize: 16, color: colors.muted, lineHeight: 1.6, margin: "16px 0 14px" },
   integrateLink: { fontSize: 15, fontWeight: 700, color: colors.navy, textDecoration: "none" },
@@ -668,19 +695,19 @@ const styles: Record<string, React.CSSProperties> = {
   specLabel: { display: "block", fontSize: 15, fontWeight: 600, color: colors.ink },
 
   devCard: { background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 16, padding: 32, textAlign: "center" },
-  devCardIcon: { width: 52, height: 52, borderRadius: 12, background: colors.bluepale, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" },
+  devCardIcon: { width: 52, height: 52, borderRadius: 12, background: colors.pale, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" },
   devCardTitle: { fontFamily: DISPLAY_FONT, fontSize: 26, color: colors.navy, fontWeight: 500, margin: "0 0 14px" },
   devCardBody: { fontSize: 14, color: colors.muted, lineHeight: 1.7, margin: "0 auto", maxWidth: 420, textAlign: "left" },
   codeBlock: { fontSize: 11, lineHeight: 1.6, background: colors.background, borderRadius: 8, padding: 14, marginTop: 14, overflowX: "auto", whiteSpace: "pre", textAlign: "left" },
 
   // 07 — final CTA
-  ctaBand: { background: colors.navy, padding: "160px 32px", textAlign: "center" },
+  ctaBand: { background: colors.navy, padding: "112px 32px", textAlign: "center" },
   ctaTitle: { fontFamily: DISPLAY_FONT, fontWeight: 500, fontSize: 48, color: colors.white, margin: "0 0 16px" },
   ctaSub: { fontSize: 16, color: colors.stone, margin: "0 0 32px", maxWidth: 480, marginLeft: "auto", marginRight: "auto" },
   ctaButton: { display: "inline-block", background: colors.white, color: colors.ink, fontSize: 14, fontWeight: 700, padding: "16px 32px", borderRadius: 999, textDecoration: "none" },
 
   // 06 — why saleis.live (editorial statements)
-  whySection: { padding: "140px 32px", maxWidth: 1200, margin: "0 auto" },
+  whySection: { padding: "96px 32px", maxWidth: 1200, margin: "0 auto" },
   whyTitle: { fontFamily: DISPLAY_FONT, fontWeight: 500, fontSize: 21, color: colors.navy, margin: "16px 0 8px", lineHeight: 1.25 },
   whyBody: { fontSize: 15, color: colors.muted, lineHeight: 1.6, margin: 0 },
 
