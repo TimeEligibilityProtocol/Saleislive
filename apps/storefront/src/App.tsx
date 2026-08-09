@@ -170,10 +170,13 @@ function HomeView({ brand, products, onAddToBag }: { brand: Brand; products: Pro
         .hero-frame { aspect-ratio: 1774 / 680; max-width: 1600px; margin: 0 auto; }
         @media (max-width: 700px) { .hero-frame { aspect-ratio: 1080 / 1290; max-width: 100%; } }
 
-        /* These hero images are just the tagline baked into the photo — no
-           button. This is a real, visible clickable button positioned by
-           percentage in the blank space below the text, so it tracks the
-           image at any width instead of drifting like a fixed-pixel value would. */
+        /* Live text overlaid on the clean photo (not baked into the image),
+           so the hero always renders in the current brand font — matches
+           the marketing site's hero pattern for typographic consistency. */
+        .hero-copy { left: 4.5%; top: 22%; max-width: 40%; }
+        @media (max-width: 700px) {
+          .hero-copy { left: 6.5%; right: 6.5%; max-width: none; top: 6%; }
+        }
         .hero-shop-cta { left: 4.5%; top: 68%; }
         @media (max-width: 700px) {
           .hero-shop-cta { left: 6.5%; top: auto; bottom: 13%; }
@@ -181,14 +184,15 @@ function HomeView({ brand, products, onAddToBag }: { brand: Brand; products: Pro
       `}</style>
       <section style={{ background: colors.background }}>
         <div className="hero-frame" style={styles.hero}>
-          <picture>
-            <source media="(max-width: 700px)" srcSet={apiClient.resolveAssetUrl(`/assets/hero/hero-mobile.png?v=${HERO_ASSET_VERSION}`)} />
-            <img
-              src={apiClient.resolveAssetUrl(`/assets/hero/hero-laptop.png?v=${HERO_ASSET_VERSION}`)}
-              alt="Stock in. Sale live. A new AI-powered way to turn your catalogue into a complete branded sale."
-              style={styles.heroImage}
-            />
-          </picture>
+          <img src="/images/hero-clean.png" alt="Products staged for a branded sale" style={styles.heroImage} />
+          <div className="hero-copy" style={styles.heroCopy}>
+            <h1 style={styles.heroTitle}>
+              Stock in.
+              <br />
+              Sale live.
+            </h1>
+            <p style={styles.heroSub}>A new AI-powered way to turn your catalogue into a complete branded sale.</p>
+          </div>
           <a href="#products-grid" className="hero-shop-cta" style={styles.heroCta}>
             Shop the sale
           </a>
@@ -601,7 +605,10 @@ const styles: Record<string, React.CSSProperties> = {
   backLink: { display: "inline-block", fontSize: 13, fontWeight: 600, color: "#5C574C", textDecoration: "none", margin: "24px 0 0" },
 
   hero: { position: "relative", overflow: "hidden", background: colors.background },
-  heroImage: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center bottom" },
+  heroImage: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "68% center" },
+  heroCopy: { position: "absolute", zIndex: 1 },
+  heroTitle: { fontFamily: "'Cormorant Garamond', 'Instrument Serif', Georgia, serif", fontWeight: 500, fontSize: "clamp(28px, 4.5vw, 56px)", color: colors.navy, margin: "0 0 12px", lineHeight: 1.05 },
+  heroSub: { fontSize: "clamp(13px, 1.6vw, 16px)", color: colors.muted, margin: 0, lineHeight: 1.5 },
   eyebrowSmall: { fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: colors.ultramarine, margin: "0 0 8px" },
   h1: { fontFamily: typography.fontFamily.display, fontSize: 44, margin: "0 0 8px", lineHeight: 1.1 },
   heroCta: {

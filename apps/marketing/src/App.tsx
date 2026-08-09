@@ -105,6 +105,9 @@ export function App() {
   const scrolled = useScrolled();
   const hash = useHashRoute();
   const onDevelopers = hash.startsWith("#/developers");
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [onDevelopers]);
 
   return (
     <div style={styles.page}>
@@ -145,11 +148,15 @@ export function App() {
         }
 
         .marketing-why-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px; margin-top: 56px; text-align: center; justify-items: center; }
+        .marketing-why-grid > div { display: flex; flex-direction: column; align-items: center; }
         @media (max-width: 900px) { .marketing-why-grid { grid-template-columns: 1fr 1fr; } }
         @media (max-width: 560px) { .marketing-why-grid { grid-template-columns: 1fr; } }
 
         .marketing-dev-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
         @media (max-width: 780px) { .marketing-dev-grid { grid-template-columns: 1fr; } }
+
+        .heading-logo { display: inline-flex; align-items: center; vertical-align: -4px; margin: 0 2px; }
+        @media (max-width: 620px) { .heading-logo svg { height: 22px !important; width: auto !important; } }
 
         @keyframes heroEnter { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: translateY(0); } }
         .hero-enter { animation: heroEnter 1s cubic-bezier(0.16, 1, 0.3, 1) both; }
@@ -290,7 +297,9 @@ function HomePage() {
       {/* 02 — How it works: horizontal 3-column sequence, matching the approved board. */}
       <Reveal>
         <section id="how-it-works" style={{ ...styles.howSection, background: colors.paper }}>
-          <h2 style={styles.h2}>How saleis.live works</h2>
+          <h2 style={styles.h2}>
+            How <span className="heading-logo"><Logo height={30} /></span> works
+          </h2>
           <p style={styles.sectionSub}>Three simple steps from stock to sale.</p>
           <div className="marketing-steps-row" style={{ marginTop: 56 }}>
             {STEPS.map((step, i) => (
@@ -319,7 +328,9 @@ function HomePage() {
       {/* 03 — See saleis.live in action: equal-weight panels inside one bordered frame, so the section reads as one unit. */}
       <Reveal>
         <section id="demo" style={styles.actionSection}>
-          <h2 style={styles.h2}>See saleis.live in action</h2>
+          <h2 style={styles.h2}>
+            See <span className="heading-logo"><Logo height={30} /></span> in action
+          </h2>
           <p style={styles.sectionSub}>Real screenshots of the actual product — your own store, on your own subdomain, is what you get after "Get saleis.live".</p>
           <div style={styles.actionFrame}>
             <div className="marketing-action-grid" style={{ marginTop: 0 }}>
@@ -350,7 +361,7 @@ function HomePage() {
 
       {/* 04 — Built to integrate: technical register, tinted band. */}
       <Reveal>
-        <section id="integrate" style={{ ...styles.integrateSection, background: colors.bluepale }}>
+        <section id="integrate" style={{ ...styles.integrateSection, background: colors.paper }}>
           <div style={styles.integrateHead}>
             <h2 style={styles.h2}>Built to integrate</h2>
             <p style={{ ...styles.integrateBody, textAlign: "center", marginLeft: "auto", marginRight: "auto" }}>saleis.live is designed as a platform, not a closed storefront. Connect product data, payments, fulfilment and existing commerce infrastructure.</p>
@@ -386,7 +397,9 @@ function HomePage() {
       {/* 06 — Why saleis.live: titled, iconed, symmetric grid. */}
       <Reveal>
         <section id="why" style={styles.whySection}>
-          <h2 style={styles.h2}>Why saleis.live</h2>
+          <h2 style={styles.h2}>
+            Why <span className="heading-logo"><Logo height={30} /></span>
+          </h2>
           <div className="marketing-why-grid">
             {TRUST_BAR.map((t) => (
               <div key={t.title}>
@@ -468,28 +481,66 @@ POST  https://saleis.live/api/webhooks/payment/{brandId}
   );
 }
 
-const STEP_ICON_PATHS = {
-  file: "M6 2h9l5 5v15H6z|M15 2v5h5",
-  sparkle: "M12 3v4M12 17v4M3 12h4M17 12h4|M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18",
-  store: "M4 9l1-5h14l1 5|M4 9a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0|M5 9v10h14V9|M10 19v-6h4v6",
-  code: "M8 6L2 12l6 6M16 6l6 6-6 6",
-  layers: "M12 3l9 5-9 5-9-5 9-5z|M3 13l9 5 9-5",
-  phone: "M6 2h12v20H6z|M11 18h2",
-  card: "M2 5h20v14H2z|M2 10h20M6 15h4",
-  truck: "M2 7h11v10H2zM13 10h5l3 3v4h-8z|M6 18a1.6 1.6 0 1 0 0-3.2 1.6 1.6 0 0 0 0 3.2z|M17 18a1.6 1.6 0 1 0 0-3.2 1.6 1.6 0 0 0 0 3.2z",
-  db: "M4 5c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3z|M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5|M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3",
-  upload: "M12 15V4M12 4l-4.5 4.5M12 4l4.5 4.5|M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2",
-  shield: "M12 3l7.5 3.2v5.8c0 4.8-3.2 8-7.5 9.5-4.3-1.5-7.5-4.7-7.5-9.5V6.2L12 3z|M8.5 12l2.3 2.3L15.5 9.5",
-  star: "M12 3l2.6 5.6 6.1.6-4.6 4.1 1.3 6-5.4-3.1-5.4 3.1 1.3-6-4.6-4.1 6.1-.6z",
+/**
+ * Real Heroicons (MIT-licensed, solid style) path data — a designed icon
+ * set rather than hand-drawn stroke glyphs, per Ola's feedback that the
+ * earlier outline icons didn't look "artistic" or finished.
+ */
+const STEP_ICON_PATHS: Record<string, string[]> = {
+  upload: [
+    "M11.47 2.47a.75.75 0 0 1 1.06 0l4.5 4.5a.75.75 0 0 1-1.06 1.06l-3.22-3.22V16.5a.75.75 0 0 1-1.5 0V4.81L8.03 8.03a.75.75 0 0 1-1.06-1.06l4.5-4.5ZM3 15.75a.75.75 0 0 1 .75.75v2.25a1.5 1.5 0 0 0 1.5 1.5h13.5a1.5 1.5 0 0 0 1.5-1.5V16.5a.75.75 0 0 1 1.5 0v2.25a3 3 0 0 1-3 3H5.25a3 3 0 0 1-3-3V16.5a.75.75 0 0 1 .75-.75Z",
+  ],
+  sparkle: [
+    "M9 4.5a.75.75 0 0 1 .721.544l.813 2.846a3.75 3.75 0 0 0 2.576 2.576l2.846.813a.75.75 0 0 1 0 1.442l-2.846.813a3.75 3.75 0 0 0-2.576 2.576l-.813 2.846a.75.75 0 0 1-1.442 0l-.813-2.846a3.75 3.75 0 0 0-2.576-2.576l-2.846-.813a.75.75 0 0 1 0-1.442l2.846-.813A3.75 3.75 0 0 0 7.466 7.89l.813-2.846A.75.75 0 0 1 9 4.5ZM18 1.5a.75.75 0 0 1 .728.568l.258 1.036c.236.94.97 1.674 1.91 1.91l1.036.258a.75.75 0 0 1 0 1.456l-1.036.258c-.94.236-1.674.97-1.91 1.91l-.258 1.036a.75.75 0 0 1-1.456 0l-.258-1.036a2.625 2.625 0 0 0-1.91-1.91l-1.036-.258a.75.75 0 0 1 0-1.456l1.036-.258a2.625 2.625 0 0 0 1.91-1.91l.258-1.036A.75.75 0 0 1 18 1.5ZM16.5 15a.75.75 0 0 1 .712.513l.394 1.183c.15.447.5.799.948.948l1.183.395a.75.75 0 0 1 0 1.422l-1.183.395c-.447.15-.799.5-.948.948l-.395 1.183a.75.75 0 0 1-1.422 0l-.395-1.183a1.5 1.5 0 0 0-.948-.948l-1.183-.395a.75.75 0 0 1 0-1.422l1.183-.395c.447-.15.799-.5.948-.948l.395-1.183A.75.75 0 0 1 16.5 15Z",
+  ],
+  store: [
+    "M5.223 2.25c-.497 0-.974.198-1.325.55l-1.3 1.298A3.75 3.75 0 0 0 7.5 9.75c.627.47 1.406.75 2.25.75.844 0 1.624-.28 2.25-.75.626.47 1.406.75 2.25.75.844 0 1.623-.28 2.25-.75a3.75 3.75 0 0 0 4.902-5.652l-1.3-1.299a1.875 1.875 0 0 0-1.325-.549H5.223Z",
+    "M3 20.25v-8.755c1.42.674 3.08.673 4.5 0A5.234 5.234 0 0 0 9.75 12c.804 0 1.568-.182 2.25-.506a5.234 5.234 0 0 0 2.25.506c.804 0 1.567-.182 2.25-.506 1.42.674 3.08.675 4.5.001v8.755h.75a.75.75 0 0 1 0 1.5H2.25a.75.75 0 0 1 0-1.5H3Zm3-6a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-.75.75h-3a.75.75 0 0 1-.75-.75v-3Zm8.25-.75a.75.75 0 0 0-.75.75v5.25c0 .414.336.75.75.75h3a.75.75 0 0 0 .75-.75v-5.25a.75.75 0 0 0-.75-.75h-3Z",
+  ],
+  code: [
+    "M14.447 3.026a.75.75 0 0 1 .527.921l-4.5 16.5a.75.75 0 0 1-1.448-.394l4.5-16.5a.75.75 0 0 1 .921-.527ZM16.72 6.22a.75.75 0 0 1 1.06 0l5.25 5.25a.75.75 0 0 1 0 1.06l-5.25 5.25a.75.75 0 1 1-1.06-1.06L21.44 12l-4.72-4.72a.75.75 0 0 1 0-1.06Zm-9.44 0a.75.75 0 0 1 0 1.06L2.56 12l4.72 4.72a.75.75 0 0 1-1.06 1.06L.97 12.53a.75.75 0 0 1 0-1.06l5.25-5.25a.75.75 0 0 1 1.06 0Z",
+  ],
+  layers: [
+    "M3 6a3 3 0 0 1 3-3h2.25a3 3 0 0 1 3 3v2.25a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6Zm9.75 0a3 3 0 0 1 3-3H18a3 3 0 0 1 3 3v2.25a3 3 0 0 1-3 3h-2.25a3 3 0 0 1-3-3V6ZM3 15.75a3 3 0 0 1 3-3h2.25a3 3 0 0 1 3 3V18a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3v-2.25Zm9.75 0a3 3 0 0 1 3-3H18a3 3 0 0 1 3 3V18a3 3 0 0 1-3 3h-2.25a3 3 0 0 1-3-3v-2.25Z",
+  ],
+  phone: [
+    "M10.5 18.75a.75.75 0 0 0 0 1.5h3a.75.75 0 0 0 0-1.5h-3Z",
+    "M8.625.75A3.375 3.375 0 0 0 5.25 4.125v15.75a3.375 3.375 0 0 0 3.375 3.375h6.75a3.375 3.375 0 0 0 3.375-3.375V4.125A3.375 3.375 0 0 0 15.375.75h-6.75ZM7.5 4.125C7.5 3.504 8.004 3 8.625 3H9.75v.375c0 .621.504 1.125 1.125 1.125h2.25c.621 0 1.125-.504 1.125-1.125V3h1.125c.621 0 1.125.504 1.125 1.125v15.75c0 .621-.504 1.125-1.125 1.125h-6.75A1.125 1.125 0 0 1 7.5 19.875V4.125Z",
+  ],
+  card: [
+    "M4.5 3.75a3 3 0 0 0-3 3v.75h21v-.75a3 3 0 0 0-3-3h-15Z",
+    "M22.5 9.75h-21v7.5a3 3 0 0 0 3 3h15a3 3 0 0 0 3-3v-7.5Zm-18 3.75a.75.75 0 0 1 .75-.75h6a.75.75 0 0 1 0 1.5h-6a.75.75 0 0 1-.75-.75Zm.75 2.25a.75.75 0 0 0 0 1.5h3a.75.75 0 0 0 0-1.5h-3Z",
+  ],
+  truck: [
+    "M3.375 4.5C2.339 4.5 1.5 5.34 1.5 6.375V13.5h12V6.375c0-1.036-.84-1.875-1.875-1.875h-8.25ZM13.5 15h-12v2.625c0 1.035.84 1.875 1.875 1.875h.375a3 3 0 1 1 6 0h3a.75.75 0 0 0 .75-.75V15Z",
+    "M8.25 19.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0ZM15.75 6.75a.75.75 0 0 0-.75.75v11.25c0 .087.015.17.042.248a3 3 0 0 1 5.958.464c.853-.175 1.522-.935 1.464-1.883a18.659 18.659 0 0 0-3.732-10.104 1.837 1.837 0 0 0-1.47-.725H15.75Z",
+    "M19.5 19.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z",
+  ],
+  db: [
+    "M21 6.375c0 2.692-4.03 4.875-9 4.875S3 9.067 3 6.375 7.03 1.5 12 1.5s9 2.183 9 4.875Z",
+    "M12 12.75c2.685 0 5.19-.586 7.078-1.609a8.283 8.283 0 0 0 1.897-1.384c.016.121.025.244.025.368C21 12.817 16.97 15 12 15s-9-2.183-9-4.875c0-.124.009-.247.025-.368a8.285 8.285 0 0 0 1.897 1.384C6.809 12.164 9.315 12.75 12 12.75Z",
+    "M12 16.5c2.685 0 5.19-.586 7.078-1.609a8.282 8.282 0 0 0 1.897-1.384c.016.121.025.244.025.368 0 2.692-4.03 4.875-9 4.875s-9-2.183-9-4.875c0-.124.009-.247.025-.368a8.284 8.284 0 0 0 1.897 1.384C6.809 15.914 9.315 16.5 12 16.5Z",
+    "M12 20.25c2.685 0 5.19-.586 7.078-1.609a8.282 8.282 0 0 0 1.897-1.384c.016.121.025.244.025.368 0 2.692-4.03 4.875-9 4.875s-9-2.183-9-4.875c0-.124.009-.247.025-.368a8.284 8.284 0 0 0 1.897 1.384C6.809 19.664 9.315 20.25 12 20.25Z",
+  ],
+  shield: [
+    "M12.516 2.17a.75.75 0 0 0-1.032 0 11.209 11.209 0 0 1-7.877 3.08.75.75 0 0 0-.722.515A12.74 12.74 0 0 0 2.25 9.75c0 5.942 4.064 10.933 9.563 12.348a.749.749 0 0 0 .374 0c5.499-1.415 9.563-6.406 9.563-12.348 0-1.39-.223-2.73-.635-3.985a.75.75 0 0 0-.722-.516l-.143.001c-2.996 0-5.717-1.17-7.734-3.08Zm3.094 8.016a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z",
+  ],
+  star: [
+    "M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z",
+  ],
+  file: [
+    "M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625Z",
+    "M12.971 1.816A5.23 5.23 0 0 1 14.25 5.25v1.875c0 .207.168.375.375.375H16.5a5.23 5.23 0 0 1 3.434 1.279 9.768 9.768 0 0 0-6.963-6.963Z",
+  ],
 };
 
 function StepIcon({ name, size = 20 }: { name?: string; size?: number }) {
-  const paths = name ? STEP_ICON_PATHS[name as keyof typeof STEP_ICON_PATHS] : undefined;
+  const paths = name ? STEP_ICON_PATHS[name] : undefined;
   if (!paths) return null;
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={colors.navy} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      {paths.split("|").map((d) => (
-        <path key={d} d={d} />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={colors.navy}>
+      {paths.map((d) => (
+        <path key={d} fillRule="evenodd" clipRule="evenodd" d={d} />
       ))}
     </svg>
   );
@@ -564,7 +615,7 @@ const styles: Record<string, React.CSSProperties> = {
   secondaryButton: { display: "inline-block", background: "transparent", color: colors.ink, fontSize: 14, fontWeight: 700, padding: "15px 28px", borderRadius: 999, textDecoration: "none", border: `1px solid ${colors.border}` },
 
   miniStepItem: { flex: 1, minWidth: 160 },
-  miniStepIcon: { width: 40, height: 40, borderRadius: 10, background: colors.bluepale, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10 },
+  miniStepIcon: { width: 40, height: 40, borderRadius: 12, background: colors.bluepale, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10 },
   miniStepTitle: { fontSize: 14, fontWeight: 700, color: colors.navy, margin: "0 0 4px" },
   miniStepBody: { fontSize: 13, color: colors.muted, margin: 0, lineHeight: 1.5 },
 
@@ -600,7 +651,7 @@ const styles: Record<string, React.CSSProperties> = {
   actionSection: { padding: "140px 32px", maxWidth: 1320, margin: "0 auto" },
   actionFrame: { marginTop: 56, border: `1px solid ${colors.border}`, borderRadius: 16, padding: 40, background: colors.surface },
   actionPanel: { display: "block", textDecoration: "none", color: colors.ink },
-  actionImageFrame: { position: "relative", aspectRatio: "1280 / 620", borderRadius: 6, overflow: "hidden", background: colors.paper },
+  actionImageFrame: { position: "relative", aspectRatio: "1280 / 620", borderRadius: 16, overflow: "hidden", background: colors.paper },
   actionImage: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" },
   actionCaption: { paddingTop: 22 },
   actionEyebrow: { fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: colors.navy, margin: "0 0 8px" },
@@ -616,11 +667,11 @@ const styles: Record<string, React.CSSProperties> = {
   specIndex: { display: "block", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, color: colors.muted, marginBottom: 4 },
   specLabel: { display: "block", fontSize: 15, fontWeight: 600, color: colors.ink },
 
-  devCard: { background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 14, padding: 32 },
-  devCardIcon: { width: 52, height: 52, borderRadius: 12, background: colors.bluepale, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 },
+  devCard: { background: colors.surface, border: `1px solid ${colors.border}`, borderRadius: 16, padding: 32, textAlign: "center" },
+  devCardIcon: { width: 52, height: 52, borderRadius: 12, background: colors.bluepale, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" },
   devCardTitle: { fontFamily: DISPLAY_FONT, fontSize: 26, color: colors.navy, fontWeight: 500, margin: "0 0 14px" },
-  devCardBody: { fontSize: 14, color: colors.muted, lineHeight: 1.7, margin: 0 },
-  codeBlock: { fontSize: 11, lineHeight: 1.6, background: colors.background, borderRadius: 8, padding: 14, marginTop: 14, overflowX: "auto", whiteSpace: "pre" },
+  devCardBody: { fontSize: 14, color: colors.muted, lineHeight: 1.7, margin: "0 auto", maxWidth: 420, textAlign: "left" },
+  codeBlock: { fontSize: 11, lineHeight: 1.6, background: colors.background, borderRadius: 8, padding: 14, marginTop: 14, overflowX: "auto", whiteSpace: "pre", textAlign: "left" },
 
   // 07 — final CTA
   ctaBand: { background: colors.navy, padding: "160px 32px", textAlign: "center" },
