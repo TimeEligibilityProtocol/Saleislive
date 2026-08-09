@@ -228,9 +228,9 @@ export class ApiClient {
   /** Storefront's test checkout — creates a real Order, no real payment/courier involved. See routes/checkout.ts's doc comment. */
   async startCheckout(input: {
     brandId: string;
-    productId: string;
-    quantity: number;
+    items: { productId: string; quantity: number }[];
     customerName: string;
+    customerPhone: string;
     customerLocation: string;
     deliveryMethod: DeliveryMethod;
   }): Promise<Order> {

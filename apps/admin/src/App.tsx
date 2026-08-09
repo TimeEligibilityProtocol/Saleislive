@@ -1927,7 +1927,7 @@ function OrderDetailPage({ orderId }: { orderId: string }) {
 
           <h2 style={{ ...styles.h1, fontSize: 16, marginTop: 24, marginBottom: 8 }}>Customer</h2>
           <p style={{ fontSize: 13, margin: 0 }}>
-            {order.customerName} • {order.customerLocation}
+            {order.customerName} • {order.customerPhone} • {order.customerLocation}
           </p>
         </div>
 

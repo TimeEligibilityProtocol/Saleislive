@@ -1,10 +1,11 @@
 import { approvedField, Product } from "@saleis-live/domain";
 
 /**
- * In-memory only, same pragmatic starting point as tenants.ts. Seeded so
- * the storefront has real data to render before the Excel import
- * pipeline exists — Ola's explicit note: self-test on files/data we
- * create ourselves rather than waiting on real client data.
+ * In-memory only, same pragmatic starting point as tenants.ts. Seeded from
+ * SALEIS.LIVE/fictional_product_catalog_EN.xlsx — the spec's own demo
+ * catalog and product photography, not invented placeholder data. No
+ * markup/"was" price is fabricated: the sheet gives one net price, so
+ * price === salePrice here (no fake discount on real data).
  */
 let products: Product[] = [];
 
@@ -16,9 +17,9 @@ function seed(): void {
     name: string,
     category: string,
     color: string,
+    size: string,
     material: string,
     priceMinor: number,
-    saleMinor: number,
     stock: number,
     imageUrl: string
   ): Product => ({
@@ -31,25 +32,23 @@ function seed(): void {
     description: approvedField(`${name} — part of this season's selection.`),
     category: approvedField(category),
     color: approvedField(color),
-    size: approvedField("One size"),
+    size: approvedField(size),
     material: approvedField(material),
     images: [{ url: imageUrl, alt: name, isMain: true }],
     price: { amountMinor: priceMinor, currency: "AED" },
-    salePrice: { amountMinor: saleMinor, currency: "AED" },
+    salePrice: { amountMinor: priceMinor, currency: "AED" },
     stock,
     createdAt: now,
     updatedAt: now,
   });
 
   products = [
-    base("p1", "DEMO-001", "Pleated Wrap Dress", "Fashion", "Ivory", "Viscose blend", 46000, 32200, 6, "/assets/products/product-01.jpg"),
-    base("p2", "DEMO-002", "Tailored Wool Blazer", "Fashion", "Camel", "Wool blend", 89000, 62300, 4, "/assets/products/product-02.jpg"),
-    base("p3", "DEMO-003", "Slingback Heels", "Shoes", "Ivory / Black", "Leather", 78000, 54600, 5, "/assets/products/product-03.jpg"),
-    base("p4", "DEMO-004", "Leather Penny Loafers", "Shoes", "Brown", "Leather", 65000, 45500, 7, "/assets/products/product-04.jpg"),
-    base("p5", "DEMO-005", "Structured Leather Tote", "Bags", "Tan", "Leather", 185000, 129500, 3, "/assets/products/product-05.jpg"),
-    base("p6", "DEMO-006", "Quilted Chain Bag", "Bags", "Ivory", "Leather", 165000, 115500, 2, "/assets/products/product-06.jpg"),
-    base("p7", "DEMO-007", "Suede Hobo Bag", "Bags", "Burgundy", "Suede", 142000, 99400, 4, "/assets/products/product-07.jpg"),
-    base("p8", "DEMO-008", "Silk-Blend Blouse", "Fashion", "Ivory", "Silk blend", 38000, 26600, 9, "/assets/products/product-08.jpg"),
+    base("P001", "P001", "Pleated Midi Dress", "Clothing", "Cream", "S/M", "Polyester", 34900, 25, "/assets/products/product-01.jpg"),
+    base("P002", "P002", "Gold Hoop Earrings", "Jewelry", "Gold", "One Size", "Stainless Steel", 12900, 40, "/assets/products/product-02.jpg"),
+    base("P003", "P003", "Two-Tone Slingback Heels", "Shoes", "Cream / Brown", "37–41", "Vegan Leather", 29900, 18, "/assets/products/product-03.jpg"),
+    base("P004", "P004", "Leather Loafers", "Shoes", "Dark Brown", "40–44", "Genuine Leather", 39900, 15, "/assets/products/product-04.jpg"),
+    base("P005", "P005", "Crescent Shoulder Bag", "Accessories", "Dark Brown", "One Size", "Vegan Leather", 27900, 12, "/assets/products/product-05.jpg"),
+    base("P006", "P006", "Sculptural Ceramic Vase", "Home", "Ivory", "One Size", "Ceramic", 15900, 30, "/assets/products/product-06.jpg"),
   ];
 }
 seed();

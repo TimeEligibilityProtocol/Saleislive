@@ -36,6 +36,7 @@ export interface Order {
   /** Payment happens through the brand's own connected payment adapter — Saleis.live never holds buyer funds. See blueprint §8. */
   paymentAdapterRef: string | null;
   customerName: string;
+  customerPhone: string;
   customerLocation: string;
   deliveryMethod: DeliveryMethod;
   fulfilmentStatus: FulfilmentStatus;
