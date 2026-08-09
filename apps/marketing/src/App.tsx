@@ -329,7 +329,7 @@ function HomePage() {
                     </div>
                   </div>
                   <h3 style={styles.stepRowTitle}>{step.title}</h3>
-                  <p style={styles.stepRowBody}>{withLogo(step.body)}</p>
+                  <p style={styles.stepRowBody}>{step.body}</p>
                 </div>
                 {i < STEPS.length - 1 ? (
                   <div className="marketing-step-arrow">
@@ -380,8 +380,7 @@ function HomePage() {
       <Reveal>
         <section style={{ ...styles.section, textAlign: "center" }}>
           <p className="systems-pulse" style={styles.systemsFlow}>
-            YOUR EXISTING SYSTEM <span style={styles.systemsArrow}>→</span> EXCEL / CSV <span style={styles.systemsArrow}>→</span>{" "}
-            <span className="heading-logo"><Logo height={20} /></span> <span style={styles.systemsArrow}>→</span> LIVE SALE
+            YOUR EXISTING SYSTEM <span style={styles.systemsArrow}>→</span> EXCEL / CSV <span style={styles.systemsArrow}>→</span> SALEIS.LIVE <span style={styles.systemsArrow}>→</span> LIVE SALE
           </p>
           <h2 style={{ ...styles.h2, marginTop: 64 }}>What do all these systems have in common?</h2>
           <div style={styles.tickerBandLight}>
@@ -394,9 +393,7 @@ function HomePage() {
               ))}
             </div>
           </div>
-          <p style={{ ...styles.sectionSub, marginTop: 32 }}>
-            They all speak Excel. <span className="heading-logo"><Logo height={16} /></span> starts there.
-          </p>
+          <p style={{ ...styles.sectionSub, marginTop: 32 }}>They all speak Excel. saleis.live starts there.</p>
         </section>
       </Reveal>
 
@@ -405,7 +402,7 @@ function HomePage() {
         <section id="integrate" style={{ ...styles.integrateSection, background: colors.paper }}>
           <div style={styles.integrateHead}>
             <h2 style={styles.h2}>Built to integrate</h2>
-            <p style={{ ...styles.integrateBody, textAlign: "center", marginLeft: "auto", marginRight: "auto" }}>{withLogo("saleis.live is designed as a platform, not a closed storefront. Connect product data, payments, fulfilment and existing commerce infrastructure.")}</p>
+            <p style={{ ...styles.integrateBody, textAlign: "center", marginLeft: "auto", marginRight: "auto" }}>saleis.live is designed as a platform, not a closed storefront. Connect product data, payments, fulfilment and existing commerce infrastructure.</p>
             <a href="#/developers" className="marketing-arrow-link" style={{ ...styles.integrateLink, display: "flex", justifyContent: "center" }}>
               Developers <span className="arrow-glyph">→</span>
             </a>
@@ -439,7 +436,7 @@ function HomePage() {
                   <StepIcon name={t.icon} size={24} />
                 </div>
                 <h3 style={styles.whyTitle}>{t.title}</h3>
-                <p style={styles.whyBody}>{withLogo(t.body)}</p>
+                <p style={styles.whyBody}>{t.body}</p>
               </div>
             ))}
           </div>
