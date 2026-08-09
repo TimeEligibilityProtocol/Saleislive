@@ -5,6 +5,7 @@
  * specific brand within it. Isolation between tenants is enforced at the
  * data-access layer, not just in the UI — see docs/product/saleis-live-blueprint-v1.md §11.
  */
+import { HttpIntegrationConfig } from "./adapters.js";
 
 /** A retail group — may own multiple brands (e.g. Chalhoub, Al Tayer). */
 export interface Tenant {
@@ -34,6 +35,9 @@ export interface Brand {
   /** Store-wide policy text shown on the storefront (screen 06's "Policies" tab) — plain text, no template engine. */
   returnPolicy: string | null;
   shippingPolicy: string | null;
+  /** Screen 06's Payments/Delivery tabs — null until the brand connects their own integration through the generic HTTP adapter contract. */
+  paymentIntegration: HttpIntegrationConfig | null;
+  deliveryIntegration: HttpIntegrationConfig | null;
   createdAt: string;
 }
 

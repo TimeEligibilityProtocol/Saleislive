@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createBrand, getBrandById, isSlugAvailable } from "../store/tenants.js";
+import { createBrand, getBrandById, isSlugAvailable, updateBrandIntegration } from "../store/tenants.js";
 
 const SLUG_PATTERN = /^[a-z0-9-]{2,32}$/;
 
@@ -50,6 +50,23 @@ export function brandsRouter(): Router {
     }
     const brand = createBrand({ tenantId, name, slug: normalizedSlug, country, currency, language, secondaryLanguage: secondaryLanguage ?? null });
     res.status(201).json({ brand });
+  });
+
+  /** Screen 06's Payments/Delivery tabs — connect or disconnect the "bring your own integration" HTTP adapter. */
+  router.patch("/api/brands/:brandId/integrations/:kind", (req, res) => {
+    const kind = req.params.kind;
+    if (kind !== "payment" && kind !== "delivery") return res.status(400).json({ error: "invalid_kind" });
+    const brand = getBrandById(req.params.brandId);
+    if (!brand) return res.status(404).json({ error: "unknown_brand" });
+
+    const body = req.body as { endpointUrl?: string; apiKey?: string; disconnect?: boolean };
+    if (body.disconnect) {
+      const updated = updateBrandIntegration(brand.id, kind, null);
+      return res.json({ brand: updated });
+    }
+    if (!body.endpointUrl?.trim() || !body.apiKey?.trim()) return res.status(400).json({ error: "missing_fields" });
+    const updated = updateBrandIntegration(brand.id, kind, { endpointUrl: body.endpointUrl.trim(), apiKey: body.apiKey.trim() });
+    res.json({ brand: updated });
   });
 
   return router;

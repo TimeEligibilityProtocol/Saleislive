@@ -35,6 +35,8 @@ export interface Order {
   total: Money;
   /** Payment happens through the brand's own connected payment adapter — Saleis.live never holds buyer funds. See blueprint §8. */
   paymentAdapterRef: string | null;
+  /** Set once the brand's connected delivery adapter books a shipment — their own tracking reference. */
+  deliveryAdapterRef: string | null;
   customerName: string;
   customerPhone: string;
   customerLocation: string;

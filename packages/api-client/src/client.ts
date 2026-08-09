@@ -199,6 +199,15 @@ export class ApiClient {
     return brand;
   }
 
+  /** Screen 06's Payments/Delivery tabs — "bring your own integration". Pass null to disconnect. */
+  async updateBrandIntegration(brandId: string, kind: "payment" | "delivery", patch: { endpointUrl: string; apiKey: string } | null): Promise<Brand> {
+    const { brand } = await this.request<{ brand: Brand }>(`/api/brands/${brandId}/integrations/${kind}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch === null ? { disconnect: true } : patch),
+    });
+    return brand;
+  }
+
   /** Screens 09-10 (Orders, Order Detail). */
   async listOrders(brandId: string): Promise<Order[]> {
     const { orders } = await this.request<{ orders: Order[] }>(`/api/brands/${brandId}/orders`);
@@ -225,7 +234,12 @@ export class ApiClient {
     return order;
   }
 
-  /** Storefront's test checkout — creates a real Order, no real payment/courier involved. See routes/checkout.ts's doc comment. */
+  /**
+   * Storefront's checkout — always creates a real Order. If the brand has
+   * a real payment integration connected, checkoutUrl comes back non-null
+   * and the caller should redirect the buyer there instead of using
+   * confirmTestPayment. See routes/checkout.ts's doc comment.
+   */
   async startCheckout(input: {
     brandId: string;
     items: { productId: string; quantity: number }[];
@@ -233,9 +247,9 @@ export class ApiClient {
     customerPhone: string;
     customerLocation: string;
     deliveryMethod: DeliveryMethod;
-  }): Promise<Order> {
-    const { order } = await this.request<{ order: Order }>("/api/checkout/start", { method: "POST", body: JSON.stringify(input) });
-    return order;
+    returnUrl?: string;
+  }): Promise<{ order: Order; checkoutUrl?: string }> {
+    return this.request<{ order: Order; checkoutUrl?: string }>("/api/checkout/start", { method: "POST", body: JSON.stringify(input) });
   }
 
   async confirmTestPayment(orderId: string): Promise<Order> {

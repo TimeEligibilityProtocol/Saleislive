@@ -14,6 +14,7 @@ import { importsRouter } from "./routes/imports.js";
 import { ordersRouter } from "./routes/orders.js";
 import { adminProductsRouter } from "./routes/products.js";
 import { storefrontRouter } from "./routes/storefront.js";
+import { webhooksRouter } from "./routes/webhooks.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const env = loadEnv();
@@ -32,6 +33,7 @@ app.use(analyzeProductRouter(env.anthropicApiKey));
 app.use(campaignsRouter());
 app.use(ordersRouter());
 app.use(checkoutRouter());
+app.use(webhooksRouter());
 
 app.listen(env.port, "0.0.0.0", () => {
   console.log(`saleis.live api listening on :${env.port} (${env.nodeEnv})`);

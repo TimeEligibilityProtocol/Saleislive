@@ -1,18 +1,22 @@
 import { DeliveryMethod, OrderLine } from "@saleis-live/domain";
 import { Router } from "express";
+import { HttpPaymentAdapter } from "../lib/httpAdapters.js";
+import { bookDeliveryIfConnected } from "../lib/orderFulfilment.js";
 import { createOrder, getOrderById, updateOrder } from "../store/orders.js";
 import { getProductById, upsertProduct } from "../store/products.js";
 import { getBrandById } from "../store/tenants.js";
 
 /**
  * Storefront's checkout — the real buyer flow (screens 11-17) now has a
- * proper bag/delivery/payment sequence. No real payment or courier is
- * involved: "confirm-test-payment" is clearly a stand-in a merchant or
- * tester clicks themselves, not a real charge — see Launch Studio's
- * "Payments: Not connected" for the honest counterpart. Screen 16's
- * mockup shows a card-number field; that's deliberately NOT built here
- * — a fake card input would look like real payment-detail collection,
- * which this project never does even in test mode.
+ * proper bag/delivery/payment sequence. If the brand has connected a real
+ * payment integration (Launch Studio's Payments tab), /checkout/start
+ * calls it and returns a real checkoutUrl to redirect the buyer to.
+ * Otherwise — the demo brand's actual state — nothing real is involved:
+ * "confirm-test-payment" is clearly a stand-in a merchant or tester
+ * clicks themselves, not a real charge. Screen 16's mockup shows a
+ * card-number field; that's deliberately NOT built here — a fake card
+ * input would look like real payment-detail collection, which this
+ * project never does even in test mode.
  */
 // Must match the storefront's COURIER_FEE_MINOR (apps/storefront/src/App.tsx) — a flat demo
 // fee, not a real courier rate lookup, so the price shown to the buyer matches what's recorded.
@@ -21,7 +25,7 @@ const COURIER_FEE_MINOR = 2500;
 export function checkoutRouter(): Router {
   const router = Router();
 
-  router.post("/api/checkout/start", (req, res) => {
+  router.post("/api/checkout/start", async (req, res) => {
     const body = req.body as {
       brandId?: string;
       items?: { productId: string; quantity: number }[];
@@ -29,6 +33,7 @@ export function checkoutRouter(): Router {
       customerPhone?: string;
       customerLocation?: string;
       deliveryMethod?: DeliveryMethod;
+      returnUrl?: string;
     };
     const brand = body.brandId ? getBrandById(body.brandId) : undefined;
     if (!brand) return res.status(400).json({ error: "unknown_brand" });
@@ -63,6 +68,7 @@ export function checkoutRouter(): Router {
       lines,
       total: { amountMinor: total, currency },
       paymentAdapterRef: null,
+      deliveryAdapterRef: null,
       customerName: body.customerName.trim(),
       customerPhone: body.customerPhone?.trim() || "—",
       customerLocation: body.customerLocation?.trim() || "—",
@@ -70,14 +76,35 @@ export function checkoutRouter(): Router {
       fulfilmentStatus: "not_started",
       timeline: [{ at: new Date().toISOString(), label: "Order created — awaiting payment" }],
     });
+
+    // Brand has a real payment integration connected — hand the buyer off to it instead of
+    // the TEST flow. If the call fails (bad config, their bridge is down), fall back to TEST
+    // mode rather than stranding the buyer with stock already reserved.
+    if (brand.paymentIntegration?.connected) {
+      try {
+        const adapter = new HttpPaymentAdapter(brand.paymentIntegration);
+        const { checkoutUrl, ref } = await adapter.createCheckout({
+          orderId: order.id,
+          amount: order.total,
+          returnUrl: body.returnUrl?.trim() || "",
+        });
+        updateOrder(order.id, { paymentAdapterRef: ref }, "Handed off to connected payment integration");
+        return res.status(201).json({ order: getOrderById(order.id), checkoutUrl });
+      } catch (err) {
+        updateOrder(order.id, {}, `Payment integration error, falling back to test mode: ${err instanceof Error ? err.message : "unknown error"}`);
+      }
+    }
+
     res.status(201).json({ order });
   });
 
-  router.post("/api/checkout/:id/confirm-test-payment", (req, res) => {
+  router.post("/api/checkout/:id/confirm-test-payment", async (req, res) => {
     const order = getOrderById(req.params.id);
     if (!order) return res.status(404).json({ error: "not_found" });
     if (order.status !== "reserved") return res.status(409).json({ error: "not_reservable" });
     const updated = updateOrder(order.id, { status: "paid", paymentAdapterRef: `test_${order.id}` }, "Payment confirmed (TEST — no real charge)");
+    const brand = getBrandById(order.brandId);
+    if (updated && brand) await bookDeliveryIfConnected(updated, brand);
     res.json({ order: updated });
   });
 

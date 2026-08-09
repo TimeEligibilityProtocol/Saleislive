@@ -29,6 +29,8 @@ function seed(): void {
       customDomain: null,
       returnPolicy: null,
       shippingPolicy: null,
+      paymentIntegration: null,
+      deliveryIntegration: null,
       createdAt: new Date(0).toISOString(),
     },
   ];
@@ -51,7 +53,9 @@ export function isSlugAvailable(slug: string): boolean {
   return !brands.some((b) => b.slug === slug);
 }
 
-export function createBrand(input: Omit<Brand, "id" | "createdAt" | "status" | "slugVerified" | "customDomain" | "returnPolicy" | "shippingPolicy">): Brand {
+export function createBrand(
+  input: Omit<Brand, "id" | "createdAt" | "status" | "slugVerified" | "customDomain" | "returnPolicy" | "shippingPolicy" | "paymentIntegration" | "deliveryIntegration">,
+): Brand {
   const brand: Brand = {
     ...input,
     id: `b_${randomUUID()}`,
@@ -60,17 +64,44 @@ export function createBrand(input: Omit<Brand, "id" | "createdAt" | "status" | "
     customDomain: null,
     returnPolicy: null,
     shippingPolicy: null,
+    paymentIntegration: null,
+    deliveryIntegration: null,
     createdAt: new Date().toISOString(),
   };
   brands = [...brands, brand];
   return brand;
 }
 
-/** Screen 06's "Policies" tab — the only brand fields editable after creation today. */
+/** Screen 06's "Policies" tab. */
 export function updateBrandPolicies(id: string, patch: Partial<{ returnPolicy: string; shippingPolicy: string }>): Brand | undefined {
   const brand = getBrandById(id);
   if (!brand) return undefined;
   if (patch.returnPolicy !== undefined) brand.returnPolicy = patch.returnPolicy;
   if (patch.shippingPolicy !== undefined) brand.shippingPolicy = patch.shippingPolicy;
+  return brand;
+}
+
+/**
+ * Screen 06's Payments/Delivery tabs — "bring your own integration".
+ * Passing null disconnects (clears the config back to null). Passing
+ * {endpointUrl, apiKey} connects/reconnects: keeps the existing
+ * webhookSecret if one was already generated (so the brand doesn't have
+ * to reconfigure their webhook on every edit), otherwise generates one.
+ */
+export function updateBrandIntegration(id: string, kind: "payment" | "delivery", patch: { endpointUrl: string; apiKey: string } | null): Brand | undefined {
+  const brand = getBrandById(id);
+  if (!brand) return undefined;
+  const field = kind === "payment" ? "paymentIntegration" : "deliveryIntegration";
+  if (patch === null) {
+    brand[field] = null;
+    return brand;
+  }
+  const existingSecret = brand[field]?.webhookSecret;
+  brand[field] = {
+    endpointUrl: patch.endpointUrl,
+    apiKey: patch.apiKey,
+    webhookSecret: existingSecret ?? randomUUID(),
+    connected: true,
+  };
   return brand;
 }

@@ -454,14 +454,24 @@ function PaymentView({
     setPlacing(true);
     setError(null);
     try {
-      const order = await apiClient.startCheckout({
+      const { order, checkoutUrl } = await apiClient.startCheckout({
         brandId: brand.id,
         items: items.map((i) => ({ productId: i.product.id, quantity: i.qty })),
         customerName: info.name,
         customerPhone: info.phone,
         customerLocation: info.location,
         deliveryMethod: info.deliveryMethod,
+        // The connected processor redirects here after payment. It knows the order id (we sent
+        // it in the checkout-creation call), so it can append its own ref/status if it wants to;
+        // we don't assume a shape here since that's between the brand and their own integration.
+        returnUrl: `${window.location.origin}${window.location.pathname}#/`,
       });
+      if (checkoutUrl) {
+        // Brand has a real payment integration connected — hand off to it. It's responsible
+        // for redirecting the buyer back; we don't poll or assume success here.
+        window.location.href = checkoutUrl;
+        return;
+      }
       const paid = await apiClient.confirmTestPayment(order.id);
       onPaid(paid);
     } catch (err) {

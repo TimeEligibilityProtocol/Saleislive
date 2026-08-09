@@ -4,6 +4,7 @@ import {
   Campaign,
   CampaignAccess,
   FulfilmentStatus,
+  HttpIntegrationConfig,
   ImportBatch,
   ImportRowDiff,
   IntakeMethod,
@@ -1288,7 +1289,7 @@ function LaunchStudioPage() {
   const [brandId] = useState(() => window.localStorage.getItem(LAST_BRAND_ID_KEY) ?? "b_demo");
   const [tab, setTab] = useState<LaunchTab>("sale");
   const [campaign, setCampaign] = useState<Campaign | null>(null);
-  const [, setBrand] = useState<Brand | null>(null);
+  const [brand, setBrand] = useState<Brand | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -1548,22 +1549,9 @@ function LaunchStudioPage() {
         </div>
       ) : null}
 
-      {tab === "payments" ? (
-        <div style={styles.sectionCard}>
-          <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 8 }}>Payments</h2>
-          <p style={{ fontSize: 13, color: colors.muted }}>
-            Not connected. Saleis.live never holds buyer funds — payments run through your own connected processor (Stripe, Tap, etc.), per the adapter boundary in packages/domain/src/adapters.ts. Wiring up a real
-            processor connection is upcoming work, not simulated here.
-          </p>
-        </div>
-      ) : null}
+      {tab === "payments" ? <IntegrationPanel kind="payment" brandId={brandId} integration={brand?.paymentIntegration ?? null} onUpdated={setBrand} /> : null}
 
-      {tab === "delivery" ? (
-        <div style={styles.sectionCard}>
-          <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 8 }}>Delivery</h2>
-          <p style={{ fontSize: 13, color: colors.muted }}>Not connected. Courier booking runs through your own delivery integration once wired up — this is upcoming work, not simulated here.</p>
-        </div>
-      ) : null}
+      {tab === "delivery" ? <IntegrationPanel kind="delivery" brandId={brandId} integration={brand?.deliveryIntegration ?? null} onUpdated={setBrand} /> : null}
 
       {tab === "policies" ? (
         <div style={{ ...styles.sectionCard, maxWidth: 600 }}>
@@ -1589,6 +1577,198 @@ function LaunchStudioPage() {
               {saving ? "Saving…" : "Save"}
             </button>
           </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+const INTEGRATION_COPY: Record<
+  "payment" | "delivery",
+  { title: string; intro: string; weCall: { method: string; path: string; body: string; response: string }[]; theyCall: { body: string } }
+> = {
+  payment: {
+    title: "Payments",
+    intro:
+      "Saleis.live never holds buyer funds and never sees a card number. Your own team (or whoever you hire) stands up a small bridge service that talks to your real payment processor — we only ever call this fixed contract.",
+    weCall: [
+      {
+        method: "POST",
+        path: "/checkout",
+        body: '{ "orderId": "ord_123", "amountMinor": 34900, "currency": "AED", "returnUrl": "https://..." }',
+        response: '{ "checkoutUrl": "https://your-processor.com/pay/...", "ref": "your-own-reference" }',
+      },
+      {
+        method: "GET",
+        path: "/status/{ref}",
+        body: "—",
+        response: '{ "status": "pending" | "authorized" | "captured" | "failed" | "refunded" }',
+      },
+      {
+        method: "POST",
+        path: "/refund",
+        body: '{ "ref": "your-own-reference", "amountMinor": 34900, "currency": "AED" }',
+        response: '{ "status": "refunded" }',
+      },
+    ],
+    theyCall: { body: '{ "orderId": "ord_123", "status": "captured", "ref": "your-own-reference" }' },
+  },
+  delivery: {
+    title: "Delivery",
+    intro: "Courier booking runs through your own delivery integration — your bridge service talks to your real courier account; we only ever call this fixed contract.",
+    weCall: [
+      {
+        method: "POST",
+        path: "/book",
+        body: '{ "orderId": "ord_123", "address": "The Greens, Dubai" }',
+        response: '{ "trackingRef": "your-own-reference" }',
+      },
+      {
+        method: "GET",
+        path: "/status/{trackingRef}",
+        body: "—",
+        response: '{ "status": "pending" | "booked" | "in_transit" | "delivered" | "failed" }',
+      },
+    ],
+    theyCall: { body: '{ "orderId": "ord_123", "status": "in_transit", "trackingRef": "your-own-reference" }' },
+  },
+};
+
+/**
+ * Screen 06's Payments/Delivery tabs — "bring your own integration". This
+ * is the whole self-service story: a form to enter the brand's endpoint
+ * + key, and the exact HTTP contract (request/response shapes, webhook
+ * shape) their developer needs to implement — no OAuth, no Saleis.live
+ * engineering work per processor/courier. Requests go through
+ * apps/api/src/lib/httpAdapters.ts; the webhook side is
+ * apps/api/src/routes/webhooks.ts — keep this copy in sync with both.
+ */
+function IntegrationPanel({
+  kind,
+  brandId,
+  integration,
+  onUpdated,
+}: {
+  kind: "payment" | "delivery";
+  brandId: string;
+  integration: HttpIntegrationConfig | null;
+  onUpdated: (brand: Brand) => void;
+}) {
+  const copy = INTEGRATION_COPY[kind];
+  const [endpointUrl, setEndpointUrl] = useState(integration?.endpointUrl ?? "");
+  const [apiKey, setApiKey] = useState(integration?.apiKey ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showGuide, setShowGuide] = useState(!integration?.connected);
+  const [revealSecret, setRevealSecret] = useState(false);
+
+  const webhookUrl = `${apiClient.baseUrl}/api/webhooks/${kind}/${brandId}`;
+
+  const onConnect = async () => {
+    if (!endpointUrl.trim() || !apiKey.trim()) {
+      setError("Endpoint URL and API key are both required.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const brand = await apiClient.updateBrandIntegration(brandId, kind, { endpointUrl: endpointUrl.trim(), apiKey: apiKey.trim() });
+      onUpdated(brand);
+      setShowGuide(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't connect.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onDisconnect = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const brand = await apiClient.updateBrandIntegration(brandId, kind, null);
+      onUpdated(brand);
+      setEndpointUrl("");
+      setApiKey("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't disconnect.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ ...styles.sectionCard, maxWidth: 640 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 8 }}>{copy.title}</h2>
+        {integration?.connected ? (
+          <span style={{ ...styles.pill, background: colors.success, color: colors.white, fontSize: 11 }}>Connected</span>
+        ) : (
+          <span style={{ ...styles.pill, background: colors.background, color: colors.muted, fontSize: 11 }}>Not connected</span>
+        )}
+      </div>
+      <p style={{ fontSize: 13, color: colors.muted, marginBottom: 16 }}>{copy.intro}</p>
+
+      {integration?.connected ? (
+        <div style={{ background: colors.background, borderRadius: 8, padding: 12, marginBottom: 16, fontSize: 12 }}>
+          <p style={{ margin: "0 0 4px" }}>
+            <strong>Your endpoint:</strong> {integration.endpointUrl}
+          </p>
+          <p style={{ margin: "0 0 4px", wordBreak: "break-all" }}>
+            <strong>Webhook URL to call us on:</strong> {webhookUrl}
+          </p>
+          <p style={{ margin: 0 }}>
+            <strong>Webhook secret</strong> (send as <code>X-Webhook-Secret</code>):{" "}
+            {revealSecret ? integration.webhookSecret : "•".repeat(16)}{" "}
+            <button type="button" onClick={() => setRevealSecret((v) => !v)} style={{ ...styles.linkButton, fontSize: 12 }}>
+              {revealSecret ? "Hide" : "Reveal"}
+            </button>
+          </p>
+        </div>
+      ) : null}
+
+      <label style={styles.label}>Endpoint URL</label>
+      <input style={styles.input} value={endpointUrl} onChange={(e) => setEndpointUrl(e.target.value)} placeholder="https://your-bridge-service.example.com" />
+      <label style={styles.label}>API key</label>
+      <input style={styles.input} type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="The key your bridge service expects from us" />
+
+      {error ? <p style={styles.error}>{error}</p> : null}
+
+      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+        {integration?.connected ? (
+          <button type="button" style={{ ...styles.button, ...styles.buttonAuto, background: colors.white, color: colors.ink, border: `1px solid ${colors.border}` }} disabled={busy} onClick={onDisconnect}>
+            Disconnect
+          </button>
+        ) : null}
+        <button style={{ ...styles.button, ...styles.buttonAuto, opacity: busy ? 0.4 : 1 }} disabled={busy} onClick={onConnect}>
+          {busy ? "Saving…" : integration?.connected ? "Update" : "Connect"}
+        </button>
+      </div>
+
+      <button type="button" onClick={() => setShowGuide((v) => !v)} style={{ ...styles.linkButton, fontSize: 13, marginTop: 20 }}>
+        {showGuide ? "Hide integration guide" : "Show integration guide (for your developer)"}
+      </button>
+
+      {showGuide ? (
+        <div style={{ marginTop: 12, fontSize: 12, lineHeight: 1.6 }}>
+          <p style={{ fontWeight: 700, margin: "12px 0 4px" }}>We call your endpoint:</p>
+          {copy.weCall.map((call) => (
+            <div key={call.path} style={{ background: colors.background, borderRadius: 8, padding: 10, marginBottom: 8 }}>
+              <p style={{ margin: "0 0 4px", fontFamily: "monospace" }}>
+                {call.method} {"{endpointUrl}"}
+                {call.path}
+              </p>
+              {call.body !== "—" ? <p style={{ margin: "0 0 4px", fontFamily: "monospace", color: colors.muted, wordBreak: "break-all" }}>Body: {call.body}</p> : null}
+              <p style={{ margin: 0, fontFamily: "monospace", color: colors.muted, wordBreak: "break-all" }}>Response: {call.response}</p>
+            </div>
+          ))}
+          <p style={{ fontWeight: 700, margin: "12px 0 4px" }}>Your service calls us back (status changes):</p>
+          <div style={{ background: colors.background, borderRadius: 8, padding: 10 }}>
+            <p style={{ margin: "0 0 4px", fontFamily: "monospace", wordBreak: "break-all" }}>POST {webhookUrl}</p>
+            <p style={{ margin: "0 0 4px", fontFamily: "monospace", color: colors.muted }}>Header: X-Webhook-Secret: {"{your webhook secret above}"}</p>
+            <p style={{ margin: 0, fontFamily: "monospace", color: colors.muted, wordBreak: "break-all" }}>Body: {copy.theyCall.body}</p>
+          </div>
+          <p style={{ color: colors.muted, marginTop: 8 }}>Auth on our side calls to you: we send your API key as an HTTP Bearer token. Every request/response is plain JSON — no SDK required.</p>
         </div>
       ) : null}
     </div>
@@ -2167,6 +2347,7 @@ const styles: Record<string, React.CSSProperties> = {
   slugInput: { flex: 1, border: "none", padding: "10px 12px", fontSize: 14, fontFamily: "inherit", outline: "none" },
   slugSuffix: { padding: "10px 12px", fontSize: 14, color: colors.muted, background: colors.background },
   error: { color: colors.error, fontSize: 13, marginTop: 12 },
+  linkButton: { background: "none", border: "none", padding: 0, color: colors.navy, fontWeight: 600, cursor: "pointer", textDecoration: "underline" },
   button: {
     width: "100%",
     marginTop: 24,
