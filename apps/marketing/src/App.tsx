@@ -761,7 +761,7 @@ const styles: Record<string, React.CSSProperties> = {
   actionSection: { padding: "96px 32px", maxWidth: 1320, margin: "0 auto" },
   actionFrame: { marginTop: 56, border: `1px solid ${colors.border}`, borderRadius: 16, padding: 40, background: colors.surface },
   actionPanel: { display: "block", textDecoration: "none", color: colors.ink },
-  actionImageFrame: { position: "relative", aspectRatio: "1280 / 620", borderRadius: 16, overflow: "hidden", background: colors.paper },
+  actionImageFrame: { position: "relative", aspectRatio: "1280 / 620", borderRadius: 8, overflow: "hidden", background: colors.paper },
   actionImage: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" },
   actionCaption: { paddingTop: 22 },
   actionEyebrow: { fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: colors.navy, margin: "0 0 8px" },
