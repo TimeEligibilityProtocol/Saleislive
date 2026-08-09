@@ -8,6 +8,11 @@ import { apiClient } from "./config/apiClient";
 // connected, see Launch Studio's honest "Payments/Delivery: Not connected").
 const COURIER_FEE_MINOR = 2500;
 
+// Bump this whenever hero-laptop.png/hero-mobile.png are replaced with new
+// content under the same filename — otherwise browsers and Render's CDN
+// keep serving the old cached bytes at that URL indefinitely.
+const HERO_ASSET_VERSION = "3";
+
 function formatMoney(m: Money): string {
   return `${m.currency} ${(m.amountMinor / 100).toFixed(0)}`;
 }
@@ -176,8 +181,12 @@ function HomeView({ brand, products, onAddToBag }: { brand: Brand; products: Pro
       <section style={{ background: colors.background }}>
         <div className="hero-frame" style={styles.hero}>
           <picture>
-            <source media="(max-width: 700px)" srcSet={apiClient.resolveAssetUrl("/assets/hero/hero-mobile.png")} />
-            <img src={apiClient.resolveAssetUrl("/assets/hero/hero-laptop.png")} alt="Stock in. Sale live. A new AI-powered way to turn your catalogue into a complete branded sale." style={styles.heroImage} />
+            <source media="(max-width: 700px)" srcSet={apiClient.resolveAssetUrl(`/assets/hero/hero-mobile.png?v=${HERO_ASSET_VERSION}`)} />
+            <img
+              src={apiClient.resolveAssetUrl(`/assets/hero/hero-laptop.png?v=${HERO_ASSET_VERSION}`)}
+              alt="Stock in. Sale live. A new AI-powered way to turn your catalogue into a complete branded sale."
+              style={styles.heroImage}
+            />
           </picture>
           <a href="#products-grid" className="hero-shop-cta" style={styles.heroCta}>
             Shop the sale
