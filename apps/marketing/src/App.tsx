@@ -37,7 +37,7 @@ const INTEGRATIONS = [
   { icon: "db", label: "Data import" },
 ];
 
-const CATEGORY_TICKER = ["Fashion", "Footwear", "Cosmetics", "Jewelry", "Home & Living", "Beauty", "Accessories", "Lifestyle"];
+const CATEGORY_TICKER = ["yourbrand", "clothes", "beauty", "shoes", "jewelry", "home", "cosmetics", "accessories"].map((slug) => `${slug}.saleis.live`);
 
 const TRUST_BAR = [
   { icon: "sparkle", title: "Turn unsold stock", body: "Bring inventory sitting in storage or spreadsheets back to life and start selling it — without discounting your brand." },
@@ -569,7 +569,7 @@ const styles: Record<string, React.CSSProperties> = {
   miniStepBody: { fontSize: 13, color: colors.muted, margin: 0, lineHeight: 1.5 },
 
   tickerBand: { background: colors.navy, padding: "16px 0", overflow: "hidden" },
-  tickerItem: { display: "inline-flex", alignItems: "center", fontFamily: DISPLAY_FONT, fontSize: 20, color: colors.white, padding: "0 28px", whiteSpace: "nowrap" },
+  tickerItem: { display: "inline-flex", alignItems: "center", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 16, fontWeight: 500, color: colors.white, padding: "0 28px", whiteSpace: "nowrap" },
   tickerDot: { marginLeft: 28, color: "rgba(255,255,255,0.35)" },
 
   section: { padding: "140px 32px", maxWidth: 1320, margin: "0 auto" },
