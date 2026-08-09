@@ -116,7 +116,7 @@ export function App() {
     <div style={styles.page}>
       <header style={styles.header}>
         <a href="#/" style={styles.brandLockup}>
-          <Logo height={18} />
+          <Logo height={55} />
           <span style={styles.brandPlaceholder}>Your brand goes here</span>
         </a>
         <a href="#/bag" style={styles.bagLink}>
