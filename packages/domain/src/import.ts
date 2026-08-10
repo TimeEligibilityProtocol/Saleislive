@@ -38,6 +38,7 @@ export interface ParsedImportRow {
   color?: string;
   size?: string;
   material?: string;
+  dimensions?: string;
   price?: string;
   salePrice?: string;
   currency?: string;
@@ -84,7 +85,7 @@ export function computeRowDiff(rowNumber: number, row: ParsedImportRow, existing
   }
   if (!row.imageUrl) warnings.push("missing_image");
 
-  const softField = (key: "name" | "description" | "category" | "color" | "size" | "material", raw: string | undefined) => {
+  const softField = (key: "name" | "description" | "category" | "color" | "size" | "material" | "dimensions", raw: string | undefined) => {
     if (raw === undefined || raw.trim() === "") return;
     const current = existing?.[key]?.value ?? null;
     if (current !== raw) changes[key] = { from: current, to: raw };
@@ -95,6 +96,7 @@ export function computeRowDiff(rowNumber: number, row: ParsedImportRow, existing
   softField("color", row.color);
   softField("size", row.size);
   softField("material", row.material);
+  softField("dimensions", row.dimensions);
 
   if (priceMinor !== null) {
     const current = existing?.price.amountMinor ?? null;
@@ -186,6 +188,7 @@ export function buildProductFromImportRow(opts: {
     color: nextField(existing?.color, row.color, { sourceReference, now }),
     size: nextField(existing?.size, row.size, { sourceReference, now }),
     material: nextField(existing?.material, row.material, { sourceReference, now }),
+    dimensions: nextField(existing?.dimensions, row.dimensions, { sourceReference, now }),
     images,
     price,
     salePrice: price,

@@ -4,6 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>saleis.live — Admin</title>
+
+    <!-- PWA: installable, "Add to Home Screen" — see public/manifest.json and public/sw.js -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#173B8F" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="saleis.live" />
+
     <style>
       /* Brand kit fonts, self-hosted from SALEIS.LIVE/assets/fonts & logotype — not a Google Fonts
          name-only reference, which silently falls back to a system font when unavailable. */
@@ -30,5 +39,10 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+      }
+    </script>
   </body>
 </html>

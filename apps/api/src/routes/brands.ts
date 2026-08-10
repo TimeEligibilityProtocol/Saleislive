@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { asyncHandler } from "../lib/asyncHandler.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, requireRole } from "../middleware/auth.js";
 import { logAudit } from "../store/auditLog.js";
 import { createMembership } from "../store/memberships.js";
-import { createBrand, getBrandById, isSlugAvailable, updateBrandIntegration } from "../store/tenants.js";
+import { createBrand, getBrandById, isSlugAvailable, updateBrandIntegration, updateBrandProfile } from "../store/tenants.js";
 
 const SLUG_PATTERN = /^[a-z0-9-]{2,32}$/;
 
@@ -70,6 +70,26 @@ export function brandsRouter(): Router {
       await createMembership({ userId: req.user!.id, brandId: brand.id, tenantId, role: "group_owner" });
       await logAudit({ tenantId, brandId: brand.id, userId: req.user!.id, action: "brand.created", entityType: "brand", entityId: brand.id, metadata: { name, slug: normalizedSlug } });
       res.status(201).json({ brand });
+    }),
+  );
+
+  /** Step 1's "edit" affordance — everything from screen 01 except the slug, which stays fixed once created. brand_admin+ only, matching the roles matrix's "Brand setup: edit" row. */
+  router.patch(
+    "/api/brands/:brandId",
+    requireAuth,
+    requireRole("brand_admin"),
+    asyncHandler(async (req, res) => {
+      const { name, country, currency, language, secondaryLanguage } = req.body as {
+        name?: string;
+        country?: string;
+        currency?: string;
+        language?: string;
+        secondaryLanguage?: string | null;
+      };
+      if (!name?.trim() || !country || !currency || !language) return res.status(400).json({ error: "missing_fields" });
+      const updated = await updateBrandProfile(req.params.brandId, { name: name.trim(), country, currency, language, secondaryLanguage: secondaryLanguage ?? null });
+      if (!updated) return res.status(404).json({ error: "unknown_brand" });
+      res.json({ brand: updated });
     }),
   );
 

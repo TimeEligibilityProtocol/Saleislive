@@ -69,9 +69,16 @@ export async function resetPasswordForUser(userId: string): Promise<string> {
   return newPassword;
 }
 
-/** The demo brand's first real login — see the login-screen milestone in conversation. Idempotent: does nothing once this account already exists, so it's safe on every boot. */
-export const DEMO_OWNER_EMAIL = "ola@saleis.live";
-export const DEMO_OWNER_PASSWORD = "SaleisDemo2026!";
+/**
+ * The demo brand's first real login — see the login-screen milestone in
+ * conversation. Idempotent: does nothing once this account already
+ * exists, so it's safe on every boot. Kept deliberately simple ("admin" /
+ * "ready", no real email needed) per Ola's request while she's testing
+ * solo — the multi-role accounts get layered on top when she's ready for
+ * that, not instead of this one.
+ */
+export const DEMO_OWNER_EMAIL = "admin";
+export const DEMO_OWNER_PASSWORD = "ready";
 
 export async function ensureSeedData(): Promise<void> {
   const existing = await getUserByEmail(DEMO_OWNER_EMAIL);

@@ -1,4 +1,4 @@
-import { AiAssistedField, approvedField, Product, ProductImage } from "@saleis-live/domain";
+import { AiAssistedField, approvedField, emptyField, Product, ProductImage } from "@saleis-live/domain";
 import { prisma } from "../lib/prisma.js";
 import { Prisma, Product as PrismaProduct } from "../generated/prisma/client.js";
 
@@ -29,6 +29,7 @@ function toDomainProduct(row: PrismaProduct): Product {
     color: row.color as unknown as AiAssistedField<string>,
     size: row.size as unknown as AiAssistedField<string>,
     material: row.material as unknown as AiAssistedField<string>,
+    dimensions: row.dimensions as unknown as AiAssistedField<string>,
     images: row.images as unknown as ProductImage[],
     price: { amountMinor: row.priceAmountMinor, currency: row.priceCurrency },
     salePrice: { amountMinor: row.salePriceAmountMinor, currency: row.salePriceCurrency },
@@ -65,6 +66,7 @@ export async function ensureSeedData(): Promise<void> {
     color: approvedField(color),
     size: approvedField(size),
     material: approvedField(material),
+    dimensions: emptyField<string>(),
     images: [{ url: imageUrl, alt: name, isMain: true }] satisfies ProductImage[],
     priceAmountMinor: priceMinor,
     priceCurrency: "AED",
@@ -84,7 +86,9 @@ export async function ensureSeedData(): Promise<void> {
   ];
 
   for (const s of seeds) {
-    await prisma.product.create({ data: { ...s, name: toJson(s.name), description: toJson(s.description), category: toJson(s.category), color: toJson(s.color), size: toJson(s.size), material: toJson(s.material), images: toJson(s.images) } });
+    await prisma.product.create({
+      data: { ...s, name: toJson(s.name), description: toJson(s.description), category: toJson(s.category), color: toJson(s.color), size: toJson(s.size), material: toJson(s.material), dimensions: toJson(s.dimensions), images: toJson(s.images) },
+    });
   }
 }
 
@@ -123,6 +127,7 @@ export async function upsertProduct(product: Product): Promise<void> {
     color: toJson(product.color),
     size: toJson(product.size),
     material: toJson(product.material),
+    dimensions: toJson(product.dimensions),
     images: toJson(product.images),
     priceAmountMinor: product.price.amountMinor,
     priceCurrency: product.price.currency,

@@ -42,6 +42,11 @@ export interface AiAssistedField<T> {
   history: FieldHistoryEntry<T>[];
 }
 
+/** The "nothing here yet" shape — same as a field no source has ever touched. */
+export function emptyField<T>(): AiAssistedField<T> {
+  return { value: null, aiSuggestion: null, sourceType: null, sourceReference: null, confidenceScore: null, verificationState: "unverified", updatedBy: null, updatedAt: null, history: [] };
+}
+
 /** A field entered or confirmed directly by a human — trusted, no review needed. */
 export function approvedField<T>(value: T, updatedBy = "system", updatedAt = new Date(0).toISOString()): AiAssistedField<T> {
   return {
@@ -101,6 +106,8 @@ export interface Product {
   color: AiAssistedField<string>;
   size: AiAssistedField<string>;
   material: AiAssistedField<string>;
+  /** Free text — "30 x 20 x 10 cm" or similar; format varies too much across categories (clothing/shoes/furniture/jewellery) for structured fields to be worth it yet. */
+  dimensions: AiAssistedField<string>;
   images: ProductImage[];
   price: Money;
   salePrice: Money;

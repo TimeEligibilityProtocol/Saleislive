@@ -1,8 +1,11 @@
 import { buildProductFromImportRow, computeRowDiff, flagDuplicateSkusInFile, ImportRowDiff, IntakeMethod, MatchMethod, ParsedImportRow, PhotoTreatment } from "@saleis-live/domain";
+import Anthropic from "@anthropic-ai/sdk";
 import { Router } from "express";
 import multer from "multer";
 import { randomUUID } from "node:crypto";
 import { asyncHandler } from "../lib/asyncHandler.js";
+import { autoAnalyzeIfNeeded } from "../lib/autoAnalyze.js";
+import { extractEmbeddedImages, saveEmbeddedImage } from "../lib/embeddedImages.js";
 import { parseSpreadsheet } from "../lib/importParsing.js";
 import { createBatch, getBatch, markCommitted } from "../store/imports.js";
 import { getProductBySku, upsertProduct } from "../store/products.js";
@@ -28,7 +31,7 @@ function parseFieldOverrides(raw: unknown): Partial<Record<string, keyof ParsedI
   }
 }
 
-export function importsRouter(): Router {
+export function importsRouter(anthropicClient: Anthropic | null): Router {
   const router = Router();
 
   /**
@@ -84,6 +87,19 @@ export function importsRouter(): Router {
       }
       if (parsed.rows.length === 0) {
         return res.status(400).json({ error: "empty_file" });
+      }
+
+      // Photos pasted straight into cells (not a URL column) — only .xlsx
+      // can carry these; extraction is best-effort and never blocks the
+      // import if a file has none.
+      if (req.file.originalname.toLowerCase().endsWith(".xlsx")) {
+        const embedded = await extractEmbeddedImages(req.file.buffer);
+        for (const image of embedded) {
+          const row = parsed.rows[image.dataRowIndex];
+          if (row && !row.imageUrl) {
+            row.imageUrl = await saveEmbeddedImage(image);
+          }
+        }
       }
 
       const diffs: ImportRowDiff[] = [];
@@ -158,7 +174,7 @@ export function importsRouter(): Router {
           continue;
         }
         const existing = await getProductBySku(brand.id, row.sku);
-        const product = buildProductFromImportRow({
+        let product = buildProductFromImportRow({
           row: row.parsedRow,
           existing,
           tenantId: brand.tenantId,
@@ -169,6 +185,11 @@ export function importsRouter(): Router {
           defaultCurrency: brand.currency,
           now,
         });
+        // "Upload a file, descriptions appear automatically" — real vision
+        // analysis on the row's photo, only for products that don't
+        // already have real copy (see autoAnalyzeIfNeeded's own doc
+        // comment on why this never overwrites a merchant's own words).
+        product = await autoAnalyzeIfNeeded(anthropicClient, product, now);
         await upsertProduct(product);
         if (existing) updated++;
         else created++;

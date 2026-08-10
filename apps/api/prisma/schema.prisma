@@ -233,6 +233,7 @@ model Product {
   color       Json
   size        Json
   material    Json
+  dimensions  Json @default("{\"value\":null,\"aiSuggestion\":null,\"sourceType\":null,\"sourceReference\":null,\"confidenceScore\":null,\"verificationState\":\"unverified\",\"updatedBy\":null,\"updatedAt\":null,\"history\":[]}")
 
   /// ProductImage[] — packages/domain/src/product.ts
   images Json @default("[]")

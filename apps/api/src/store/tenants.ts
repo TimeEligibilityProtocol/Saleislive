@@ -100,6 +100,16 @@ export async function createBrand(
   return toDomainBrand(row);
 }
 
+/** Editing an already-created brand's step-1 fields — everything from screen 01 except the slug, which storefront URLs already depend on so it stays fixed once created. */
+export async function updateBrandProfile(id: string, patch: { name: string; country: string; currency: string; language: string; secondaryLanguage: string | null }): Promise<Brand | undefined> {
+  try {
+    const row = await prisma.brand.update({ where: { id }, data: patch });
+    return toDomainBrand(row);
+  } catch {
+    return undefined;
+  }
+}
+
 /** Screen 06's "Policies" tab. */
 export async function updateBrandPolicies(id: string, patch: Partial<{ returnPolicy: string; shippingPolicy: string }>): Promise<Brand | undefined> {
   try {

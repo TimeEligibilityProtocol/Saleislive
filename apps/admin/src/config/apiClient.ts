@@ -22,7 +22,13 @@ export function resolveStorefrontPreviewUrl(slug: string): string {
   return `${base}/?brand=${encodeURIComponent(slug)}`;
 }
 
-export const apiClient = new ApiClient({ baseUrl: resolveApiBaseUrl() });
+export const AUTH_TOKEN_KEY = "saleislive:authToken";
+
+export const apiClient = new ApiClient({
+  baseUrl: resolveApiBaseUrl(),
+  // eslint-disable-next-line @typescript-eslint/require-await
+  getAuthToken: async () => window.localStorage.getItem(AUTH_TOKEN_KEY),
+});
 
 /** A plain file download, not a JSON call — Catalogue Center's "Export" link points straight at this. */
 export function resolveCatalogueExportUrl(brandId: string): string {

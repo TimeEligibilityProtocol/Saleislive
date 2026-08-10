@@ -44,6 +44,25 @@ export interface ProductPhotoAnalysis {
 export type SetupStepKey = "brand_setup" | "stock_intake" | "ai_catalogue_review" | "launch_setup" | "preview_publish";
 export type SetupStepStatus = "not_started" | "in_progress" | "submitted" | "approved" | "rejected";
 
+/** Mirrors apps/api's TeamMemberView (memberships.ts) — a BrandMembership joined with the user's email/display name. */
+export interface TeamMemberView {
+  userId: string;
+  email: string;
+  displayName: string;
+  role: Role;
+}
+
+/** Mirrors apps/api's AuditLogEntry (auditLog.ts). */
+export interface AuditLogEntry {
+  id: string;
+  userId: string | null;
+  action: string;
+  entityType: string;
+  entityId: string;
+  metadata: unknown;
+  createdAt: string;
+}
+
 export interface SetupStepView {
   stepKey: SetupStepKey;
   status: SetupStepStatus;
@@ -96,6 +115,12 @@ export class ApiClient {
       method: "POST",
       body: JSON.stringify(input),
     });
+    return brand;
+  }
+
+  /** 403s server-side unless the caller is brand_admin/group_owner. Never touches the slug — storefront URLs already depend on it. */
+  async updateBrand(brandId: string, input: { name: string; country: string; currency: string; language: string; secondaryLanguage: string | null }): Promise<Brand> {
+    const { brand } = await this.request<{ brand: Brand }>(`/api/brands/${brandId}`, { method: "PATCH", body: JSON.stringify(input) });
     return brand;
   }
 
@@ -177,13 +202,66 @@ export class ApiClient {
   async updateProduct(
     brandId: string,
     id: string,
-    patch: Partial<{ name: string; description: string; category: string; color: string; material: string; price: number; salePrice: number; stock: number; approve: boolean }>,
+    patch: Partial<{ name: string; description: string; category: string; color: string; size: string; material: string; dimensions: string; price: number; salePrice: number; stock: number; approve: boolean }>,
   ): Promise<Product> {
     const { product } = await this.request<{ product: Product }>(`/api/brands/${brandId}/products/${id}`, {
       method: "PATCH",
       body: JSON.stringify(patch),
     });
     return product;
+  }
+
+  /** Product Studio's "add another photo" — appends, never replaces; becomes the main photo only if the product had none before. Raw fetch, not this.request(): a FormData body needs the browser's own multipart Content-Type/boundary, not the JSON one request() always sets. */
+  async addProductImage(brandId: string, id: string, file: File): Promise<Product> {
+    const token = await this.config.getAuthToken?.();
+    const form = new FormData();
+    form.append("file", file);
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`${this.config.baseUrl}/api/brands/${brandId}/products/${id}/images`, { method: "POST", body: form, headers });
+    if (!res.ok) throw new ApiError(res.status, await res.text());
+    const { product } = (await res.json()) as { product: Product };
+    return product;
+  }
+
+  /** "Product photos" / "phone camera" intake — no spreadsheet, just photos. Each file becomes its own draft product with AI-filled details; price/stock still need a human afterward. */
+  async createProductsFromPhotos(brandId: string, files: File[]): Promise<Product[]> {
+    const token = await this.config.getAuthToken?.();
+    const form = new FormData();
+    for (const file of files) form.append("files", file);
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`${this.config.baseUrl}/api/brands/${brandId}/products/from-photos`, { method: "POST", body: form, headers });
+    if (!res.ok) throw new ApiError(res.status, await res.text());
+    const { products } = (await res.json()) as { products: Product[] };
+    return products;
+  }
+
+  async setMainProductImage(brandId: string, id: string, url: string): Promise<Product> {
+    const { product } = await this.request<{ product: Product }>(`/api/brands/${brandId}/products/${id}/images/main`, { method: "PATCH", body: JSON.stringify({ url }) });
+    return product;
+  }
+
+  /** Refuses (409) if this is the product's only remaining photo. */
+  async removeProductImage(brandId: string, id: string, url: string): Promise<Product> {
+    const { product } = await this.request<{ product: Product }>(`/api/brands/${brandId}/products/${id}/images`, { method: "DELETE", body: JSON.stringify({ url }) });
+    return product;
+  }
+
+  /** Real local background removal (no external API) — adds the cutout as a new photo. Throws ApiError(422) if the model couldn't find a product in the image. */
+  async removeImageBackground(brandId: string, id: string, url: string): Promise<Product> {
+    const { product } = await this.request<{ product: Product }>(`/api/brands/${brandId}/products/${id}/images/remove-background`, { method: "POST", body: JSON.stringify({ url }) });
+    return product;
+  }
+
+  async applyBackgroundPreset(brandId: string, id: string, url: string, preset: string): Promise<Product> {
+    const { product } = await this.request<{ product: Product }>(`/api/brands/${brandId}/products/${id}/images/apply-background`, { method: "POST", body: JSON.stringify({ url, preset }) });
+    return product;
+  }
+
+  async listBackgroundPresets(): Promise<string[]> {
+    const { presets } = await this.request<{ presets: string[] }>("/api/background-presets");
+    return presets;
   }
 
   /** Product Studio's "Suggest with AI" — fetches the product's own image and sends it for real vision analysis. Throws ApiError(503) if ANTHROPIC_API_KEY isn't configured server-side. */
@@ -291,6 +369,33 @@ export class ApiClient {
   /** Only callable by a caller who is already brand_admin/group_owner on `brandId` — the server re-checks this, this isn't just a client-side gate. */
   async inviteTeamMember(input: { email: string; displayName: string; password: string; brandId: string; role: Role; tenantId: string }): Promise<{ user: User; membership: BrandMembership }> {
     return this.request("/api/auth/invite", { method: "POST", body: JSON.stringify(input) });
+  }
+
+  async listTeam(brandId: string): Promise<TeamMemberView[]> {
+    const { team } = await this.request<{ team: TeamMemberView[] }>(`/api/brands/${brandId}/team`);
+    return team;
+  }
+
+  /** 403s server-side unless the caller is brand_admin/group_owner. */
+  async updateTeamMemberRole(brandId: string, userId: string, role: Role): Promise<BrandMembership> {
+    const { membership } = await this.request<{ membership: BrandMembership }>(`/api/brands/${brandId}/team/${userId}`, { method: "PATCH", body: JSON.stringify({ role }) });
+    return membership;
+  }
+
+  /** Server blocks removing yourself (400) or the last group_owner (403) — surface those errors as-is. */
+  async removeTeamMember(brandId: string, userId: string): Promise<void> {
+    await this.request(`/api/brands/${brandId}/team/${userId}`, { method: "DELETE" });
+  }
+
+  /** Returns the freshly-generated plaintext password once — hand it to the teammate directly, nothing stores it. */
+  async resetTeamMemberPassword(brandId: string, userId: string): Promise<string> {
+    const { newPassword } = await this.request<{ newPassword: string }>(`/api/brands/${brandId}/team/${userId}/reset-password`, { method: "POST" });
+    return newPassword;
+  }
+
+  async listAuditLog(brandId: string): Promise<AuditLogEntry[]> {
+    const { entries } = await this.request<{ entries: AuditLogEntry[] }>(`/api/brands/${brandId}/audit-log`);
+    return entries;
   }
 
   // ---------------------------------------------------------------------

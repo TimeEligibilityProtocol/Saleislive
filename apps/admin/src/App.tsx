@@ -1,26 +1,26 @@
 import { colors, typography } from "@saleis-live/ui";
 import {
   Brand,
+  BrandMembership,
   Campaign,
   CampaignAccess,
   FulfilmentStatus,
   HttpIntegrationConfig,
   ImportBatch,
   ImportRowDiff,
-  IntakeMethod,
   isProductReadyToPublish,
-  MatchMethod,
   Order,
   OrderStatus,
   ParsedImportRow,
-  PhotoTreatment,
   Product,
+  Role,
   ThemePresetId,
+  User,
 } from "@saleis-live/domain";
-import { ApiError, ImportPreview } from "@saleis-live/api-client";
-import { useEffect, useRef, useState } from "react";
+import { ApiError, ImportPreview, SetupStepKey, SetupStepView, TeamMemberView } from "@saleis-live/api-client";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Logo } from "./components/Logo";
-import { apiClient, resolveCatalogueExportUrl, resolveStorefrontPreviewUrl } from "./config/apiClient";
+import { apiClient, AUTH_TOKEN_KEY, resolveCatalogueExportUrl, resolveStorefrontPreviewUrl } from "./config/apiClient";
 
 const ROOT_DOMAIN = "saleis.live";
 const DEMO_TENANT_ID = "t_demo";
@@ -31,14 +31,72 @@ const DEMO_TENANT_ID = "t_demo";
  * Center and Import are deliberately NOT top-level items — they live
  * inside Products, per the doc's own screen consolidation.
  */
+/**
+ * Ola's explicit sequence — each step of the process is its own tab, in
+ * the order the process actually happens: shop, team, stock, catalogue,
+ * sale, publish. Dashboard moves to the very end — it only has real
+ * numbers to show once you've gone through the process, so it doesn't
+ * belong near the start. Orders sits with it, since both are ongoing
+ * operations rather than one-time setup steps.
+ */
 const NAV_ITEMS = [
-  { label: "Dashboard", route: "#/dashboard" },
-  { label: "Products", route: "#/add-stock" },
-  { label: "Sales", route: "#/launch-studio" },
+  { label: "New brand", route: "#/shop" },
+  { label: "Team", route: "#/team" },
+  { label: "Add your stock", route: "#/add-stock" },
+  { label: "Check your products", route: "#/catalogue-center" },
+  { label: "Set up your sale", route: "#/launch-studio" },
+  { label: "Go live", route: "#/preview-publish" },
   { label: "Orders", route: "#/orders" },
+  { label: "Dashboard", route: "#/dashboard" },
   { label: "Store", route: null },
-  { label: "Settings", route: null },
 ] as const;
+
+type NavLabel = (typeof NAV_ITEMS)[number]["label"];
+
+/**
+ * docs/product/saleis-live-roles-permissions-v1.md's role → permission
+ * matrix, collapsed to "which top-level nav areas can this role open at
+ * all" — the row-by-row edit/view distinction inside each area isn't
+ * enforced yet (see the read_only gap noted where this is used).
+ */
+const ROLE_NAV_ACCESS: Record<Role, NavLabel[]> = {
+  group_owner: ["New brand", "Team", "Add your stock", "Check your products", "Set up your sale", "Go live", "Orders", "Dashboard", "Store"],
+  brand_admin: ["New brand", "Team", "Add your stock", "Check your products", "Set up your sale", "Go live", "Orders", "Dashboard", "Store"],
+  merchandiser: ["Add your stock", "Check your products", "Set up your sale", "Go live"],
+  order_manager: ["Orders"],
+  analyst: ["Dashboard"],
+  read_only: ["New brand", "Team", "Add your stock", "Check your products", "Set up your sale", "Go live", "Orders", "Dashboard", "Store"],
+};
+
+/** Where each wizard step's real work happens — used both to link the setup bar's step label and to redirect someone who jumps ahead to a step that isn't unlocked yet. */
+const SETUP_STEP_ROUTES: Record<SetupStepKey, string> = {
+  brand_setup: "#/shop",
+  stock_intake: "#/add-stock",
+  ai_catalogue_review: "#/catalogue-center",
+  launch_setup: "#/launch-studio",
+  preview_publish: "#/preview-publish",
+};
+
+function firstAccessibleRoute(role: Role | null): string | null {
+  if (!role) return null;
+  const allowed = ROLE_NAV_ACCESS[role];
+  return NAV_ITEMS.find((item) => item.route && allowed.includes(item.label))?.route ?? null;
+}
+
+/** Shared by the setup bar and the route guard below so both agree on the same fetch, not two independent ones. */
+function useSetupSteps(brandId: string) {
+  const [steps, setSteps] = useState<SetupStepView[] | null>(null);
+  const reload = useCallback(() => {
+    apiClient
+      .listSetupSteps(brandId)
+      .then(setSteps)
+      .catch(() => setSteps(null));
+  }, [brandId]);
+  useEffect(() => {
+    reload();
+  }, [reload]);
+  return { steps, reload };
+}
 
 function slugify(input: string): string {
   return input
@@ -59,101 +117,504 @@ function useHashRoute(): string {
   return hash;
 }
 
-export function App() {
-  const hash = useHashRoute();
+interface AuthState {
+  loading: boolean;
+  user: User | null;
+  memberships: BrandMembership[];
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => void;
+}
 
-  if (hash === "#/dashboard") {
-    return (
-      <AdminShell active="Dashboard">
-        <DashboardPage />
-      </AdminShell>
-    );
-  }
+/**
+ * Session lives in localStorage as a bearer token — apiClient.getAuthToken
+ * (config/apiClient.ts) reads the same key, so every request everywhere
+ * already carries it once this resolves. On mount, a stored token is
+ * revalidated against /api/auth/me rather than trusted blindly, since it
+ * may have expired or been revoked server-side since the last visit.
+ */
+function useAuth(): AuthState {
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [memberships, setMemberships] = useState<BrandMembership[]>([]);
 
-  if (hash === "#/add-stock") {
-    return (
-      <AdminShell active="Products">
-        <AddStockPage />
-      </AdminShell>
-    );
-  }
+  useEffect(() => {
+    let cancelled = false;
+    const token = window.localStorage.getItem(AUTH_TOKEN_KEY);
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+    apiClient
+      .me()
+      .then((res) => {
+        if (cancelled) return;
+        setUser(res.user);
+        setMemberships(res.memberships);
+      })
+      .catch(() => {
+        if (!cancelled) window.localStorage.removeItem(AUTH_TOKEN_KEY);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  if (hash.startsWith("#/products/")) {
-    const productId = decodeURIComponent(hash.slice("#/products/".length));
-    return (
-      <AdminShell active="Products">
-        <ProductStudioPage productId={productId} />
-      </AdminShell>
-    );
-  }
+  const login = async (email: string, password: string) => {
+    const res = await apiClient.login(email, password);
+    window.localStorage.setItem(AUTH_TOKEN_KEY, res.token);
+    setUser(res.user);
+    const me = await apiClient.me();
+    setMemberships(me.memberships);
+  };
 
-  if (hash === "#/catalogue-center") {
-    return (
-      <AdminShell active="Products">
-        <CatalogueCenterPage />
-      </AdminShell>
-    );
-  }
+  const logout = () => {
+    apiClient.logout().catch(() => {});
+    window.localStorage.removeItem(AUTH_TOKEN_KEY);
+    setUser(null);
+    setMemberships([]);
+  };
 
-  if (hash === "#/launch-studio") {
-    return (
-      <AdminShell active="Sales">
-        <LaunchStudioPage />
-      </AdminShell>
-    );
-  }
+  return { loading, user, memberships, login, logout };
+}
 
-  if (hash === "#/preview-publish") {
-    return (
-      <AdminShell active="Sales">
-        <PreviewPublishPage />
-      </AdminShell>
-    );
-  }
+const AuthContext = createContext<AuthState | null>(null);
 
-  if (hash === "#/orders") {
-    return (
-      <AdminShell active="Orders">
-        <OrdersPage />
-      </AdminShell>
-    );
-  }
+/** AdminShell (and anything else deep in the tree that needs who's logged in / what role they hold) reads this instead of threading auth through every page component's props. */
+function useAuthContext(): AuthState {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuthContext must be used within AuthContext.Provider");
+  return ctx;
+}
 
-  if (hash.startsWith("#/orders/")) {
-    const orderId = decodeURIComponent(hash.slice("#/orders/".length));
-    return (
-      <AdminShell active="Orders">
-        <OrderDetailPage orderId={orderId} />
-      </AdminShell>
-    );
-  }
+/** Any of these, typed in the one-field quick-sign-in box, logs straight into the demo group_owner account — see DEMO_OWNER_EMAIL/PASSWORD in apps/api/src/store/users.ts. */
+const QUICK_SIGNIN_NAMES = ["ola", "admin"];
 
-  // Mockup 01-brand-setup.png shows this inside the full shell with
-  // "Settings" active, not a standalone card — matched exactly here.
+/**
+ * Two logins in one screen: a single "just type your name" field for Ola
+ * demoing this to people (her request — as frictionless as possible, no
+ * visible password), and underneath it, unchanged, the real email+password
+ * login real teammate accounts still need. The quick field never bypasses
+ * the backend's password check — it just silently supplies the known demo
+ * password, so a real teammate's login stays exactly as protected as
+ * before.
+ */
+function LoginPage({ onLogin }: { onLogin: (email: string, password: string) => Promise<void> }) {
+  const [quickName, setQuickName] = useState("");
+  const [quickError, setQuickError] = useState<string | null>(null);
+  const [quickSubmitting, setQuickSubmitting] = useState(false);
+  const [showFullLogin, setShowFullLogin] = useState(false);
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleQuickSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setQuickError(null);
+    if (!QUICK_SIGNIN_NAMES.includes(quickName.trim().toLowerCase())) {
+      setQuickError("Don't recognise that name — use email sign-in below.");
+      return;
+    }
+    setQuickSubmitting(true);
+    try {
+      await onLogin("admin", "ready");
+    } catch (err) {
+      setQuickError(err instanceof ApiError && err.status === 429 ? "Too many attempts — wait a few minutes and try again." : "Couldn't sign in.");
+    } finally {
+      setQuickSubmitting(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await onLogin(email, password);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 429) setError("Too many attempts — wait a few minutes and try again.");
+      else setError("Wrong email or password.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <AdminShell active="Settings">
-      <CreateBrandPage />
-    </AdminShell>
+    <div style={styles.loginRoot}>
+      <div style={styles.loginCard}>
+        <Logo height={40} />
+        <h1 style={{ ...styles.h1, fontSize: 22, marginTop: 24 }}>Sign in</h1>
+
+        {!showFullLogin ? (
+          <form onSubmit={(e) => void handleQuickSubmit(e)}>
+            <label style={styles.label} htmlFor="quick-name">
+              Your name
+            </label>
+            <input id="quick-name" type="text" autoFocus required value={quickName} onChange={(e) => setQuickName(e.target.value)} style={styles.input} placeholder="Ola" />
+            {quickError ? <p style={{ color: colors.error, fontSize: 13, marginTop: 12 }}>{quickError}</p> : null}
+            <button type="submit" disabled={quickSubmitting} style={{ ...styles.button, marginTop: 24, width: "100%" }}>
+              {quickSubmitting ? "Signing in…" : "Sign in"}
+            </button>
+            <button type="button" onClick={() => setShowFullLogin(true)} style={{ ...styles.linkButton, fontSize: 12, marginTop: 16, display: "block" }}>
+              Sign in with email instead
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={(e) => void handleSubmit(e)}>
+            <label style={styles.label} htmlFor="login-email">
+              Email or username
+            </label>
+            {/* type="text", not "email" — the demo login is a plain username ("admin"), and native email-format
+                validation would silently block submitting anything that isn't a real address. */}
+            <input id="login-email" type="text" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} style={styles.input} />
+            <label style={styles.label} htmlFor="login-password">
+              Password
+            </label>
+            <input id="login-password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} style={styles.input} />
+            {error ? <p style={{ color: colors.error, fontSize: 13, marginTop: 12 }}>{error}</p> : null}
+            <button type="submit" disabled={submitting} style={{ ...styles.button, marginTop: 24, width: "100%" }}>
+              {submitting ? "Signing in…" : "Sign in"}
+            </button>
+            <button type="button" onClick={() => setShowFullLogin(false)} style={{ ...styles.linkButton, fontSize: 12, marginTop: 16, display: "block" }}>
+              Back to quick sign-in
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
   );
 }
 
+export function App() {
+  const hash = useHashRoute();
+  const auth = useAuth();
+
+  if (auth.loading) {
+    return <div style={styles.loginRoot} />;
+  }
+
+  if (!auth.user) {
+    return <LoginPage onLogin={auth.login} />;
+  }
+
+  return (
+    <AuthContext.Provider value={auth}>
+      <AppRoutes hash={hash} />
+    </AuthContext.Provider>
+  );
+}
+
+/**
+ * Resolves a hash to what it needs for gating: which nav area it belongs
+ * to (role check) and which wizard step it belongs to, if any (lock
+ * check) — kept separate from rendering so the guard below can run before
+ * committing to a page.
+ */
+function resolveRoute(hash: string): { active: NavLabel; stepKey: SetupStepKey | null; page: React.ReactNode } {
+  if (hash === "#/dashboard") return { active: "Dashboard", stepKey: null, page: <DashboardPage /> };
+  if (hash === "#/add-stock") return { active: "Add your stock", stepKey: "stock_intake", page: <AddStockPage /> };
+  if (hash.startsWith("#/products/")) {
+    const productId = decodeURIComponent(hash.slice("#/products/".length));
+    return { active: "Check your products", stepKey: "ai_catalogue_review", page: <ProductStudioPage productId={productId} /> };
+  }
+  if (hash === "#/catalogue-center") return { active: "Check your products", stepKey: "ai_catalogue_review", page: <CatalogueCenterPage /> };
+  if (hash === "#/launch-studio") return { active: "Set up your sale", stepKey: "launch_setup", page: <LaunchStudioPage /> };
+  if (hash === "#/preview-publish") return { active: "Go live", stepKey: "preview_publish", page: <PreviewPublishPage /> };
+  if (hash === "#/orders") return { active: "Orders", stepKey: null, page: <OrdersPage /> };
+  if (hash.startsWith("#/orders/")) {
+    const orderId = decodeURIComponent(hash.slice("#/orders/".length));
+    return { active: "Orders", stepKey: null, page: <OrderDetailPage orderId={orderId} /> };
+  }
+  if (hash === "#/team") return { active: "Team", stepKey: null, page: <TeamPage /> };
+  if (hash === "#/shop") return { active: "New brand", stepKey: "brand_setup", page: <ShopSetupPage /> };
+  // Unmatched hash (the bare "#/" a fresh login with no brand yet resolves
+  // to) lands on the same shop-setup page.
+  return { active: "New brand", stepKey: "brand_setup", page: <ShopSetupPage /> };
+}
+
+/**
+ * Two gates run on every navigation, in this order: (1) does this role
+ * even open this nav area at all — docs/product/saleis-live-roles-permissions-v1.md's
+ * matrix, e.g. a Merchandiser never sees Dashboard or Orders; (2) for
+ * pages tied to a wizard step, is that step actually unlocked yet — so
+ * jumping straight to Launch Setup before Stock Intake is approved bounces
+ * back to whichever step is actually current. Redirects, rather than an
+ * error page, so a restricted nav item behaves as if it simply isn't there
+ * — matching "those menu items simply aren't shown to them" in the doc.
+ */
+function AppRoutes({ hash }: { hash: string }) {
+  const auth = useAuthContext();
+  const [brandId] = useState(() => window.localStorage.getItem(LAST_BRAND_ID_KEY) ?? "b_demo");
+  const role = auth.memberships.find((m) => m.brandId === brandId)?.role ?? null;
+  const { steps } = useSetupSteps(brandId);
+
+  const resolved = resolveRoute(hash);
+  const hasBrandAccess = role !== null;
+  const roleBlocked = hasBrandAccess && !ROLE_NAV_ACCESS[role].includes(resolved.active);
+  const stepView = resolved.stepKey && steps ? (steps.find((s) => s.stepKey === resolved.stepKey) ?? null) : null;
+  const stepLocked = !!stepView && !stepView.unlocked;
+  const fallback = firstAccessibleRoute(role);
+
+  useEffect(() => {
+    if (roleBlocked && fallback && hash !== fallback) {
+      window.location.hash = fallback;
+    } else if (stepLocked && steps) {
+      const currentKey = steps.find((s) => s.status !== "approved")?.stepKey ?? "brand_setup";
+      const target = SETUP_STEP_ROUTES[currentKey];
+      if (hash !== target) window.location.hash = target;
+    }
+  }, [hash, roleBlocked, stepLocked, fallback, steps]);
+
+  if (!hasBrandAccess) {
+    return (
+      <AdminShell active={resolved.active}>
+        <p style={styles.sub}>You don't have access to this brand.</p>
+      </AdminShell>
+    );
+  }
+  if (roleBlocked || stepLocked) return null;
+
+  return <AdminShell active={resolved.active}>{resolved.page}</AdminShell>;
+}
+
+/** Plain language for what's actually happening at each step, not internal screen/tab names — Ola's explicit correction. */
+const SETUP_STEP_LABELS: Record<SetupStepKey, string> = {
+  brand_setup: "Set up your shop",
+  stock_intake: "Add your stock",
+  ai_catalogue_review: "Check your products",
+  launch_setup: "Set up your sale",
+  preview_publish: "Go live",
+};
+
+const SETUP_STEP_ORDER: SetupStepKey[] = ["brand_setup", "stock_intake", "ai_catalogue_review", "launch_setup", "preview_publish"];
+
+/**
+ * A "Next step →" button on the page itself, not just the top bar — Ola's
+ * request: every screen in the process should have one. Solo operator (the
+ * common case so far): if the signed-in person can approve, clicking Next
+ * submits AND approves in one motion, then moves on — no separate trip to
+ * the bar. A real teammate who can't approve their own step just submits
+ * and waits; Next stays disabled until someone else signs off.
+ */
+function WizardNextButton({ stepKey }: { stepKey: SetupStepKey }) {
+  const auth = useAuthContext();
+  const [brandId] = useState(() => window.localStorage.getItem(LAST_BRAND_ID_KEY) ?? "b_demo");
+  const { steps, reload } = useSetupSteps(brandId);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const role = auth.memberships.find((m) => m.brandId === brandId)?.role ?? null;
+  const canApprove = role === "brand_admin" || role === "group_owner";
+  const step = steps?.find((s) => s.stepKey === stepKey);
+  if (!step) return null;
+
+  const idx = SETUP_STEP_ORDER.indexOf(stepKey);
+  const nextKey = SETUP_STEP_ORDER[idx + 1];
+  const isLast = !nextKey;
+
+  if (isLast && step.status === "approved") {
+    return (
+      <div style={styles.wizardNextRow}>
+        <span style={{ fontSize: 13, color: colors.success, fontWeight: 600 }}>✓ Setup complete</span>
+      </div>
+    );
+  }
+
+  const goNext = () => {
+    if (nextKey) window.location.hash = SETUP_STEP_ROUTES[nextKey];
+  };
+
+  const waitingForOthers = step.status === "submitted" && !canApprove;
+
+  const handleClick = async () => {
+    if (step.status === "approved") {
+      goNext();
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await apiClient.submitSetupStep(brandId, stepKey);
+      if (canApprove) await apiClient.approveSetupStep(brandId, stepKey);
+      reload();
+      if (canApprove) goNext();
+    } catch {
+      setError("Couldn't continue — try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={styles.wizardNextRow}>
+      <button type="button" disabled={busy || waitingForOthers} style={{ ...styles.button, ...styles.buttonAuto, opacity: waitingForOthers ? 0.5 : 1 }} onClick={() => void handleClick()}>
+        {waitingForOthers ? "Waiting for approval" : isLast ? "Finish setup" : "Next step →"}
+      </button>
+      {error ? <span style={{ color: colors.error, fontSize: 13 }}>{error}</span> : null}
+    </div>
+  );
+}
+
+/**
+ * Thin bar, dots + current-step label side by side — persistent on every
+ * admin page, not a block in the middle of one page. Ola confirmed the
+ * dots version was right; what needed fixing was just the step labels
+ * (now the real screen names, see SETUP_STEP_LABELS) and the "Team" nav
+ * item's name/position. Hides itself once all 5 steps are approved.
+ */
+function SetupProgressBar() {
+  const auth = useAuthContext();
+  const [brandId] = useState(() => window.localStorage.getItem(LAST_BRAND_ID_KEY) ?? "b_demo");
+  const { steps, reload } = useSetupSteps(brandId);
+  const [busy, setBusy] = useState(false);
+
+  if (!steps) return null;
+  const currentIndex = steps.findIndex((s) => s.status !== "approved");
+  if (currentIndex === -1) return null;
+  const current = steps[currentIndex];
+  const role = auth.memberships.find((m) => m.brandId === brandId)?.role ?? null;
+  const canApprove = role === "brand_admin" || role === "group_owner";
+
+  const act = async (fn: () => Promise<SetupStepView>) => {
+    setBusy(true);
+    try {
+      await fn();
+    } catch {
+      // fall through to reload() — it re-fetches the real state either way
+    } finally {
+      reload();
+      setBusy(false);
+    }
+  };
+
+  const handleReject = () => {
+    const note = window.prompt(`Why is "${SETUP_STEP_LABELS[current.stepKey]}" being rejected?`)?.trim();
+    if (!note) return;
+    void act(() => apiClient.rejectSetupStep(brandId, current.stepKey, note));
+  };
+
+  return (
+    <div className="admin-setup-bar" style={styles.setupBar}>
+      <div style={styles.setupBarDots}>
+        {steps.map((s, i) => (
+          <span
+            key={s.stepKey}
+            title={SETUP_STEP_LABELS[s.stepKey]}
+            style={{ ...styles.setupDot, ...(s.status === "approved" ? styles.setupDotDone : i === currentIndex ? styles.setupDotCurrent : {}) }}
+          />
+        ))}
+      </div>
+      <div style={styles.setupBarText}>
+        <strong>Setup {currentIndex}/5</strong>
+        <span style={{ color: colors.muted }}> · </span>
+        <a href={SETUP_STEP_ROUTES[current.stepKey]} style={{ color: colors.navy, fontWeight: 600 }}>
+          {SETUP_STEP_LABELS[current.stepKey]}
+        </a>
+        {current.status === "submitted" ? <span style={{ color: colors.warning }}> · waiting for approval</span> : null}
+        {current.status === "rejected" && current.note ? <span style={{ color: colors.error }}> · rejected: {current.note}</span> : null}
+      </div>
+      <div style={styles.setupBarActions}>
+        {current.status === "submitted" && canApprove ? (
+          <>
+            <button type="button" disabled={busy} style={styles.setupBtnPrimary} onClick={() => void act(() => apiClient.approveSetupStep(brandId, current.stepKey))}>
+              Approve
+            </button>
+            <button type="button" disabled={busy} style={styles.setupBtnGhost} onClick={handleReject}>
+              Reject
+            </button>
+          </>
+        ) : null}
+        {current.status === "submitted" && !canApprove ? <span style={{ fontSize: 12, color: colors.muted }}>Waiting for approval</span> : null}
+        {current.status === "not_started" || current.status === "in_progress" || current.status === "rejected" ? (
+          <button type="button" disabled={busy} style={styles.setupBtnPrimary} onClick={() => void act(() => apiClient.submitSetupStep(brandId, current.stepKey))}>
+            {current.status === "rejected" ? "Resubmit" : "Submit for approval"}
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Mobile-first shell chrome — see docs/product/creative-simplicity-audit-v1.md
+ * idea G: this doesn't try to squeeze the desktop sidebar onto a phone, it
+ * swaps to a fixed bottom tab bar below 700px (thumb-reachable, same
+ * muscle memory as WhatsApp/Instagram), full-bleed content, and a
+ * collapsed topbar. Desktop keeps the original sidebar layout untouched.
+ */
 function AdminShell({ active, children }: { active: (typeof NAV_ITEMS)[number]["label"]; children: React.ReactNode }) {
+  const auth = useAuthContext();
+  const [brandId] = useState(() => window.localStorage.getItem(LAST_BRAND_ID_KEY) ?? "b_demo");
+  const role = auth.memberships.find((m) => m.brandId === brandId)?.role ?? null;
+  // "Those menu items simply aren't shown to them" — roles doc. AppRoutes'
+  // guard stops direct navigation; this is what makes it also true visually.
+  const visibleNavItems = NAV_ITEMS.filter((item) => !role || ROLE_NAV_ACCESS[role].includes(item.label));
   return (
     <div style={styles.shellRoot}>
-      <div style={styles.topbar}>
+      <style>{`
+        .admin-topbar { padding: 0 28px; }
+        @media (max-width: 700px) { .admin-topbar { padding: 0 16px; } .admin-topbar svg { height: 34px !important; width: auto !important; } }
+
+        .admin-shell-body { display: flex; align-items: flex-start; }
+        @media (max-width: 700px) { .admin-shell-body { display: block; } }
+
+        .admin-sidebar { width: 232px; flex-shrink: 0; }
+        @media (max-width: 700px) {
+          /* !important required: these overlap React's inline style={styles.sidebar}
+             (width/minHeight/flexDirection/padding), which otherwise wins over a
+             stylesheet media query regardless of specificity. */
+          .admin-sidebar {
+            width: auto !important; position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+            display: flex; flex-direction: row !important; justify-content: space-around;
+            padding: 6px 4px calc(6px + env(safe-area-inset-bottom)) !important;
+            min-height: 0 !important; border-right: none; border-top: 1px solid ${colors.line};
+          }
+          .admin-sidebar > a, .admin-sidebar > span { flex: 1; }
+        }
+
+        .admin-nav-item { flex-direction: row; }
+        @media (max-width: 700px) {
+          /* Same inline-style override issue as above (styles.navItem sets justifyContent/padding). */
+          .admin-nav-item {
+            flex-direction: column !important; align-items: center; justify-content: center !important;
+            gap: 2px; padding: 6px 2px !important; font-size: 10px; text-align: center; border-radius: 10px;
+          }
+        }
+
+        .admin-main { padding: 40px 40px 64px; }
+        @media (max-width: 700px) { .admin-main { padding: 20px 16px calc(84px + env(safe-area-inset-bottom)); } }
+
+        .admin-account { font-size: 12px; color: ${colors.muted}; display: flex; align-items: center; gap: 10px; }
+        @media (max-width: 480px) { .admin-account span:first-child { display: none; } }
+
+        .admin-setup-bar { padding: 10px 28px; }
+        @media (max-width: 700px) { .admin-setup-bar { padding: 8px 16px; } }
+      `}</style>
+      <div className="admin-topbar" style={styles.topbar}>
         <div style={styles.logoRow}>
           <Logo height={55} />
         </div>
-        <a href="#/" style={styles.newBrandLink}>
-          + New brand
-        </a>
+        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+          {/* Removed the separate "+ New brand" topbar link — redundant now that "New brand" is its own nav tab pointing at the same #/shop page. */}
+          <div className="admin-account">
+            <span>{auth.user?.displayName}</span>
+            <button type="button" onClick={auth.logout} style={styles.linkButton}>
+              Log out
+            </button>
+          </div>
+        </div>
       </div>
-      <div style={styles.shellBody}>
-        <aside style={styles.sidebar}>
-          {NAV_ITEMS.map((item) => {
+      <SetupProgressBar />
+      <div className="admin-shell-body" style={styles.shellBody}>
+        <aside className="admin-sidebar" style={styles.sidebar}>
+          {visibleNavItems.map((item) => {
             const isActive = item.label === active;
             const content = (
-              <span style={{ ...styles.navItem, ...(isActive ? styles.navItemActive : {}), ...(item.route ? {} : styles.navItemDisabled) }}>
+              <span className="admin-nav-item" style={{ ...styles.navItem, ...(isActive ? styles.navItemActive : {}), ...(item.route ? {} : styles.navItemDisabled) }}>
                 {item.label}
                 {!item.route ? <span style={styles.soonTag}>Soon</span> : null}
               </span>
@@ -167,7 +628,9 @@ function AdminShell({ active, children }: { active: (typeof NAV_ITEMS)[number]["
             );
           })}
         </aside>
-        <main style={styles.main}>{children}</main>
+        <main className="admin-main" style={styles.main}>
+          {children}
+        </main>
       </div>
     </div>
   );
@@ -194,6 +657,175 @@ const LANGUAGES = [
 
 const LAST_BRAND_ID_KEY = "saleislive:lastBrandId";
 const LAST_BRAND_SLUG_KEY = "saleislive:lastBrandSlug";
+
+/**
+ * The "New brand" tab's real destination — Ola's "musi być opcja powrotu i
+ * edycji" (there must be a way to come back and edit): if a brand already
+ * exists, show its current details with an edit toggle instead of the
+ * blank creation form. Only falls back to CreateBrandPage when there's
+ * genuinely no brand yet for this id.
+ */
+function ShopSetupPage() {
+  const [brandId] = useState(() => window.localStorage.getItem(LAST_BRAND_ID_KEY) ?? "b_demo");
+  const [brand, setBrand] = useState<Brand | null | undefined>(undefined);
+
+  useEffect(() => {
+    apiClient
+      .getBrand(brandId)
+      .then(setBrand)
+      .catch(() => setBrand(null));
+  }, [brandId]);
+
+  if (brand === undefined) return <p style={styles.sub}>Loading…</p>;
+  if (!brand) return <CreateBrandPage />;
+  return <EditBrandForm brand={brand} onSaved={setBrand} />;
+}
+
+function EditBrandForm({ brand, onSaved }: { brand: Brand; onSaved: (b: Brand) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(brand.name);
+  const [countryCode, setCountryCode] = useState<(typeof COUNTRIES)[number]["code"]>(COUNTRIES.find((c) => c.code === brand.country)?.code ?? "AE");
+  const [currency, setCurrency] = useState(brand.currency);
+  const [language, setLanguage] = useState(brand.language);
+  const [secondaryLanguage, setSecondaryLanguage] = useState(brand.secondaryLanguage ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const startEdit = () => {
+    setName(brand.name);
+    setCountryCode(COUNTRIES.find((c) => c.code === brand.country)?.code ?? "AE");
+    setCurrency(brand.currency);
+    setLanguage(brand.language);
+    setSecondaryLanguage(brand.secondaryLanguage ?? "");
+    setError(null);
+    setEditing(true);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await apiClient.updateBrand(brand.id, { name: name.trim(), country: countryCode, currency, language, secondaryLanguage: secondaryLanguage || null });
+      onSaved(updated);
+      setEditing(false);
+    } catch {
+      setError("Couldn't save changes.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!editing) {
+    return (
+      <div>
+        <h1 style={styles.h1}>Set up your shop</h1>
+        <p style={styles.sub}>Your shop's basic details.</p>
+        <hr style={styles.divider} />
+        <div style={styles.sectionCard}>
+          <table style={styles.teamTable}>
+            <tbody>
+              <tr>
+                <td style={styles.teamTd}>Name</td>
+                <td style={{ ...styles.teamTd, textAlign: "right" }}>{brand.name}</td>
+              </tr>
+              <tr>
+                <td style={styles.teamTd}>Storefront address</td>
+                <td style={{ ...styles.teamTd, textAlign: "right" }}>
+                  {brand.slug}.{ROOT_DOMAIN}
+                </td>
+              </tr>
+              <tr>
+                <td style={styles.teamTd}>Country</td>
+                <td style={{ ...styles.teamTd, textAlign: "right" }}>{COUNTRIES.find((c) => c.code === brand.country)?.name ?? brand.country}</td>
+              </tr>
+              <tr>
+                <td style={styles.teamTd}>Currency</td>
+                <td style={{ ...styles.teamTd, textAlign: "right" }}>{brand.currency}</td>
+              </tr>
+              <tr>
+                <td style={{ ...styles.teamTd, borderBottom: "none" }}>Language</td>
+                <td style={{ ...styles.teamTd, borderBottom: "none", textAlign: "right" }}>{LANGUAGES.find((l) => l.code === brand.language)?.name ?? brand.language}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+            <button type="button" style={{ ...styles.button, ...styles.buttonAuto }} onClick={startEdit}>
+              Edit
+            </button>
+          </div>
+        </div>
+        <WizardNextButton stepKey="brand_setup" />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h1 style={styles.h1}>Set up your shop</h1>
+      <p style={styles.sub}>Your shop's basic details. The storefront address can't be changed once set.</p>
+      <hr style={styles.divider} />
+      <div style={styles.fieldGrid}>
+        <div>
+          <label style={styles.label}>Brand / store name</label>
+          <input style={styles.input} value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div>
+          <label style={styles.label}>Country</label>
+          <select
+            style={styles.input}
+            value={countryCode}
+            onChange={(e) => {
+              const next = COUNTRIES.find((c) => c.code === e.target.value);
+              if (!next) return;
+              setCountryCode(next.code);
+              setCurrency(next.currency);
+            }}
+          >
+            {COUNTRIES.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label style={styles.label}>Currency</label>
+          <input style={styles.input} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} maxLength={3} />
+        </div>
+        <div>
+          <label style={styles.label}>Primary language</label>
+          <select style={styles.input} value={language} onChange={(e) => setLanguage(e.target.value)}>
+            {LANGUAGES.map((l) => (
+              <option key={l.code} value={l.code}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label style={styles.label}>Secondary language</label>
+          <select style={styles.input} value={secondaryLanguage} onChange={(e) => setSecondaryLanguage(e.target.value)}>
+            <option value="">None</option>
+            {LANGUAGES.filter((l) => l.code !== language).map((l) => (
+              <option key={l.code} value={l.code}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      {error ? <p style={styles.error}>{error}</p> : null}
+      <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+        <button type="button" style={styles.linkButton} onClick={() => setEditing(false)}>
+          Cancel
+        </button>
+        <button type="button" disabled={saving} style={{ ...styles.button, ...styles.buttonAuto }} onClick={() => void handleSave()}>
+          {saving ? "Saving…" : "Save"}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function CreateBrandPage() {
   const [name, setName] = useState("");
@@ -359,6 +991,201 @@ function CreateBrandPage() {
   );
 }
 
+const ROLE_OPTIONS: Role[] = ["group_owner", "brand_admin", "merchandiser", "order_manager", "analyst", "read_only"];
+const ROLE_LABELS: Record<Role, string> = {
+  group_owner: "Group Owner",
+  brand_admin: "Brand Admin",
+  merchandiser: "Merchandiser",
+  order_manager: "Order Manager",
+  analyst: "Analyst",
+  read_only: "Read-only",
+};
+
+/** Shown once, never stored — the admin copies it and hands it to the teammate directly, since no email infra exists yet to send it for us. */
+function generateTempPassword(): string {
+  const bytes = new Uint8Array(12);
+  window.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(36).padStart(2, "0")).join("").slice(0, 16);
+}
+
+/**
+ * The screen that makes "several people, different roles, restricted
+ * access" real instead of theoretical — see the roles matrix doc. Anyone
+ * can be added with any of the 6 roles; ROLE_NAV_ACCESS in AppRoutes is
+ * what actually enforces what each role can then see.
+ */
+function TeamPage() {
+  const auth = useAuthContext();
+  const [brandId] = useState(() => window.localStorage.getItem(LAST_BRAND_ID_KEY) ?? "b_demo");
+  const [team, setTeam] = useState<TeamMemberView[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteName, setInviteName] = useState("");
+  const [inviteRole, setInviteRole] = useState<Role>("merchandiser");
+  const [inviting, setInviting] = useState(false);
+
+  const reload = () => {
+    apiClient
+      .listTeam(brandId)
+      .then(setTeam)
+      .catch(() => setError("Couldn't load the team."));
+  };
+
+  useEffect(() => {
+    reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brandId]);
+
+  const handleInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setNotice(null);
+    setInviting(true);
+    try {
+      const password = generateTempPassword();
+      const email = inviteEmail.trim();
+      await apiClient.inviteTeamMember({ email, displayName: inviteName.trim(), password, brandId, role: inviteRole, tenantId: DEMO_TENANT_ID });
+      setNotice(`${email} added as ${ROLE_LABELS[inviteRole]}. Temporary password: ${password} — share this with them directly, it won't be shown again.`);
+      setInviteEmail("");
+      setInviteName("");
+      reload();
+    } catch (err) {
+      setError(err instanceof ApiError && err.status === 409 ? "That email already has an account." : "Couldn't add that teammate.");
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const handleRoleChange = async (userId: string, role: Role) => {
+    setError(null);
+    try {
+      await apiClient.updateTeamMemberRole(brandId, userId, role);
+      reload();
+    } catch {
+      setError("Couldn't change that role.");
+    }
+  };
+
+  const handleRemove = async (member: TeamMemberView) => {
+    if (!window.confirm(`Remove ${member.displayName} (${member.email}) from this brand?`)) return;
+    setError(null);
+    try {
+      await apiClient.removeTeamMember(brandId, member.userId);
+      reload();
+    } catch (err) {
+      setError(err instanceof ApiError && err.status === 403 ? "Can't remove the last Group Owner." : "Couldn't remove that teammate.");
+    }
+  };
+
+  const handleResetPassword = async (member: TeamMemberView) => {
+    setError(null);
+    setNotice(null);
+    try {
+      const newPassword = await apiClient.resetTeamMemberPassword(brandId, member.userId);
+      setNotice(`New password for ${member.email}: ${newPassword} — share this with them directly, it won't be shown again.`);
+    } catch {
+      setError("Couldn't reset that password.");
+    }
+  };
+
+  return (
+    <div>
+      <h1 style={styles.h1}>Your team</h1>
+      <p style={styles.sub}>Who has access to this brand, and what they can do.</p>
+      <hr style={styles.divider} />
+
+      {notice ? <p style={styles.noticeBox}>{notice}</p> : null}
+      {error ? <p style={styles.error}>{error}</p> : null}
+
+      <div style={styles.sectionCard}>
+        {!team ? (
+          <p style={styles.sub}>Loading…</p>
+        ) : (
+          <table style={styles.teamTable}>
+            <thead>
+              <tr>
+                <th style={styles.teamTh}>Name</th>
+                <th style={styles.teamTh}>Email</th>
+                <th style={styles.teamTh}>Role</th>
+                <th style={styles.teamTh} />
+              </tr>
+            </thead>
+            <tbody>
+              {team.map((member) => {
+                const isSelf = member.userId === auth.user?.id;
+                return (
+                  <tr key={member.userId}>
+                    <td style={styles.teamTd}>
+                      {member.displayName}
+                      {isSelf ? " (you)" : ""}
+                    </td>
+                    <td style={styles.teamTd}>{member.email}</td>
+                    <td style={styles.teamTd}>
+                      <select style={styles.teamRoleSelect} value={member.role} onChange={(e) => void handleRoleChange(member.userId, e.target.value as Role)}>
+                        {ROLE_OPTIONS.map((r) => (
+                          <option key={r} value={r}>
+                            {ROLE_LABELS[r]}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td style={{ ...styles.teamTd, textAlign: "right", whiteSpace: "nowrap" }}>
+                      <button type="button" style={styles.linkButton} onClick={() => void handleResetPassword(member)}>
+                        Reset password
+                      </button>
+                      {!isSelf ? (
+                        <button type="button" style={{ ...styles.linkButton, color: colors.error, marginLeft: 16 }} onClick={() => void handleRemove(member)}>
+                          Remove
+                        </button>
+                      ) : null}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <h2 style={{ ...styles.h1, fontSize: 18, marginTop: 32 }}>Add a teammate</h2>
+      <form onSubmit={(e) => void handleInvite(e)} style={styles.sectionCard}>
+        <div style={styles.fieldGrid}>
+          <div>
+            <label style={styles.label}>Name</label>
+            <input style={styles.input} value={inviteName} onChange={(e) => setInviteName(e.target.value)} required />
+          </div>
+          <div>
+            <label style={styles.label}>Email</label>
+            <input type="email" style={styles.input} value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} required />
+          </div>
+          <div>
+            <label style={styles.label}>Role</label>
+            <select style={styles.input} value={inviteRole} onChange={(e) => setInviteRole(e.target.value as Role)}>
+              {ROLE_OPTIONS.map((r) => (
+                <option key={r} value={r}>
+                  {ROLE_LABELS[r]}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button type="submit" disabled={inviting} style={{ ...styles.button, ...styles.buttonAuto, opacity: inviting ? 0.6 : 1 }}>
+            {inviting ? "Adding…" : "Add teammate"}
+          </button>
+        </div>
+      </form>
+      <div style={styles.wizardNextRow}>
+        <a href="#/add-stock" style={{ ...styles.button, ...styles.buttonAuto, textDecoration: "none", display: "inline-block" }}>
+          Next step →
+        </a>
+      </div>
+    </div>
+  );
+}
+
 const ROW_LABELS: Record<string, string> = {
   missing_sku: "No SKU in this row — can't be matched or imported.",
   missing_price: "No price found — required for a new product.",
@@ -379,35 +1206,6 @@ function formatChange(value: unknown): string {
   return String(value);
 }
 
-const INTAKE_TILES: { key: IntakeMethod; title: string; subtitle: string }[] = [
-  { key: "excel_csv", title: "Excel / CSV", subtitle: "Product data: SKU, price, sale price, stock and optional attributes." },
-  { key: "product_photos", title: "Product photos", subtitle: "Upload a folder or multiple images." },
-  { key: "photo_zip", title: "ZIP with photos", subtitle: "Useful for large catalogues." },
-  { key: "images_in_spreadsheet", title: "Images are in my spreadsheet", subtitle: "URLs or filenames already reference images." },
-  { key: "manual", title: "Add manually", subtitle: "Create or correct a single product." },
-  { key: "phone_camera", title: "Phone / camera", subtitle: "Add new stock later from a phone." },
-];
-
-const MATCH_METHODS: { key: MatchMethod; label: string }[] = [
-  { key: "sku", label: "SKU / variant SKU" },
-  { key: "ean", label: "EAN / barcode" },
-  { key: "filename", label: "Filename" },
-  { key: "ai_suggest", label: "Let AI suggest" },
-];
-
-const PHOTO_TREATMENTS: { key: PhotoTreatment; label: string }[] = [
-  { key: "use_as_supplied", label: "Use as supplied" },
-  { key: "quality_check", label: "Quality check only" },
-  { key: "crop_resize", label: "Crop & resize" },
-  { key: "remove_background", label: "Remove background" },
-  { key: "branded_background", label: "Create branded background" },
-];
-
-// Only these two intake methods actually run today (see IntakeMethod's doc
-// comment in packages/domain) — everything else in INTAKE_TILES is real UI
-// wired to an honest "queued" state, never a fake success.
-const REAL_INTAKE_METHODS: IntakeMethod[] = ["excel_csv", "manual"];
-
 // Screen 03's "Saleis.live field" column options — labels the merchant sees
 // when pointing a header at a canonical field.
 const IMPORT_FIELD_LABELS: Record<keyof ParsedImportRow, string> = {
@@ -418,6 +1216,7 @@ const IMPORT_FIELD_LABELS: Record<keyof ParsedImportRow, string> = {
   color: "Colour",
   size: "Size",
   material: "Material",
+  dimensions: "Dimensions",
   price: "Price",
   salePrice: "Sale price",
   currency: "Currency",
@@ -428,14 +1227,6 @@ const IMPORT_FIELD_LABELS: Record<keyof ParsedImportRow, string> = {
 function AddStockPage() {
   const [brandId] = useState(() => window.localStorage.getItem(LAST_BRAND_ID_KEY) ?? "b_demo");
   const [brandSlug] = useState(() => window.localStorage.getItem(LAST_BRAND_SLUG_KEY));
-  // A merchant's stock is rarely one clean source — mockup 02's own copy
-  // says "Choose one or several sources," e.g. bulk via Excel plus a
-  // manual add for whatever the file didn't cover. Tiles are multi-select.
-  const [selectedMethods, setSelectedMethods] = useState<Set<IntakeMethod>>(new Set());
-  const [matchMethod, setMatchMethod] = useState<MatchMethod>("sku");
-  const [photoTreatment, setPhotoTreatment] = useState<Set<PhotoTreatment>>(new Set());
-  const [queuedNotice, setQueuedNotice] = useState<string | null>(null);
-  const [queuingOthers, setQueuingOthers] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [batch, setBatch] = useState<ImportBatch | null>(null);
@@ -455,11 +1246,18 @@ function AddStockPage() {
   const [manualSku, setManualSku] = useState("");
   const [manualName, setManualName] = useState("");
   const [manualCategory, setManualCategory] = useState("");
+  const [manualSize, setManualSize] = useState("");
+  const [manualDimensions, setManualDimensions] = useState("");
   const [manualPrice, setManualPrice] = useState("");
   const [manualStock, setManualStock] = useState("");
   const [manualImageUrl, setManualImageUrl] = useState("");
   const [manualSubmitting, setManualSubmitting] = useState(false);
   const [manualSaved, setManualSaved] = useState<Product | null>(null);
+
+  const photosInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [photosError, setPhotosError] = useState<string | null>(null);
+  const [photosCreated, setPhotosCreated] = useState<Product[] | null>(null);
 
   const loadProducts = async (id: string) => {
     try {
@@ -473,15 +1271,6 @@ function AddStockPage() {
     loadProducts(brandId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const togglePhotoTreatment = (key: PhotoTreatment) => {
-    setPhotoTreatment((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
 
   const onFilePicked = async (file: File | null) => {
     if (!file) return;
@@ -514,7 +1303,7 @@ function AddStockPage() {
     setSummary(null);
     try {
       const fieldOverrides = Object.fromEntries(Object.entries(excelFieldByHeader).filter(([, field]) => field)) as Partial<Record<string, keyof ParsedImportRow>>;
-      const { batch: staged } = await apiClient.uploadImport(brandId, excelFile, { intakeMethod: "excel_csv", matchMethod, photoTreatment: [...photoTreatment], fieldOverrides });
+      const { batch: staged } = await apiClient.uploadImport(brandId, excelFile, { intakeMethod: "excel_csv", matchMethod: "sku", photoTreatment: [], fieldOverrides });
       setBatch(staged);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed.");
@@ -556,6 +1345,8 @@ function AddStockPage() {
         sku: manualSku.trim(),
         name: manualName || undefined,
         category: manualCategory || undefined,
+        size: manualSize || undefined,
+        dimensions: manualDimensions || undefined,
         price: manualPrice || undefined,
         stock: manualStock || undefined,
         imageUrl: manualImageUrl || undefined,
@@ -564,6 +1355,8 @@ function AddStockPage() {
       setManualSku("");
       setManualName("");
       setManualCategory("");
+      setManualSize("");
+      setManualDimensions("");
       setManualPrice("");
       setManualStock("");
       setManualImageUrl("");
@@ -575,35 +1368,30 @@ function AddStockPage() {
     }
   };
 
-  // Non-file tiles still record a real batch each (0 rows, no fake success)
-  // so the AI & Catalogue Center has something to read once it exists —
-  // see the /api/imports/intent route's doc comment. Several can be
-  // selected at once (e.g. "product photos" + "phone/camera"), so this
-  // records all of them together in one click.
-  const onQueueIntent = async (methods: IntakeMethod[]) => {
-    if (methods.length === 0) return;
-    setQueuingOthers(true);
-    setError(null);
+  const onPhotosPicked = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploadingPhotos(true);
+    setPhotosError(null);
+    setPhotosCreated(null);
     try {
-      const results = await Promise.all(methods.map((m) => apiClient.recordIntakeIntent(brandId, { intakeMethod: m, matchMethod, photoTreatment: [...photoTreatment] })));
-      const ids = results.map((r) => r.batch.id).join(", ");
-      setQueuedNotice(`Recorded (${ids}) — connects to real processing once the AI & Catalogue Center (screen 04) ships. Nothing was silently added to your catalogue.`);
+      const created = await apiClient.createProductsFromPhotos(brandId, Array.from(files));
+      setPhotosCreated(created);
+      await loadProducts(brandId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't record those choices.");
+      setPhotosError(err instanceof Error ? err.message : "Couldn't create products from those photos.");
     } finally {
-      setQueuingOthers(false);
+      setUploadingPhotos(false);
     }
   };
 
   const readyCount = batch?.rows.filter((r) => !r.blocking).length ?? 0;
   const blockingCount = batch?.rows.filter((r) => r.blocking).length ?? 0;
-  const queuedMethods = [...selectedMethods].filter((m) => !REAL_INTAKE_METHODS.includes(m));
 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
-          <h1 style={styles.h1}>Add stock</h1>
+          <h1 style={styles.h1}>Add your stock</h1>
           <p style={styles.sub}>Tell saleis.live what you have. Choose one or several sources.</p>
         </div>
         {brandSlug ? (
@@ -613,55 +1401,6 @@ function AddStockPage() {
         ) : null}
       </div>
       <hr style={styles.divider} />
-
-      <div style={styles.tileGrid}>
-        {INTAKE_TILES.map((tile) => {
-          const active = selectedMethods.has(tile.key);
-          return (
-            <button
-              key={tile.key}
-              type="button"
-              style={{ ...styles.tile, ...(active ? styles.tileActive : {}) }}
-              onClick={() => {
-                setSelectedMethods((prev) => {
-                  const next = new Set(prev);
-                  if (next.has(tile.key)) next.delete(tile.key);
-                  else next.add(tile.key);
-                  return next;
-                });
-                setQueuedNotice(null);
-              }}
-            >
-              <div style={{ ...styles.tileTitle, ...(active ? { color: colors.navy } : {}) }}>{tile.title}</div>
-              <div style={styles.tileSubtitle}>{tile.subtitle}</div>
-              {!REAL_INTAKE_METHODS.includes(tile.key) ? <div style={styles.tileTag}>Queues for Catalogue Center</div> : null}
-            </button>
-          );
-        })}
-      </div>
-
-      <h2 style={styles.groupLabel}>How should we match photos?</h2>
-      <div style={styles.pillRow}>
-        {MATCH_METHODS.map((m) => (
-          <button key={m.key} type="button" style={{ ...styles.pillButton, ...(matchMethod === m.key ? styles.pillButtonActive : {}) }} onClick={() => setMatchMethod(m.key)}>
-            {m.label}
-          </button>
-        ))}
-      </div>
-
-      <h2 style={styles.groupLabel}>What should happen to product photos?</h2>
-      <div style={styles.pillRow}>
-        {PHOTO_TREATMENTS.map((t) => {
-          const checked = photoTreatment.has(t.key);
-          return (
-            <button key={t.key} type="button" style={{ ...styles.pillButton, ...(checked ? styles.pillButtonActive : {}) }} onClick={() => togglePhotoTreatment(t.key)}>
-              <span style={{ ...styles.checkbox, ...(checked ? styles.checkboxChecked : {}) }}>{checked ? "✓" : ""}</span>
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
-      <p style={{ fontSize: 11, color: colors.muted, marginTop: 8 }}>Recorded now, applied by the AI &amp; Catalogue Center once that screen ships — never silently assumed done.</p>
 
       <input
         ref={fileInputRef}
@@ -675,9 +1414,8 @@ function AddStockPage() {
         }}
       />
 
-      {selectedMethods.has("excel_csv") ? (
-        <div style={{ ...styles.sectionCard, marginTop: 24 }}>
-          <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 4 }}>Excel / CSV</h2>
+      <div style={{ ...styles.sectionCard, marginTop: 24 }}>
+        <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 4 }}>Excel / CSV</h2>
 
           {!excelPreview ? (
             <>
@@ -757,12 +1495,11 @@ function AddStockPage() {
               </div>
             </>
           )}
-        </div>
-      ) : null}
+      </div>
 
-      {selectedMethods.has("manual") ? (
-        <div style={{ ...styles.sectionCard, marginTop: 24 }}>
-          <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 16 }}>Add a product</h2>
+      <div style={{ ...styles.sectionCard, marginTop: 24 }}>
+          <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 4 }}>Add one product by hand</h2>
+          <p style={{ ...styles.sub, marginBottom: 12 }}>For a single item, or to fix one thing without redoing the whole file.</p>
           <div style={styles.fieldGrid}>
             <div>
               <label style={styles.label}>SKU *</label>
@@ -775,6 +1512,14 @@ function AddStockPage() {
             <div>
               <label style={styles.label}>Category</label>
               <input style={styles.input} value={manualCategory} onChange={(e) => setManualCategory(e.target.value)} />
+            </div>
+            <div>
+              <label style={styles.label}>Size</label>
+              <input style={styles.input} value={manualSize} onChange={(e) => setManualSize(e.target.value)} placeholder="e.g. S/M, 37–41" />
+            </div>
+            <div>
+              <label style={styles.label}>Dimensions</label>
+              <input style={styles.input} value={manualDimensions} onChange={(e) => setManualDimensions(e.target.value)} placeholder="e.g. 30 x 20 x 10 cm" />
             </div>
             <div>
               <label style={styles.label}>Price</label>
@@ -795,26 +1540,43 @@ function AddStockPage() {
               {manualSubmitting ? "Saving…" : "Add product"}
             </button>
           </div>
-        </div>
-      ) : null}
+      </div>
 
-      {queuedMethods.length > 0 ? (
-        <div style={{ ...styles.sectionCard, marginTop: 24 }}>
-          <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 4 }}>Other sources selected</h2>
-          <p style={{ ...styles.sub, marginBottom: 0 }}>
-            {queuedMethods.map((m) => INTAKE_TILES.find((t) => t.key === m)?.title).join(", ")} — not processed automatically yet; recording this so the Catalogue Center picks it up once it ships.
+      <div style={{ ...styles.sectionCard, marginTop: 24 }}>
+        <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 4 }}>Upload photos</h2>
+        <p style={{ ...styles.sub, marginBottom: 12 }}>No spreadsheet — just photos, from a folder or your phone. Each one becomes a draft product; AI fills in what it can see. You still set price and stock afterward.</p>
+        <input
+          ref={photosInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const files = e.target.files;
+            void onPhotosPicked(files);
+            e.target.value = "";
+          }}
+        />
+        <button
+          type="button"
+          disabled={uploadingPhotos}
+          onClick={() => photosInputRef.current?.click()}
+          style={{ ...styles.button, ...styles.buttonAuto, opacity: uploadingPhotos ? 0.4 : 1 }}
+        >
+          {uploadingPhotos ? "Uploading…" : "Choose photos"}
+        </button>
+        {photosError ? <p style={{ ...styles.error, marginTop: 12 }}>{photosError}</p> : null}
+        {photosCreated ? (
+          <p style={{ ...styles.sub, color: colors.success, fontWeight: 600, marginTop: 12, marginBottom: 0 }}>
+            Created {photosCreated.length} draft product{photosCreated.length === 1 ? "" : "s"} —{" "}
+            <a href="#/catalogue-center" style={styles.previewLink}>
+              set price and stock in Check your products →
+            </a>
           </p>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
-            <button style={{ ...styles.button, ...styles.buttonAuto, opacity: queuingOthers ? 0.4 : 1 }} disabled={queuingOthers} onClick={() => onQueueIntent(queuedMethods)}>
-              {queuingOthers ? "Recording…" : "Record these choices"}
-            </button>
-          </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
       {error ? <p style={styles.error}>{error}</p> : null}
-
-      {queuedNotice ? <p style={{ fontSize: 13, color: colors.navy, fontWeight: 600, marginTop: 16 }}>{queuedNotice}</p> : null}
 
       {batch ? (
         <div style={{ ...styles.sectionCard, marginTop: 24 }}>
@@ -922,6 +1684,7 @@ function AddStockPage() {
           <p style={{ fontSize: 13, color: colors.muted }}>No products yet for this brand.</p>
         )}
       </div>
+      <WizardNextButton stepKey="stock_intake" />
     </div>
   );
 }
@@ -939,12 +1702,32 @@ function ProductStudioPage({ productId }: { productId: string }) {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [color, setColor] = useState("");
+  const [size, setSize] = useState("");
   const [material, setMaterial] = useState("");
+  const [dimensions, setDimensions] = useState("");
   const [price, setPrice] = useState("");
   const [salePrice, setSalePrice] = useState("");
   const [stock, setStock] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [aiNotConfigured, setAiNotConfigured] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  const [presets, setPresets] = useState<string[]>([]);
+  const [preset, setPreset] = useState<string>("white");
+  const [removingBg, setRemovingBg] = useState(false);
+  const [applyingBg, setApplyingBg] = useState(false);
+
+  useEffect(() => {
+    apiClient
+      .listBackgroundPresets()
+      .then((p) => {
+        setPresets(p);
+        if (p.length > 0) setPreset(p[0]);
+      })
+      .catch(() => setPresets([]));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -959,7 +1742,9 @@ function ProductStudioPage({ productId }: { productId: string }) {
         setDescription(p.description.value ?? "");
         setCategory(p.category.value ?? "");
         setColor(p.color.value ?? "");
+        setSize(p.size.value ?? "");
         setMaterial(p.material.value ?? "");
+        setDimensions(p.dimensions.value ?? "");
         setPrice((p.price.amountMinor / 100).toString());
         setSalePrice((p.salePrice.amountMinor / 100).toString());
         setStock(String(p.stock));
@@ -985,7 +1770,9 @@ function ProductStudioPage({ productId }: { productId: string }) {
         description,
         category,
         color,
+        size,
         material,
+        dimensions,
         price: Number(price) || 0,
         salePrice: Number(salePrice) || 0,
         stock: Number(stock) || 0,
@@ -1000,10 +1787,78 @@ function ProductStudioPage({ productId }: { productId: string }) {
     }
   };
 
+  const onPhotoPicked = async (file: File | null) => {
+    if (!file) return;
+    setUploadingPhoto(true);
+    setPhotoError(null);
+    try {
+      const updated = await apiClient.addProductImage(brandId, productId, file);
+      setProduct(updated);
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : "Couldn't upload that photo.");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const onSetMainPhoto = async (url: string) => {
+    if (!product) return;
+    setPhotoError(null);
+    try {
+      setProduct(await apiClient.setMainProductImage(brandId, productId, url));
+    } catch {
+      setPhotoError("Couldn't set that as the main photo.");
+    }
+  };
+
+  const onRemovePhoto = async (url: string) => {
+    if (!product) return;
+    setPhotoError(null);
+    try {
+      setProduct(await apiClient.removeProductImage(brandId, productId, url));
+    } catch (err) {
+      setPhotoError(err instanceof ApiError && err.status === 409 ? "Can't remove the only photo — add another one first." : "Couldn't remove that photo.");
+    }
+  };
+
+  // Acts on whichever photo is currently main — click a thumbnail below to make a different one main first.
+  const targetPhotoUrl = () => product?.images.find((i) => i.isMain)?.url ?? product?.images[0]?.url ?? null;
+
+  const onRemoveBackground = async () => {
+    if (!product) return;
+    const url = targetPhotoUrl();
+    if (!url) return;
+    setRemovingBg(true);
+    setPhotoError(null);
+    try {
+      setProduct(await apiClient.removeImageBackground(brandId, productId, url));
+    } catch (err) {
+      setPhotoError(err instanceof ApiError && err.status === 422 ? "Couldn't find a clear product in that photo — try a different one." : "Background removal failed.");
+    } finally {
+      setRemovingBg(false);
+    }
+  };
+
+  const onApplyBackground = async () => {
+    if (!product) return;
+    const url = targetPhotoUrl();
+    if (!url) return;
+    setApplyingBg(true);
+    setPhotoError(null);
+    try {
+      setProduct(await apiClient.applyBackgroundPreset(brandId, productId, url, preset));
+    } catch {
+      setPhotoError("Couldn't apply that background.");
+    } finally {
+      setApplyingBg(false);
+    }
+  };
+
   if (loading) return <p style={styles.sub}>Loading…</p>;
   if (notFound || !product) return <p style={styles.error}>Product not found.</p>;
 
   const mainImage = product.images.find((i) => i.isMain) ?? product.images[0];
+  const resolveImg = (url: string) => (url.startsWith("http") ? url : apiClient.resolveAssetUrl(url));
 
   const onSuggestWithAI = async () => {
     if (!mainImage) return;
@@ -1027,6 +1882,9 @@ function ProductStudioPage({ productId }: { productId: string }) {
 
   return (
     <div>
+      <a href="#/catalogue-center" style={{ ...styles.previewLink, display: "inline-block", marginBottom: 12 }}>
+        ← Back to Check your products
+      </a>
       <h1 style={styles.h1}>Product Studio</h1>
       <p style={styles.sub}>Edit one product, its images, copy and variants.</p>
       <hr style={styles.divider} />
@@ -1035,11 +1893,8 @@ function ProductStudioPage({ productId }: { productId: string }) {
         <div style={{ ...styles.sectionCard, width: 260, flexShrink: 0 }}>
           <h2 style={{ ...styles.h1, fontSize: 15, marginBottom: 16 }}>Product media</h2>
           {mainImage ? (
-            <img
-              src={mainImage.url}
-              alt={mainImage.alt}
-              style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 10, background: colors.background }}
-            />
+            // objectFit: "contain" (not "cover") — shows the whole photo, never crops it; the box just letterboxes around whatever shape the photo is.
+            <img src={resolveImg(mainImage.url)} alt={mainImage.alt} style={{ width: "100%", aspectRatio: "1", objectFit: "contain", borderRadius: 10, background: colors.background }} />
           ) : (
             <div
               style={{
@@ -1059,7 +1914,108 @@ function ProductStudioPage({ productId }: { productId: string }) {
               NO PRODUCT IMAGE
             </div>
           )}
-          <p style={{ fontSize: 11, color: colors.muted, marginTop: 12 }}>Image tools (background removal, crop, branded backgrounds) arrive with the AI &amp; Catalogue Center.</p>
+
+          {product.images.length > 0 ? (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
+              {product.images.map((img) => (
+                <div key={img.url} style={{ position: "relative", width: 52, height: 52 }}>
+                  <button
+                    type="button"
+                    onClick={() => void onSetMainPhoto(img.url)}
+                    title={img.isMain ? "Main photo" : "Set as main photo"}
+                    style={{
+                      width: 52,
+                      height: 52,
+                      padding: 0,
+                      borderRadius: 8,
+                      border: img.isMain ? `2px solid ${colors.navy}` : `1px solid ${colors.border}`,
+                      background: colors.white,
+                      cursor: "pointer",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <img src={resolveImg(img.url)} alt={img.alt} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  </button>
+                  {product.images.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => void onRemovePhoto(img.url)}
+                      title="Remove photo"
+                      style={{
+                        position: "absolute",
+                        top: -6,
+                        right: -6,
+                        width: 18,
+                        height: 18,
+                        borderRadius: 999,
+                        border: "none",
+                        background: colors.error,
+                        color: colors.white,
+                        fontSize: 11,
+                        lineHeight: "18px",
+                        padding: 0,
+                        cursor: "pointer",
+                      }}
+                    >
+                      ×
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const file = e.target.files?.[0] ?? null;
+              e.target.value = "";
+              void onPhotoPicked(file);
+            }}
+          />
+          <button
+            type="button"
+            disabled={uploadingPhoto}
+            onClick={() => photoInputRef.current?.click()}
+            style={{ ...styles.button, ...styles.buttonAuto, width: "100%", marginTop: 12, opacity: uploadingPhoto ? 0.5 : 1 }}
+          >
+            {uploadingPhoto ? "Uploading…" : "Add a photo"}
+          </button>
+          {photoError ? <p style={{ ...styles.error, marginTop: 8 }}>{photoError}</p> : null}
+
+          <hr style={{ ...styles.divider, margin: "16px 0" }} />
+          <p style={{ fontSize: 12, fontWeight: 600, margin: "0 0 8px" }}>Photo tools — acts on the main photo above</p>
+          <button
+            type="button"
+            disabled={removingBg || !mainImage}
+            onClick={() => void onRemoveBackground()}
+            style={{ ...styles.button, ...styles.buttonAuto, width: "100%", background: colors.white, color: colors.ink, border: `1px solid ${colors.border}`, opacity: removingBg || !mainImage ? 0.5 : 1 }}
+          >
+            {removingBg ? "Removing background…" : "Remove background"}
+          </button>
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <select style={{ ...styles.input, padding: "8px 10px", fontSize: 12 }} value={preset} onChange={(e) => setPreset(e.target.value)}>
+              {presets.map((p) => (
+                <option key={p} value={p}>
+                  {p[0].toUpperCase() + p.slice(1)} background
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              disabled={applyingBg || !mainImage || presets.length === 0}
+              onClick={() => void onApplyBackground()}
+              style={{ ...styles.button, ...styles.buttonAuto, opacity: applyingBg || !mainImage ? 0.5 : 1 }}
+            >
+              {applyingBg ? "Applying…" : "Apply"}
+            </button>
+          </div>
+          <p style={{ fontSize: 11, color: colors.muted, marginTop: 8 }}>
+            Both add a new photo to the gallery above rather than replacing the original — pick "Remove background" first, then set that cutout as main before applying a background to it.
+          </p>
         </div>
 
         <div style={{ flex: 1, minWidth: 320 }}>
@@ -1094,8 +2050,16 @@ function ProductStudioPage({ productId }: { productId: string }) {
                 <input style={styles.input} value={color} onChange={(e) => setColor(e.target.value)} />
               </div>
               <div>
+                <label style={styles.label}>Size</label>
+                <input style={styles.input} value={size} onChange={(e) => setSize(e.target.value)} placeholder="e.g. S/M, 37–41, 30ml" />
+              </div>
+              <div>
                 <label style={styles.label}>Material</label>
                 <input style={styles.input} value={material} onChange={(e) => setMaterial(e.target.value)} />
+              </div>
+              <div>
+                <label style={styles.label}>Dimensions</label>
+                <input style={styles.input} value={dimensions} onChange={(e) => setDimensions(e.target.value)} placeholder="e.g. 30 x 20 x 10 cm" />
               </div>
             </div>
 
@@ -1201,7 +2165,7 @@ function CatalogueCenterPage() {
     <div>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
         <div>
-          <h1 style={styles.h1}>AI &amp; Catalogue Center</h1>
+          <h1 style={styles.h1}>Check your products</h1>
           <p style={styles.sub}>Real readiness, computed from your actual catalogue data.</p>
         </div>
         <a href={resolveCatalogueExportUrl(brandId)} style={styles.previewLink}>
@@ -1272,6 +2236,7 @@ function CatalogueCenterPage() {
           </div>
         )}
       </div>
+      <WizardNextButton stepKey="ai_catalogue_review" />
     </div>
   );
 }
@@ -1408,7 +2373,7 @@ function LaunchStudioPage() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
-          <h1 style={styles.h1}>Launch Studio</h1>
+          <h1 style={styles.h1}>Set up your sale</h1>
           <p style={styles.sub}>Configure sale, storefront, payment and delivery in one launch workspace.</p>
         </div>
         <a href="#/preview-publish" style={styles.previewLink}>
@@ -1586,6 +2551,7 @@ function LaunchStudioPage() {
           </div>
         </div>
       ) : null}
+      <WizardNextButton stepKey="launch_setup" />
     </div>
   );
 }
@@ -1844,7 +2810,7 @@ function PreviewPublishPage() {
 
   return (
     <div>
-      <h1 style={styles.h1}>Preview &amp; Publish</h1>
+      <h1 style={styles.h1}>Go live</h1>
       <p style={styles.sub}>Final check before the sale goes live.</p>
       <hr style={styles.divider} />
 
@@ -2296,6 +3262,8 @@ const styles: Record<string, React.CSSProperties> = {
   // Shell chrome — matches render_screens.py's admin() helper: 70px paper
   // topbar, 232px paper sidebar with a bluepale active pill, ivory content.
   shellRoot: { minHeight: "100vh", background: colors.ivory, fontFamily: typography.fontFamily.ui, color: colors.ink },
+  loginRoot: { minHeight: "100vh", background: colors.ivory, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: typography.fontFamily.ui },
+  loginCard: { width: "100%", maxWidth: 360, background: colors.paper, border: `1px solid ${colors.line}`, borderRadius: 14, padding: 32, boxSizing: "border-box" },
   topbar: {
     height: 70,
     display: "flex",
@@ -2305,7 +3273,16 @@ const styles: Record<string, React.CSSProperties> = {
     background: colors.paper,
     borderBottom: `1px solid ${colors.line}`,
   },
-  newBrandLink: { fontSize: 12, fontWeight: 700, color: colors.navy, textDecoration: "none" },
+  wizardNextRow: { display: "flex", alignItems: "center", gap: 12, marginTop: 32, paddingTop: 24, borderTop: `1px solid ${colors.line}` },
+  setupBar: { display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", background: colors.bluepale, borderBottom: `1px solid ${colors.line}` },
+  setupBarDots: { display: "flex", gap: 4, flexShrink: 0 },
+  setupDot: { width: 8, height: 8, borderRadius: 999, background: colors.stone },
+  setupDotDone: { background: colors.success },
+  setupDotCurrent: { background: colors.navy },
+  setupBarText: { fontSize: 12, flex: "1 1 200px", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  setupBarActions: { display: "flex", gap: 8, flexShrink: 0 },
+  setupBtnPrimary: { fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 999, border: "none", background: colors.navy, color: colors.white, cursor: "pointer" },
+  setupBtnGhost: { fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 999, border: `1px solid ${colors.line}`, background: "transparent", color: colors.muted, cursor: "pointer" },
   shellBody: { display: "flex", alignItems: "flex-start" },
   sidebar: {
     width: 232,
@@ -2333,6 +3310,11 @@ const styles: Record<string, React.CSSProperties> = {
   soonTag: { fontSize: 9, fontWeight: 700, color: colors.muted, textTransform: "uppercase", letterSpacing: 0.4 },
   main: { flex: 1, padding: "40px 40px 64px", minWidth: 0 },
   sectionCard: { background: colors.paper, border: `1px solid ${colors.line}`, borderRadius: 14, padding: 28 },
+  noticeBox: { background: colors.bluepale, border: `1px solid ${colors.line}`, borderRadius: 10, padding: "12px 16px", fontSize: 13, marginBottom: 16 },
+  teamTable: { width: "100%", borderCollapse: "collapse", fontSize: 13 },
+  teamTh: { textAlign: "left", fontSize: 11, fontWeight: 700, color: colors.muted, textTransform: "uppercase", letterSpacing: 0.4, padding: "0 0 12px", borderBottom: `1px solid ${colors.line}` },
+  teamTd: { padding: "12px 12px 12px 0", borderBottom: `1px solid ${colors.line}`, verticalAlign: "middle" },
+  teamRoleSelect: { fontSize: 12, padding: "6px 8px", borderRadius: 6, border: `1px solid ${colors.border}`, background: colors.white, fontFamily: "inherit" },
 
   logoRow: { display: "flex", alignItems: "center", gap: 8 },
   h1: { fontFamily: typography.fontFamily.ui, fontSize: 28, fontWeight: 600, margin: "0 0 8px" },

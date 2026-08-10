@@ -25,6 +25,42 @@ const RECORD_PRODUCT_DETAILS_TOOL = {
   },
 };
 
+export interface PhotoAnalysis {
+  color: string;
+  material: string;
+  category: string;
+  description: string;
+}
+
+/**
+ * The actual vision call, shared by the HTTP route (Product Studio's
+ * manual "Suggest with AI") and any automatic caller (import commit,
+ * Product Studio's "Add a photo" — see their doc comments for how each
+ * decides whether to write the result as a confirmed value or leave it
+ * for review). Throws on any failure; callers decide whether that should
+ * be fatal or swallowed.
+ */
+export async function analyzeProductImage(client: Anthropic, buffer: Buffer, mimetype: string): Promise<PhotoAnalysis> {
+  const message = await client.messages.create({
+    model: "claude-sonnet-5",
+    max_tokens: 1024,
+    tools: [RECORD_PRODUCT_DETAILS_TOOL],
+    tool_choice: { type: "tool", name: "record_product_details" },
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: mimetype as "image/jpeg" | "image/png" | "image/webp", data: buffer.toString("base64") } },
+          { type: "text", text: "This is a photo of a retail product for a fashion/lifestyle catalogue. Look at it carefully and record its details." },
+        ],
+      },
+    ],
+  });
+  const toolUse = message.content.find((block) => block.type === "tool_use");
+  if (!toolUse || toolUse.type !== "tool_use") throw new Error("no_analysis_returned");
+  return toolUse.input as PhotoAnalysis;
+}
+
 /**
  * Real AI photo analysis for Product Studio's "Suggest with AI" — ported
  * from Cirka's analyzePhoto.ts, retuned for a retail/luxury catalogue
@@ -49,34 +85,8 @@ export function analyzeProductRouter(anthropicApiKey: string | null): Router {
     if (!file.mimetype.startsWith("image/")) return res.status(400).json({ error: "not_an_image" });
 
     try {
-      const message = await client.messages.create({
-        model: "claude-sonnet-5",
-        max_tokens: 1024,
-        tools: [RECORD_PRODUCT_DETAILS_TOOL],
-        tool_choice: { type: "tool", name: "record_product_details" },
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "image",
-                source: { type: "base64", media_type: file.mimetype as "image/jpeg" | "image/png" | "image/webp", data: file.buffer.toString("base64") },
-              },
-              {
-                type: "text",
-                text: "This is a photo of a retail product for a fashion/lifestyle catalogue. Look at it carefully and record its details.",
-              },
-            ],
-          },
-        ],
-      });
-
-      const toolUse = message.content.find((block) => block.type === "tool_use");
-      if (!toolUse || toolUse.type !== "tool_use") {
-        return res.status(502).json({ error: "no_analysis_returned" });
-      }
-
-      res.status(200).json(toolUse.input);
+      const analysis = await analyzeProductImage(client, file.buffer, file.mimetype);
+      res.status(200).json(analysis);
     } catch (err) {
       console.error("analyze-photo failed:", err);
       res.status(500).json({ error: "processing_failed" });
@@ -84,4 +94,9 @@ export function analyzeProductRouter(anthropicApiKey: string | null): Router {
   });
 
   return router;
+}
+
+/** Same client construction the router above uses — exported so automatic (non-HTTP) callers can reuse it without re-reading env vars themselves. */
+export function createAnthropicClient(anthropicApiKey: string | null): Anthropic | null {
+  return anthropicApiKey ? new Anthropic({ apiKey: anthropicApiKey }) : null;
 }

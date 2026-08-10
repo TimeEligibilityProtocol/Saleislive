@@ -24,6 +24,7 @@ export function setupStepsRouter(): Router {
   router.get(
     "/api/brands/:brandId/setup-steps",
     requireAuth,
+    requireRole("read_only"),
     asyncHandler(async (req, res) => {
       res.json({ steps: await listSetupSteps(req.params.brandId) });
     }),
@@ -32,6 +33,7 @@ export function setupStepsRouter(): Router {
   router.post(
     "/api/brands/:brandId/setup-steps/:stepKey/submit",
     requireAuth,
+    requireRole("read_only"),
     asyncHandler(async (req, res) => {
       const { stepKey } = req.params;
       if (!isStepKey(stepKey)) return res.status(400).json({ error: "invalid_step" });
