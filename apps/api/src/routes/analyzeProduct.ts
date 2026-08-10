@@ -89,7 +89,7 @@ export function analyzeProductRouter(anthropicApiKey: string | null): Router {
       res.status(200).json(analysis);
     } catch (err) {
       console.error("analyze-photo failed:", err);
-      res.status(500).json({ error: "processing_failed" });
+      res.status(500).json({ error: "processing_failed", detail: err instanceof Error ? err.message : String(err) });
     }
   });
 
