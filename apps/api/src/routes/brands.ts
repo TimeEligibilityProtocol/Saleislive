@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { asyncHandler } from "../lib/asyncHandler.js";
 import { createBrand, getBrandById, isSlugAvailable, updateBrandIntegration } from "../store/tenants.js";
 
 const SLUG_PATTERN = /^[a-z0-9-]{2,32}$/;
@@ -13,61 +14,73 @@ const SLUG_PATTERN = /^[a-z0-9-]{2,32}$/;
 export function brandsRouter(): Router {
   const router = Router();
 
-  router.get("/api/brands/slug-available", (req, res) => {
-    const slug = String(req.query.slug ?? "").toLowerCase();
-    if (!SLUG_PATTERN.test(slug)) {
-      return res.status(400).json({ error: "invalid_slug" });
-    }
-    res.json({ slug, available: isSlugAvailable(slug) });
-  });
+  router.get(
+    "/api/brands/slug-available",
+    asyncHandler(async (req, res) => {
+      const slug = String(req.query.slug ?? "").toLowerCase();
+      if (!SLUG_PATTERN.test(slug)) {
+        return res.status(400).json({ error: "invalid_slug" });
+      }
+      res.json({ slug, available: await isSlugAvailable(slug) });
+    }),
+  );
 
   // Must come after the literal /slug-available route above — :id is a wildcard and would otherwise shadow it.
-  router.get("/api/brands/:id", (req, res) => {
-    const brand = getBrandById(req.params.id);
-    if (!brand) return res.status(404).json({ error: "unknown_brand" });
-    res.json({ brand });
-  });
+  router.get(
+    "/api/brands/:id",
+    asyncHandler(async (req, res) => {
+      const brand = await getBrandById(req.params.id);
+      if (!brand) return res.status(404).json({ error: "unknown_brand" });
+      res.json({ brand });
+    }),
+  );
 
-  router.post("/api/brands", (req, res) => {
-    const { tenantId, name, slug, country, currency, language, secondaryLanguage } = req.body as {
-      tenantId?: string;
-      name?: string;
-      slug?: string;
-      country?: string;
-      currency?: string;
-      language?: string;
-      secondaryLanguage?: string | null;
-    };
-    if (!tenantId || !name || !slug || !country || !currency || !language) {
-      return res.status(400).json({ error: "missing_fields" });
-    }
-    const normalizedSlug = slug.toLowerCase();
-    if (!SLUG_PATTERN.test(normalizedSlug)) {
-      return res.status(400).json({ error: "invalid_slug" });
-    }
-    if (!isSlugAvailable(normalizedSlug)) {
-      return res.status(409).json({ error: "slug_taken" });
-    }
-    const brand = createBrand({ tenantId, name, slug: normalizedSlug, country, currency, language, secondaryLanguage: secondaryLanguage ?? null });
-    res.status(201).json({ brand });
-  });
+  router.post(
+    "/api/brands",
+    asyncHandler(async (req, res) => {
+      const { tenantId, name, slug, country, currency, language, secondaryLanguage } = req.body as {
+        tenantId?: string;
+        name?: string;
+        slug?: string;
+        country?: string;
+        currency?: string;
+        language?: string;
+        secondaryLanguage?: string | null;
+      };
+      if (!tenantId || !name || !slug || !country || !currency || !language) {
+        return res.status(400).json({ error: "missing_fields" });
+      }
+      const normalizedSlug = slug.toLowerCase();
+      if (!SLUG_PATTERN.test(normalizedSlug)) {
+        return res.status(400).json({ error: "invalid_slug" });
+      }
+      if (!(await isSlugAvailable(normalizedSlug))) {
+        return res.status(409).json({ error: "slug_taken" });
+      }
+      const brand = await createBrand({ tenantId, name, slug: normalizedSlug, country, currency, language, secondaryLanguage: secondaryLanguage ?? null });
+      res.status(201).json({ brand });
+    }),
+  );
 
   /** Screen 06's Payments/Delivery tabs — connect or disconnect the "bring your own integration" HTTP adapter. */
-  router.patch("/api/brands/:brandId/integrations/:kind", (req, res) => {
-    const kind = req.params.kind;
-    if (kind !== "payment" && kind !== "delivery") return res.status(400).json({ error: "invalid_kind" });
-    const brand = getBrandById(req.params.brandId);
-    if (!brand) return res.status(404).json({ error: "unknown_brand" });
+  router.patch(
+    "/api/brands/:brandId/integrations/:kind",
+    asyncHandler(async (req, res) => {
+      const kind = req.params.kind;
+      if (kind !== "payment" && kind !== "delivery") return res.status(400).json({ error: "invalid_kind" });
+      const brand = await getBrandById(req.params.brandId);
+      if (!brand) return res.status(404).json({ error: "unknown_brand" });
 
-    const body = req.body as { endpointUrl?: string; apiKey?: string; disconnect?: boolean };
-    if (body.disconnect) {
-      const updated = updateBrandIntegration(brand.id, kind, null);
-      return res.json({ brand: updated });
-    }
-    if (!body.endpointUrl?.trim() || !body.apiKey?.trim()) return res.status(400).json({ error: "missing_fields" });
-    const updated = updateBrandIntegration(brand.id, kind, { endpointUrl: body.endpointUrl.trim(), apiKey: body.apiKey.trim() });
-    res.json({ brand: updated });
-  });
+      const body = req.body as { endpointUrl?: string; apiKey?: string; disconnect?: boolean };
+      if (body.disconnect) {
+        const updated = await updateBrandIntegration(brand.id, kind, null);
+        return res.json({ brand: updated });
+      }
+      if (!body.endpointUrl?.trim() || !body.apiKey?.trim()) return res.status(400).json({ error: "missing_fields" });
+      const updated = await updateBrandIntegration(brand.id, kind, { endpointUrl: body.endpointUrl.trim(), apiKey: body.apiKey.trim() });
+      res.json({ brand: updated });
+    }),
+  );
 
   return router;
 }

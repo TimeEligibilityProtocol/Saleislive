@@ -1,15 +1,41 @@
 import { Campaign } from "@saleis-live/domain";
 import { randomUUID } from "node:crypto";
+import { prisma } from "../lib/prisma.js";
+import { Campaign as PrismaCampaign, Prisma } from "../generated/prisma/client.js";
 
-/** In-memory only, same pragmatic starting point as the other stores. */
-let campaigns: Campaign[] = [];
+const toJson = (v: unknown) => v as Prisma.InputJsonValue;
 
-export function listCampaignsForBrand(brandId: string): Campaign[] {
-  return campaigns.filter((c) => c.brandId === brandId);
+/** Persisted in Postgres via Prisma. */
+
+function toDomainCampaign(row: PrismaCampaign): Campaign {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    brandId: row.brandId,
+    name: row.name,
+    slug: row.slug,
+    access: row.access,
+    status: row.status,
+    productIds: row.productIds as unknown as string[],
+    startsAt: row.startsAt.toISOString(),
+    endsAt: row.endsAt ? row.endsAt.toISOString() : null,
+    headline: row.headline,
+    shortDescription: row.shortDescription,
+    heroDesktopUrl: row.heroDesktopUrl,
+    heroMobileUrl: row.heroMobileUrl,
+    themePreset: row.themePreset as Campaign["themePreset"],
+    createdAt: row.createdAt.toISOString(),
+  };
 }
 
-export function getCampaignById(id: string): Campaign | undefined {
-  return campaigns.find((c) => c.id === id);
+export async function listCampaignsForBrand(brandId: string): Promise<Campaign[]> {
+  const rows = await prisma.campaign.findMany({ where: { brandId } });
+  return rows.map(toDomainCampaign);
+}
+
+export async function getCampaignById(id: string): Promise<Campaign | undefined> {
+  const row = await prisma.campaign.findUnique({ where: { id } });
+  return row ? toDomainCampaign(row) : undefined;
 }
 
 /**
@@ -17,34 +43,41 @@ export function getCampaignById(id: string): Campaign | undefined {
  * time for MVP — a full campaign list/switcher is later scope. Returns
  * the brand's first campaign, creating an empty draft one on first visit.
  */
-export function getOrCreateCurrentCampaign(tenantId: string, brandId: string): Campaign {
-  const existing = campaigns.find((c) => c.brandId === brandId);
-  if (existing) return existing;
-  const campaign: Campaign = {
-    id: `camp_${randomUUID()}`,
-    tenantId,
-    brandId,
-    name: "",
-    slug: "",
-    access: "public",
-    status: "draft",
-    productIds: [],
-    startsAt: new Date().toISOString(),
-    endsAt: null,
-    headline: "",
-    shortDescription: "",
-    heroDesktopUrl: null,
-    heroMobileUrl: null,
-    themePreset: "editorial",
-    createdAt: new Date().toISOString(),
-  };
-  campaigns = [...campaigns, campaign];
-  return campaign;
+export async function getOrCreateCurrentCampaign(tenantId: string, brandId: string): Promise<Campaign> {
+  const existing = await prisma.campaign.findFirst({ where: { brandId } });
+  if (existing) return toDomainCampaign(existing);
+  const row = await prisma.campaign.create({
+    data: {
+      id: `camp_${randomUUID()}`,
+      tenantId,
+      brandId,
+      name: "",
+      slug: `draft-${randomUUID().slice(0, 8)}`,
+      access: "public",
+      status: "draft",
+      productIds: [],
+      startsAt: new Date(),
+      headline: "",
+      shortDescription: "",
+      themePreset: "editorial",
+    },
+  });
+  return toDomainCampaign(row);
 }
 
-export function updateCampaign(id: string, patch: Partial<Omit<Campaign, "id" | "tenantId" | "brandId" | "createdAt">>): Campaign | undefined {
-  const campaign = getCampaignById(id);
-  if (!campaign) return undefined;
-  Object.assign(campaign, patch);
-  return campaign;
+export async function updateCampaign(id: string, patch: Partial<Omit<Campaign, "id" | "tenantId" | "brandId" | "createdAt">>): Promise<Campaign | undefined> {
+  try {
+    const row = await prisma.campaign.update({
+      where: { id },
+      data: {
+        ...patch,
+        productIds: patch.productIds !== undefined ? toJson(patch.productIds) : undefined,
+        startsAt: patch.startsAt !== undefined ? new Date(patch.startsAt) : undefined,
+        endsAt: patch.endsAt !== undefined ? (patch.endsAt ? new Date(patch.endsAt) : null) : undefined,
+      },
+    });
+    return toDomainCampaign(row);
+  } catch {
+    return undefined;
+  }
 }

@@ -16,8 +16,8 @@ export async function bookDeliveryIfConnected(order: Order, brand: Brand): Promi
   try {
     const adapter = new HttpDeliveryAdapter(brand.deliveryIntegration);
     const { trackingRef } = await adapter.bookShipment({ orderId: order.id, address: order.customerLocation });
-    updateOrder(order.id, { deliveryAdapterRef: trackingRef }, "Courier booked via connected delivery integration");
+    await updateOrder(order.id, { deliveryAdapterRef: trackingRef }, "Courier booked via connected delivery integration");
   } catch (err) {
-    updateOrder(order.id, {}, `Courier booking failed: ${err instanceof Error ? err.message : "unknown error"}`);
+    await updateOrder(order.id, {}, `Courier booking failed: ${err instanceof Error ? err.message : "unknown error"}`);
   }
 }

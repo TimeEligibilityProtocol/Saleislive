@@ -1,0 +1,384 @@
+// Saleis.live persistent data model. Mirrors the shapes in
+// packages/domain/src — see that package for the authoritative field-level
+// documentation (blueprint references, business rules). This file adds only
+// what persistence itself requires: ids, relations, and the two new
+// concepts this migration introduces — real login credentials/sessions,
+// and per-step setup approval tracking.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Tenancy — packages/domain/src/tenant.ts
+// ---------------------------------------------------------------------------
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  brands Brand[]
+  users  User[]
+
+  @@map("tenants")
+}
+
+enum BrandStatus {
+  draft
+  active
+  suspended
+}
+
+model Brand {
+  id                String      @id @default(cuid())
+  tenantId          String
+  tenant            Tenant      @relation(fields: [tenantId], references: [id])
+  name              String
+  slug              String      @unique
+  status            BrandStatus @default(draft)
+  country           String
+  currency          String
+  language          String
+  secondaryLanguage String?
+  slugVerified      Boolean     @default(false)
+  customDomain      String?
+  returnPolicy      String?
+  shippingPolicy    String?
+  /// HttpIntegrationConfig — packages/domain/src/adapters.ts
+  paymentIntegration  Json?
+  deliveryIntegration Json?
+  createdAt         DateTime    @default(now())
+
+  memberships BrandMembership[]
+  products    Product[]
+  campaigns   Campaign[]
+  orders      Order[]
+  setupSteps  BrandSetupStep[]
+  importBatches ImportBatch[]
+
+  @@map("brands")
+}
+
+enum Role {
+  group_owner
+  brand_admin
+  merchandiser
+  order_manager
+  analyst
+  read_only
+}
+
+model BrandMembership {
+  userId   String
+  brandId  String
+  tenantId String
+  role     Role
+
+  user  User  @relation(fields: [userId], references: [id])
+  brand Brand @relation(fields: [brandId], references: [id])
+
+  @@id([userId, brandId])
+  @@map("brand_memberships")
+}
+
+// ---------------------------------------------------------------------------
+// Users, credentials, sessions — packages/domain/src/user.ts + new auth
+// ---------------------------------------------------------------------------
+
+/// Platform-level account. Never carries password material directly — see
+/// Credential below — since one person can belong to multiple brands with
+/// different roles via BrandMembership.
+model User {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
+  email       String   @unique
+  displayName String
+  createdAt   DateTime @default(now())
+
+  credential          Credential?
+  sessions            Session[]
+  memberships         BrandMembership[]
+  submittedSteps      BrandSetupStep[] @relation("SubmittedBy")
+  approvedSteps       BrandSetupStep[] @relation("ApprovedBy")
+
+  @@map("users")
+}
+
+/// Kept separate from User by design (see User's own doc comment) so the
+/// core identity record never needs to be handled with password-grade care.
+model Credential {
+  userId       String   @id
+  user         User     @relation(fields: [userId], references: [id])
+  passwordHash String
+  updatedAt    DateTime @updatedAt
+
+  @@map("credentials")
+}
+
+/// Opaque bearer session — the token itself is only ever returned to the
+/// client once at login; only its hash is stored, so a leaked database
+/// dump can't be replayed as a valid session.
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  tokenHash    String   @unique
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+
+  @@map("sessions")
+}
+
+// ---------------------------------------------------------------------------
+// Setup wizard: step + approval tracking (new — Ola's step/approval flow)
+// ---------------------------------------------------------------------------
+
+enum SetupStepKey {
+  brand_setup
+  stock_intake
+  ai_catalogue_review
+  launch_setup
+  preview_publish
+}
+
+enum SetupStepStatus {
+  not_started
+  in_progress
+  submitted
+  approved
+  rejected
+}
+
+/// One row per (brand, step) — tracks the setup wizard's progress
+/// independently of Brand.status (which is the whole-brand draft/active
+/// state). A step can only be approved by someone with a role senior
+/// enough to approve (enforced in the API layer, not here).
+model BrandSetupStep {
+  id       String           @id @default(cuid())
+  brandId  String
+  brand    Brand            @relation(fields: [brandId], references: [id])
+  stepKey  SetupStepKey
+  status   SetupStepStatus  @default(not_started)
+
+  submittedByUserId String?
+  submittedBy       User?    @relation("SubmittedBy", fields: [submittedByUserId], references: [id])
+  submittedAt       DateTime?
+
+  approvedByUserId String?
+  approvedBy       User?    @relation("ApprovedBy", fields: [approvedByUserId], references: [id])
+  approvedAt       DateTime?
+
+  note      String?
+  updatedAt DateTime @updatedAt
+
+  @@unique([brandId, stepKey])
+  @@map("brand_setup_steps")
+}
+
+// ---------------------------------------------------------------------------
+// Products — packages/domain/src/product.ts
+// ---------------------------------------------------------------------------
+
+enum ProductStatus {
+  draft
+  active
+  archived
+}
+
+model Product {
+  id       String        @id @default(cuid())
+  tenantId String
+  brandId  String
+  brand    Brand         @relation(fields: [brandId], references: [id])
+  sku      String
+  status   ProductStatus @default(draft)
+
+  /// Each of these stores a full AiAssistedField<string> JSON blob
+  /// (value, aiSuggestion, source, confidence, verification state,
+  /// who/when, history) — see packages/domain/src/product.ts.
+  name        Json
+  description Json
+  category    Json
+  color       Json
+  size        Json
+  material    Json
+
+  /// ProductImage[] — packages/domain/src/product.ts
+  images Json @default("[]")
+
+  priceAmountMinor     Int
+  priceCurrency        String
+  salePriceAmountMinor Int
+  salePriceCurrency    String
+  stock                Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([brandId, sku])
+  @@map("products")
+}
+
+// ---------------------------------------------------------------------------
+// Campaigns — packages/domain/src/campaign.ts
+// ---------------------------------------------------------------------------
+
+enum CampaignAccess {
+  public
+  private
+  invite
+  password
+}
+
+enum CampaignStatus {
+  draft
+  scheduled
+  live
+  ended
+  canceled
+}
+
+// ---------------------------------------------------------------------------
+// Imports — packages/domain/src/import.ts
+// ---------------------------------------------------------------------------
+
+enum ImportBatchStatus {
+  staged
+  committed
+  rolled_back
+}
+
+/// A file upload always produces a batch in "staged" status with a
+/// row-level diff before anything touches the live catalogue — see
+/// blueprint §10 ("Staging import: plik nigdy nie zapisuje zmian bez
+/// etapu Preview → Commit"). `rows` stores the full ImportRowDiff[] as
+/// JSON — it's transient staging detail, not something later screens
+/// query into, so one blob is the right shape here (contrast with
+/// Product, where each field is its own column because Catalogue Center
+/// filters/sorts by them).
+model ImportBatch {
+  id                String            @id @default(cuid())
+  tenantId          String
+  brandId           String
+  brand             Brand             @relation(fields: [brandId], references: [id])
+  fileName          String
+  status            ImportBatchStatus @default(staged)
+  rows              Json              @default("[]")
+  createdAt         DateTime          @default(now())
+  committedAt       DateTime?
+  rollbackOfBatchId String?
+  intakeMethod      String
+  photoTreatment    Json              @default("[]")
+  matchMethod       String
+
+  @@map("import_batches")
+}
+
+model Campaign {
+  id       String         @id @default(cuid())
+  tenantId String
+  brandId  String
+  brand    Brand          @relation(fields: [brandId], references: [id])
+  name     String
+  slug     String
+  access   CampaignAccess
+  status   CampaignStatus @default(draft)
+
+  /// string[] of Product.id — a campaign never owns its own product copies.
+  productIds Json @default("[]")
+
+  startsAt DateTime
+  endsAt   DateTime?
+
+  headline         String
+  shortDescription String
+  heroDesktopUrl   String?
+  heroMobileUrl    String?
+  themePreset      String
+
+  createdAt DateTime @default(now())
+
+  orders Order[]
+
+  @@unique([brandId, slug])
+  @@map("campaigns")
+}
+
+// ---------------------------------------------------------------------------
+// Orders — packages/domain/src/order.ts
+// ---------------------------------------------------------------------------
+
+enum OrderStatus {
+  reserved
+  paid
+  fulfilled
+  refunded
+  canceled
+}
+
+enum FulfilmentStatus {
+  not_started
+  ready_to_pack
+  packed
+  in_transit
+  delivered
+}
+
+enum DeliveryMethod {
+  courier
+  pickup
+}
+
+model Order {
+  id         String         @id @default(cuid())
+  tenantId   String
+  brandId    String
+  brand      Brand          @relation(fields: [brandId], references: [id])
+  campaignId String
+  campaign   Campaign       @relation(fields: [campaignId], references: [id])
+  status     OrderStatus    @default(reserved)
+
+  /// OrderLine[] — packages/domain/src/order.ts
+  lines Json @default("[]")
+
+  totalAmountMinor Int
+  totalCurrency    String
+
+  paymentAdapterRef  String?
+  deliveryAdapterRef String?
+
+  customerName     String
+  customerPhone    String
+  customerLocation String
+  deliveryMethod   DeliveryMethod
+
+  fulfilmentStatus FulfilmentStatus @default(not_started)
+
+  /// OrderTimelineEntry[] — packages/domain/src/order.ts
+  timeline Json @default("[]")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  reservations InventoryReservation[]
+
+  @@map("orders")
+}
+
+model InventoryReservation {
+  id        String   @id @default(cuid())
+  productId String
+  quantity  Int
+  orderId   String?
+  order     Order?   @relation(fields: [orderId], references: [id])
+  expiresAt DateTime
+
+  @@map("inventory_reservations")
+}

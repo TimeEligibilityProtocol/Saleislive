@@ -1,38 +1,58 @@
-import { ImportBatch } from "@saleis-live/domain";
-import { randomUUID } from "node:crypto";
+import { ImportBatch, ImportRowDiff, IntakeMethod, MatchMethod, PhotoTreatment } from "@saleis-live/domain";
+import { prisma } from "../lib/prisma.js";
+import { ImportBatch as PrismaImportBatch, Prisma } from "../generated/prisma/client.js";
 
-/**
- * In-memory only, same pragmatic starting point as products.ts/tenants.ts.
- * A batch is "staged" the moment a file is parsed — nothing touches the
- * live catalogue until an explicit commit (blueprint §10 Preview → Commit).
- */
-let batches: ImportBatch[] = [];
+const toJson = (v: unknown) => v as Prisma.InputJsonValue;
 
-export function createBatch(input: Omit<ImportBatch, "id" | "status" | "createdAt" | "committedAt" | "rollbackOfBatchId">): ImportBatch {
-  const batch: ImportBatch = {
-    ...input,
-    id: `imp_${randomUUID()}`,
-    status: "staged",
-    createdAt: new Date().toISOString(),
-    committedAt: null,
-    rollbackOfBatchId: null,
+/** Persisted in Postgres via Prisma — see prisma/schema.prisma's ImportBatch model comment. */
+
+function toDomainBatch(row: PrismaImportBatch): ImportBatch {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    brandId: row.brandId,
+    fileName: row.fileName,
+    status: row.status,
+    rows: row.rows as unknown as ImportRowDiff[],
+    createdAt: row.createdAt.toISOString(),
+    committedAt: row.committedAt ? row.committedAt.toISOString() : null,
+    rollbackOfBatchId: row.rollbackOfBatchId,
+    intakeMethod: row.intakeMethod as IntakeMethod,
+    photoTreatment: row.photoTreatment as unknown as PhotoTreatment[],
+    matchMethod: row.matchMethod as MatchMethod,
   };
-  batches = [...batches, batch];
-  return batch;
 }
 
-export function getBatch(id: string): ImportBatch | undefined {
-  return batches.find((b) => b.id === id);
+export async function createBatch(input: Omit<ImportBatch, "id" | "status" | "createdAt" | "committedAt" | "rollbackOfBatchId">): Promise<ImportBatch> {
+  const row = await prisma.importBatch.create({
+    data: {
+      tenantId: input.tenantId,
+      brandId: input.brandId,
+      fileName: input.fileName,
+      rows: toJson(input.rows),
+      intakeMethod: input.intakeMethod,
+      photoTreatment: toJson(input.photoTreatment),
+      matchMethod: input.matchMethod,
+    },
+  });
+  return toDomainBatch(row);
 }
 
-export function markCommitted(id: string): ImportBatch | undefined {
-  const batch = getBatch(id);
-  if (!batch) return undefined;
-  batch.status = "committed";
-  batch.committedAt = new Date().toISOString();
-  return batch;
+export async function getBatch(id: string): Promise<ImportBatch | undefined> {
+  const row = await prisma.importBatch.findUnique({ where: { id } });
+  return row ? toDomainBatch(row) : undefined;
 }
 
-export function listBatchesForBrand(brandId: string): ImportBatch[] {
-  return batches.filter((b) => b.brandId === brandId);
+export async function markCommitted(id: string): Promise<ImportBatch | undefined> {
+  try {
+    const row = await prisma.importBatch.update({ where: { id }, data: { status: "committed", committedAt: new Date() } });
+    return toDomainBatch(row);
+  } catch {
+    return undefined;
+  }
+}
+
+export async function listBatchesForBrand(brandId: string): Promise<ImportBatch[]> {
+  const rows = await prisma.importBatch.findMany({ where: { brandId } });
+  return rows.map(toDomainBatch);
 }

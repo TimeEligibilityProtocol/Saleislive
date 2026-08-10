@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { asyncHandler } from "../lib/asyncHandler.js";
 import { requireBrand } from "../middleware/tenantRouter.js";
 import { listProductsForBrand } from "../store/products.js";
 
@@ -8,8 +9,12 @@ export function storefrontRouter(): Router {
   router.get("/api/storefront/me", requireBrand, (req, res) => {
     res.json({ brand: req.brand });
   });
-  router.get("/api/storefront/products", requireBrand, (req, res) => {
-    res.json({ products: listProductsForBrand(req.brand!.id) });
-  });
+  router.get(
+    "/api/storefront/products",
+    requireBrand,
+    asyncHandler(async (req, res) => {
+      res.json({ products: await listProductsForBrand(req.brand!.id) });
+    }),
+  );
   return router;
 }

@@ -21,30 +21,32 @@ declare global {
  */
 export function tenantRouter(rootDomain: string, defaultBrandSlug: string | null = null) {
   return function resolveTenant(req: Request, _res: Response, next: NextFunction): void {
-    // An explicit X-Brand-Slug header (set by the storefront from its own
-    // ?brand= query param) always wins — it's how a shared preview host
-    // (no wildcard DNS yet) can still show any brand, not just the default.
-    const explicitSlug = req.header("x-brand-slug");
-    if (explicitSlug) {
-      req.brand = getBrandBySlug(explicitSlug);
-      next();
-      return;
-    }
-
-    const host = (req.header("host") ?? "").split(":")[0];
-    const suffix = `.${rootDomain}`;
-    if (host.endsWith(suffix)) {
-      const slug = host.slice(0, -suffix.length);
-      if (slug && slug !== "www" && slug !== "admin") {
-        req.brand = getBrandBySlug(slug);
+    void (async () => {
+      // An explicit X-Brand-Slug header (set by the storefront from its own
+      // ?brand= query param) always wins — it's how a shared preview host
+      // (no wildcard DNS yet) can still show any brand, not just the default.
+      const explicitSlug = req.header("x-brand-slug");
+      if (explicitSlug) {
+        req.brand = await getBrandBySlug(explicitSlug);
+        next();
+        return;
       }
-    } else if (defaultBrandSlug) {
-      // Host isn't a *.{rootDomain} subdomain at all (e.g. a bare Render
-      // preview URL before wildcard DNS is wired up) — fall back to a
-      // fixed demo brand instead of resolving nothing.
-      req.brand = getBrandBySlug(defaultBrandSlug);
-    }
-    next();
+
+      const host = (req.header("host") ?? "").split(":")[0];
+      const suffix = `.${rootDomain}`;
+      if (host.endsWith(suffix)) {
+        const slug = host.slice(0, -suffix.length);
+        if (slug && slug !== "www" && slug !== "admin") {
+          req.brand = await getBrandBySlug(slug);
+        }
+      } else if (defaultBrandSlug) {
+        // Host isn't a *.{rootDomain} subdomain at all (e.g. a bare Render
+        // preview URL before wildcard DNS is wired up) — fall back to a
+        // fixed demo brand instead of resolving nothing.
+        req.brand = await getBrandBySlug(defaultBrandSlug);
+      }
+      next();
+    })().catch(next);
   };
 }
 
