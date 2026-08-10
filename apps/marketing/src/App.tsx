@@ -157,9 +157,9 @@ export function App() {
         .marketing-dev-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
         @media (max-width: 780px) { .marketing-dev-grid { grid-template-columns: 1fr; } }
 
-        .heading-logo { display: inline-block; vertical-align: middle; margin: 0 8px 0 12px; position: relative; top: -0.06em; }
+        .heading-logo { display: inline-block; vertical-align: middle; margin: 0 8px 0 12px; position: relative; top: 0.04em; }
         @media (max-width: 620px) { .heading-logo svg { height: 22px !important; width: auto !important; } }
-        .payoff-logo { display: inline-block; vertical-align: middle; margin: 0 6px 0 9px; position: relative; top: -0.05em; }
+        .payoff-logo { display: inline-block; vertical-align: middle; margin: 0 6px 0 9px; position: relative; top: 0.04em; }
 
         @keyframes iconGlow {
           0%, 100% { box-shadow: 0 0 0 0 rgba(23,59,143,0); }
