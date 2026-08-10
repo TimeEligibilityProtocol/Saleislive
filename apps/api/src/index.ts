@@ -4,6 +4,7 @@ import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadEnv } from "./config/env.js";
+import { UPLOADS_DIR } from "./lib/assetStorage.js";
 import { tenantRouter } from "./middleware/tenantRouter.js";
 import { analyzeProductRouter, createAnthropicClient } from "./routes/analyzeProduct.js";
 import { authRouter } from "./routes/auth.js";
@@ -35,6 +36,12 @@ async function main() {
   const app = express();
   app.use(cors());
   app.use(express.json());
+  // Uploaded/generated images (imports, Product Studio photos, cutouts) —
+  // mounted BEFORE the general /assets fallback below, and pointed at
+  // UPLOADS_DIR specifically (a Render Persistent Disk in production, set
+  // via the UPLOADS_DIR env var) so they survive redeploys instead of
+  // living in the container's own throwaway filesystem.
+  app.use("/assets/uploads", express.static(UPLOADS_DIR));
   app.use("/assets", express.static(path.join(__dirname, "..", "public", "assets")));
   app.use(tenantRouter(env.platformRootDomain, env.defaultBrandSlug));
   app.use(healthRouter());

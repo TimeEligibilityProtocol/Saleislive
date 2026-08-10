@@ -10,7 +10,7 @@ import { BACKGROUND_PRESET_KEYS, compositeOntoBackground, removeImageBackground 
 import { productsToWorkbookBuffer } from "../lib/exportCatalogue.js";
 import { requireAuth } from "../middleware/auth.js";
 import { logAudit } from "../store/auditLog.js";
-import { getProductById, getProductBySku, listAllProductsForBrand, upsertProduct } from "../store/products.js";
+import { deleteProduct, getProductById, getProductBySku, listAllProductsForBrand, upsertProduct } from "../store/products.js";
 import { getBrandById } from "../store/tenants.js";
 
 const photoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -133,6 +133,26 @@ export function adminProductsRouter(anthropicClient: Anthropic | null): Router {
       const product = await getProductById(req.params.id);
       if (!product || product.brandId !== brand.id) return res.status(404).json({ error: "not_found" });
       res.json({ product });
+    }),
+  );
+
+  /**
+   * Catalogue Center's "Delete" action — a merchant removing one wrong
+   * item directly, distinct from /api/imports/:id/rollback which undoes a
+   * whole batch. Permanent (no soft-delete/undo here, unlike an import
+   * rollback which still has the batch's diff to revert from).
+   */
+  router.delete(
+    "/api/brands/:brandId/products/:id",
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const brand = await getBrandById(req.params.brandId);
+      if (!brand) return res.status(404).json({ error: "unknown_brand" });
+      const existing = await getProductById(req.params.id);
+      if (!existing || existing.brandId !== brand.id) return res.status(404).json({ error: "not_found" });
+      await deleteProduct(existing.id);
+      await logAudit({ tenantId: brand.tenantId, brandId: brand.id, userId: req.user!.id, action: "product.deleted", entityType: "product", entityId: existing.id, metadata: { sku: existing.sku } });
+      res.status(204).end();
     }),
   );
 

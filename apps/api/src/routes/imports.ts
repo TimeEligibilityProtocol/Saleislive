@@ -1,4 +1,4 @@
-import { buildProductFromImportRow, computeRowDiff, flagDuplicateSkusInFile, ImportRowDiff, IntakeMethod, MatchMethod, ParsedImportRow, PhotoTreatment } from "@saleis-live/domain";
+import { buildProductFromImportRow, computeRowDiff, editField, flagDuplicateSkusInFile, ImportRowDiff, IntakeMethod, MatchMethod, ParsedImportRow, PhotoTreatment } from "@saleis-live/domain";
 import Anthropic from "@anthropic-ai/sdk";
 import { Router } from "express";
 import multer from "multer";
@@ -7,8 +7,9 @@ import { asyncHandler } from "../lib/asyncHandler.js";
 import { autoAnalyzeIfNeeded } from "../lib/autoAnalyze.js";
 import { extractEmbeddedImages, saveEmbeddedImage } from "../lib/embeddedImages.js";
 import { parseSpreadsheet } from "../lib/importParsing.js";
-import { createBatch, getBatch, markCommitted } from "../store/imports.js";
-import { getProductBySku, upsertProduct } from "../store/products.js";
+import { requireAuth } from "../middleware/auth.js";
+import { createBatch, getBatch, listBatchesForBrand, markCommitted, markRolledBack } from "../store/imports.js";
+import { deleteProduct, getProductBySku, upsertProduct } from "../store/products.js";
 import { getBrandById } from "../store/tenants.js";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -144,6 +145,19 @@ export function importsRouter(anthropicClient: Anthropic | null): Router {
     }),
   );
 
+  /** "Import history" — lets a merchant see recent batches (and roll one back) without hunting for a batch id. Newest first. */
+  router.get(
+    "/api/brands/:brandId/imports",
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const brand = await getBrandById(req.params.brandId);
+      if (!brand) return res.status(404).json({ error: "unknown_brand" });
+      const batches = await listBatchesForBrand(brand.id);
+      batches.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      res.json({ batches });
+    }),
+  );
+
   router.get(
     "/api/imports/:id",
     asyncHandler(async (req, res) => {
@@ -197,6 +211,65 @@ export function importsRouter(anthropicClient: Anthropic | null): Router {
 
       await markCommitted(batch.id);
       res.json({ batch: await getBatch(batch.id), summary: { created, updated, skipped } });
+    }),
+  );
+
+  /**
+   * "I uploaded the wrong file" — undoes a committed batch. Rows this
+   * batch ADDED get deleted outright; rows it UPDATED get their changed
+   * fields (name/description/category/colour/size/material/dimensions/
+   * price/stock — everything computeRowDiff records a before/after for)
+   * put back to the `from` value it already recorded, via the same
+   * editField history mechanism a normal manual edit uses. Deliberately
+   * does not touch `images` — that diff's shape (existing array vs. a
+   * single new URL) doesn't reduce to a clean single-value revert, and a
+   * stray extra photo is a far smaller problem than deleting a photo the
+   * merchant actually wanted. Can only run once per batch (rolled_back is
+   * terminal) — there's no state left to roll back a second time.
+   */
+  router.post(
+    "/api/imports/:id/rollback",
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const batch = await getBatch(req.params.id);
+      if (!batch) return res.status(404).json({ error: "not_found" });
+      if (batch.status !== "committed") return res.status(409).json({ error: "not_committed" });
+
+      const brand = await getBrandById(batch.brandId);
+      if (!brand) return res.status(400).json({ error: "unknown_brand" });
+
+      const now = new Date().toISOString();
+      let deleted = 0;
+      let reverted = 0;
+
+      for (const row of batch.rows) {
+        if (row.blocking || row.action === "skip") continue;
+        const product = await getProductBySku(brand.id, row.sku);
+        if (!product) continue;
+
+        if (row.action === "add") {
+          await deleteProduct(product.id);
+          deleted++;
+          continue;
+        }
+
+        const editOpts = { updatedBy: "rollback", now };
+        const reverted_ = { ...product };
+        for (const [field, change] of Object.entries(row.changes)) {
+          if (field === "name" || field === "description" || field === "category" || field === "color" || field === "size" || field === "material" || field === "dimensions") {
+            reverted_[field] = editField(product[field], (change.from as string | null) ?? "", editOpts);
+          } else if (field === "price" && change.from) {
+            reverted_.price = change.from as { amountMinor: number; currency: string };
+          } else if (field === "stock") {
+            reverted_.stock = (change.from as number | null) ?? 0;
+          }
+        }
+        await upsertProduct(reverted_);
+        reverted++;
+      }
+
+      await markRolledBack(batch.id);
+      res.json({ batch: await getBatch(batch.id), summary: { deleted, reverted } });
     }),
   );
 

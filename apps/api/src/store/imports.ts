@@ -52,6 +52,15 @@ export async function markCommitted(id: string): Promise<ImportBatch | undefined
   }
 }
 
+export async function markRolledBack(id: string): Promise<ImportBatch | undefined> {
+  try {
+    const row = await prisma.importBatch.update({ where: { id }, data: { status: "rolled_back" } });
+    return toDomainBatch(row);
+  } catch {
+    return undefined;
+  }
+}
+
 export async function listBatchesForBrand(brandId: string): Promise<ImportBatch[]> {
   const rows = await prisma.importBatch.findMany({ where: { brandId } });
   return rows.map(toDomainBatch);

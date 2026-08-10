@@ -175,6 +175,17 @@ export class ApiClient {
     return this.request(`/api/imports/${batchId}/commit`, { method: "POST" });
   }
 
+  /** "Wrong file uploaded by mistake" — undoes a committed batch: deletes rows it added, reverts fields on rows it updated. See the route's own doc comment for exactly what it does and doesn't touch (images are left alone). */
+  async rollbackImportBatch(batchId: string): Promise<{ batch: ImportBatch; summary: { deleted: number; reverted: number } }> {
+    return this.request(`/api/imports/${batchId}/rollback`, { method: "POST" });
+  }
+
+  /** Recent import batches for a brand, newest first — so a merchant can find the one to roll back without knowing its id. */
+  async listImportBatches(brandId: string): Promise<ImportBatch[]> {
+    const { batches } = await this.request<{ batches: ImportBatch[] }>(`/api/brands/${brandId}/imports`);
+    return batches;
+  }
+
   async listBrandProducts(brandId: string): Promise<Product[]> {
     const { products } = await this.request<{ products: Product[] }>(`/api/brands/${brandId}/products`);
     return products;
@@ -196,6 +207,11 @@ export class ApiClient {
   async getProduct(brandId: string, id: string): Promise<Product> {
     const { product } = await this.request<{ product: Product }>(`/api/brands/${brandId}/products/${id}`);
     return product;
+  }
+
+  /** Catalogue Center's "Delete" — permanent, single-item removal (distinct from rollbackImportBatch, which undoes a whole import). */
+  async deleteProduct(brandId: string, id: string): Promise<void> {
+    await this.request(`/api/brands/${brandId}/products/${id}`, { method: "DELETE" });
   }
 
   /** Screen 05 (Product Studio). `approve: true` also publishes the product to the storefront. */

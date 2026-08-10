@@ -141,3 +141,13 @@ export async function upsertProduct(product: Product): Promise<void> {
     create: { id: product.id, ...data },
   });
 }
+
+/** Permanent delete — the catalogue's own "remove this product" action, and how a batch rollback undoes rows it added. Returns false if the id didn't exist (already gone, or never did). */
+export async function deleteProduct(id: string): Promise<boolean> {
+  try {
+    await prisma.product.delete({ where: { id } });
+    return true;
+  } catch {
+    return false;
+  }
+}

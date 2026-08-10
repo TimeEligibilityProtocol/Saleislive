@@ -2137,6 +2137,9 @@ function CatalogueCenterPage() {
   const [products, setProducts] = useState<Product[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<CatalogueTab>("attention");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const reloadProducts = () => apiClient.listBrandProducts(brandId).then(setProducts);
 
   useEffect(() => {
     let cancelled = false;
@@ -2152,6 +2155,19 @@ function CatalogueCenterPage() {
       cancelled = true;
     };
   }, [brandId]);
+
+  const handleDelete = async (p: Product) => {
+    if (!window.confirm(`Delete "${p.name.value ?? p.sku}" (SKU ${p.sku})? This can't be undone.`)) return;
+    setDeletingId(p.id);
+    try {
+      await apiClient.deleteProduct(brandId, p.id);
+      await reloadProducts();
+    } catch {
+      window.alert("Couldn't delete that product. Try again.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   if (loading) return <p style={styles.sub}>Loading…</p>;
 
@@ -2223,10 +2239,18 @@ function CatalogueCenterPage() {
                       <td style={styles.td}>{p.name.value ?? "—"}</td>
                       <td style={styles.td}>{p.sku}</td>
                       <td style={{ ...styles.td, fontSize: 11, color: issues.length ? colors.error : colors.success }}>{issues.length ? issues.join(", ") : "All good"}</td>
-                      <td style={styles.td}>
+                      <td style={{ ...styles.td, display: "flex", gap: 12, alignItems: "center" }}>
                         <a href={`#/products/${encodeURIComponent(p.id)}`} style={styles.previewLink}>
                           Fix in Product Studio →
                         </a>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(p)}
+                          disabled={deletingId === p.id}
+                          style={{ background: "none", border: "none", color: colors.error, fontSize: 12, cursor: "pointer", padding: 0 }}
+                        >
+                          {deletingId === p.id ? "Deleting…" : "Delete"}
+                        </button>
                       </td>
                     </tr>
                   );
@@ -2236,7 +2260,99 @@ function CatalogueCenterPage() {
           </div>
         )}
       </div>
+      <ImportHistorySection brandId={brandId} />
       <WizardNextButton stepKey="ai_catalogue_review" />
+    </div>
+  );
+}
+
+/** "Wrong file uploaded by mistake" — Ola's own words. Committed batches can be rolled back once: rows they added are deleted, rows they updated are reverted to their pre-import values (see the rollback route's doc comment for exactly what — never touches images). */
+function ImportHistorySection({ brandId }: { brandId: string }) {
+  const [batches, setBatches] = useState<ImportBatch[] | null>(null);
+  const [rollingBackId, setRollingBackId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const reload = () => apiClient.listImportBatches(brandId).then(setBatches);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiClient
+      .listImportBatches(brandId)
+      .then((b) => {
+        if (!cancelled) setBatches(b);
+      })
+      .catch(() => {
+        if (!cancelled) setBatches([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [brandId]);
+
+  const handleRollback = async (batch: ImportBatch) => {
+    if (!window.confirm(`Undo "${batch.fileName || "this import"}"? Products it added will be deleted, products it updated will revert to their previous values. Photos are left as-is.`)) return;
+    setRollingBackId(batch.id);
+    setNotice(null);
+    try {
+      const { summary } = await apiClient.rollbackImportBatch(batch.id);
+      setNotice(`Undone — ${summary.deleted} product${summary.deleted === 1 ? "" : "s"} removed, ${summary.reverted} reverted.`);
+      await reload();
+    } catch {
+      window.alert("Couldn't undo that import. Try again.");
+    } finally {
+      setRollingBackId(null);
+    }
+  };
+
+  const relevant = (batches ?? []).filter((b) => b.fileName);
+  if (batches !== null && relevant.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: 24 }}>
+      <h2 style={{ ...styles.h1, fontSize: 18 }}>Import history</h2>
+      <p style={styles.sub}>Uploaded the wrong file? Undo it here — it only affects what that import actually changed.</p>
+      {notice && <p style={{ fontSize: 13, color: colors.success }}>{notice}</p>}
+      {batches === null ? (
+        <p style={styles.sub}>Loading…</p>
+      ) : (
+        <div style={styles.sectionCard}>
+          <div style={{ overflowX: "auto" }}>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>File</th>
+                  <th style={styles.th}>Uploaded</th>
+                  <th style={styles.th}>Rows</th>
+                  <th style={styles.th}>Status</th>
+                  <th style={styles.th}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {relevant.map((b) => (
+                  <tr key={b.id}>
+                    <td style={styles.td}>{b.fileName}</td>
+                    <td style={styles.td}>{new Date(b.createdAt).toLocaleString()}</td>
+                    <td style={styles.td}>{b.rows.length}</td>
+                    <td style={styles.td}>{b.status === "committed" ? "Applied" : b.status === "rolled_back" ? "Undone" : "Staged"}</td>
+                    <td style={styles.td}>
+                      {b.status === "committed" && (
+                        <button
+                          type="button"
+                          onClick={() => handleRollback(b)}
+                          disabled={rollingBackId === b.id}
+                          style={{ background: "none", border: "none", color: colors.error, fontSize: 12, cursor: "pointer", padding: 0 }}
+                        >
+                          {rollingBackId === b.id ? "Undoing…" : "Undo this import"}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
