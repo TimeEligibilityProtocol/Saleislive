@@ -169,6 +169,10 @@ function HomeView({ brand, products, onAddToBag }: { brand: Brand; products: Pro
            products), via heroImage's "center bottom" object-position. */
         .hero-frame { aspect-ratio: 1774 / 680; max-width: 1600px; margin: 0 auto; }
         @media (max-width: 700px) { .hero-frame { aspect-ratio: 1080 / 1290; max-width: 100%; } }
+        /* The tall mobile crop needs a different horizontal window than the wide
+           desktop crop, or the diagonal silk sweep drapes straight across the
+           headline instead of framing it. */
+        @media (max-width: 700px) { .hero-image { object-position: 35% center !important; } }
 
         /* Live text overlaid on the clean photo (not baked into the image),
            so the hero always renders in the current brand font — matches
@@ -184,7 +188,7 @@ function HomeView({ brand, products, onAddToBag }: { brand: Brand; products: Pro
       `}</style>
       <section style={{ background: colors.background }}>
         <div className="hero-frame" style={styles.hero}>
-          <img src="/images/hero-clean.png" alt="Products staged for a branded sale" style={styles.heroImage} />
+          <img src="/images/hero-clean.png" alt="Products staged for a branded sale" className="hero-image" style={styles.heroImage} />
           <div className="hero-copy" style={styles.heroCopy}>
             <h1 style={styles.heroTitle}>
               Stock in.
