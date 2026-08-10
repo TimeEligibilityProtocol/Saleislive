@@ -20,7 +20,7 @@ import {
 import { ApiError, ImportPreview } from "@saleis-live/api-client";
 import { useEffect, useRef, useState } from "react";
 import { Logo } from "./components/Logo";
-import { apiClient, resolveStorefrontPreviewUrl } from "./config/apiClient";
+import { apiClient, resolveCatalogueExportUrl, resolveStorefrontPreviewUrl } from "./config/apiClient";
 
 const ROOT_DOMAIN = "saleis.live";
 const DEMO_TENANT_ID = "t_demo";
@@ -1199,8 +1199,15 @@ function CatalogueCenterPage() {
 
   return (
     <div>
-      <h1 style={styles.h1}>AI &amp; Catalogue Center</h1>
-      <p style={styles.sub}>Real readiness, computed from your actual catalogue data.</p>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+        <div>
+          <h1 style={styles.h1}>AI &amp; Catalogue Center</h1>
+          <p style={styles.sub}>Real readiness, computed from your actual catalogue data.</p>
+        </div>
+        <a href={resolveCatalogueExportUrl(brandId)} style={styles.previewLink}>
+          Export to Excel
+        </a>
+      </div>
       <hr style={styles.divider} />
 
       <div style={styles.tileGrid}>

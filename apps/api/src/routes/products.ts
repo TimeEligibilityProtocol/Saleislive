@@ -2,6 +2,7 @@ import { buildProductFromImportRow, editField, ParsedImportRow } from "@saleis-l
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { asyncHandler } from "../lib/asyncHandler.js";
+import { productsToWorkbookBuffer } from "../lib/exportCatalogue.js";
 import { getProductById, getProductBySku, listAllProductsForBrand, upsertProduct } from "../store/products.js";
 import { getBrandById } from "../store/tenants.js";
 
@@ -15,6 +16,26 @@ export function adminProductsRouter(): Router {
       const brand = await getBrandById(req.params.brandId);
       if (!brand) return res.status(404).json({ error: "unknown_brand" });
       res.json({ products: await listAllProductsForBrand(brand.id) });
+    }),
+  );
+
+  /**
+   * Catalogue Center's "Export" action — the other half of the
+   * reconcile-stock-after-a-sale loop (§ conversation with Ola): export,
+   * update offline, re-upload through the same Stock Intake import. Must
+   * come before /:id below or Express would try to look up a product
+   * literally named "export".
+   */
+  router.get(
+    "/api/brands/:brandId/products/export",
+    asyncHandler(async (req, res) => {
+      const brand = await getBrandById(req.params.brandId);
+      if (!brand) return res.status(404).json({ error: "unknown_brand" });
+      const products = await listAllProductsForBrand(brand.id);
+      const buffer = productsToWorkbookBuffer(products);
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="${brand.slug}-catalogue-${new Date().toISOString().slice(0, 10)}.xlsx"`);
+      res.send(buffer);
     }),
   );
 

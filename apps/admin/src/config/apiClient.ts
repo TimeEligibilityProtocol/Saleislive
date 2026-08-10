@@ -23,3 +23,8 @@ export function resolveStorefrontPreviewUrl(slug: string): string {
 }
 
 export const apiClient = new ApiClient({ baseUrl: resolveApiBaseUrl() });
+
+/** A plain file download, not a JSON call — Catalogue Center's "Export" link points straight at this. */
+export function resolveCatalogueExportUrl(brandId: string): string {
+  return `${resolveApiBaseUrl()}/api/brands/${encodeURIComponent(brandId)}/products/export`;
+}
