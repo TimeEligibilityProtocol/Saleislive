@@ -10,9 +10,14 @@
  * placeholder shape — this is the only logo component in the app.
  */
 export function Logo({ height = 24 }: { height?: number }) {
-  const width = (height * 1070) / 220;
+  // viewBox is cropped tight to the lockup's real ink (measured via getBBox:
+  // mark+wordmark occupy x:[8.86,744.43] y:[14,206] inside the source 1070x220
+  // canvas) — the original box carried ~300px of invisible padding on the
+  // right, which made the mark look undersized and pushed following text
+  // too far away when set inline at a matched pixel height.
+  const width = (height * 753) / 208;
   return (
-    <svg width={width} height={height} viewBox="0 0 1070 220" role="img" aria-label="saleis.live">
+    <svg width={width} height={height} viewBox="0 6 753 208" role="img" aria-label="saleis.live">
       <g fill="#173b8f" transform="translate(100,110)">
         <path d="m 0,-96 c 8.864,0 16,7.136 16,16 v 45 c 0,8.864 -7.136,16 -16,16 -8.864,0 -16,-7.136 -16,-16 v -45 c 0,-8.864 7.136,-16 16,-16 z" />
         <path
