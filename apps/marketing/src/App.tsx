@@ -157,8 +157,9 @@ export function App() {
         .marketing-dev-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
         @media (max-width: 780px) { .marketing-dev-grid { grid-template-columns: 1fr; } }
 
-        .heading-logo { display: inline-block; vertical-align: middle; margin: 0 4px; position: relative; top: -0.08em; }
+        .heading-logo { display: inline-block; vertical-align: middle; margin: 0 10px; position: relative; top: -0.06em; }
         @media (max-width: 620px) { .heading-logo svg { height: 22px !important; width: auto !important; } }
+        .payoff-logo { display: inline-block; vertical-align: middle; margin: 0 7px; position: relative; top: -0.05em; }
 
         @keyframes iconGlow {
           0%, 100% { box-shadow: 0 0 0 0 rgba(23,59,143,0); }
@@ -341,7 +342,7 @@ function HomePage() {
       <Reveal>
         <section id="how-it-works" style={{ ...styles.howSection, background: colors.paper }}>
           <h2 style={styles.h2}>
-            How <span className="heading-logo"><Logo height={58} /></span> works
+            How<span className="heading-logo"><Logo height={58} /></span>works
           </h2>
           <p style={styles.sectionSub}>Three simple steps from stock to sale.</p>
           <div className="marketing-steps-row" style={{ marginTop: 56 }}>
@@ -372,7 +373,7 @@ function HomePage() {
       <Reveal>
         <section id="demo" style={styles.actionSection}>
           <h2 style={styles.h2}>
-            See <span className="heading-logo"><Logo height={58} /></span> in action
+            See<span className="heading-logo"><Logo height={58} /></span>in action
           </h2>
           <p style={styles.sectionSub}>Real screenshots of the actual product — your own store, on your own subdomain, is what you get after "Get saleis.live".</p>
           <div style={styles.actionFrame}>
@@ -407,15 +408,24 @@ function HomePage() {
         <section style={{ ...styles.section, textAlign: "center" }}>
           <div style={styles.systemsCard}>
             <div className="systems-flow-pill icon-glow" style={styles.systemsFlowPill}>
-              <StepIcon name="db" size={22} />
-              <span className="systems-flow-arrow" style={styles.systemsFlowArrow}>→</span>
-              <StepIcon name="file" size={22} />
-              <span className="systems-flow-arrow" style={styles.systemsFlowArrow}>→</span>
-              <span className="systems-flow-logo">
-                <Logo height={24} />
+              <span style={styles.systemsFlowNode}>
+                <StepIcon name="db" size={20} />
+                <span style={styles.systemsFlowLabel}>Your system</span>
               </span>
               <span className="systems-flow-arrow" style={styles.systemsFlowArrow}>→</span>
-              <StepIcon name="store" size={22} />
+              <span style={styles.systemsFlowNode}>
+                <StepIcon name="file" size={20} />
+                <span style={styles.systemsFlowLabel}>Excel / CSV</span>
+              </span>
+              <span className="systems-flow-arrow" style={styles.systemsFlowArrow}>→</span>
+              <span className="systems-flow-logo">
+                <Logo height={22} />
+              </span>
+              <span className="systems-flow-arrow" style={styles.systemsFlowArrow}>→</span>
+              <span style={styles.systemsFlowNode}>
+                <StepIcon name="store" size={20} />
+                <span style={styles.systemsFlowLabel}>Live sale</span>
+              </span>
             </div>
             <h2 style={{ ...styles.h2, marginTop: 56 }}>What do all these systems have in common?</h2>
             <div style={styles.tickerBandLight}>
@@ -429,7 +439,7 @@ function HomePage() {
               </div>
             </div>
             <p className="systems-payoff" style={styles.systemsPayoff}>
-              They all speak Excel. <span className="heading-logo"><Logo height={46} /></span> starts there.
+              They all speak Excel.<span className="payoff-logo"><Logo height={40} /></span>starts there.
             </p>
           </div>
         </section>
@@ -465,7 +475,7 @@ function HomePage() {
       <Reveal>
         <section id="why" style={styles.whySection}>
           <h2 style={styles.h2}>
-            Why <span className="heading-logo"><Logo height={58} /></span>
+            Why<span className="heading-logo"><Logo height={58} /></span>
           </h2>
           <div className="marketing-why-grid">
             {TRUST_BAR.map((t) => (
@@ -720,11 +730,13 @@ const styles: Record<string, React.CSSProperties> = {
   systemsFlowPill: {
     display: "inline-flex",
     alignItems: "center",
-    gap: 14,
+    gap: 12,
     background: colors.bluepale,
     borderRadius: 999,
-    padding: "16px 30px",
+    padding: "14px 24px",
   },
+  systemsFlowNode: { display: "inline-flex", alignItems: "center", gap: 8 },
+  systemsFlowLabel: { fontFamily: typography.fontFamily.ui, fontWeight: 700, fontSize: 13, letterSpacing: 0.3, color: colors.navy, whiteSpace: "nowrap" },
   systemsFlowArrow: { color: colors.navy, fontSize: 18, lineHeight: 1 },
   systemsPayoff: {
     fontFamily: DISPLAY_FONT,
