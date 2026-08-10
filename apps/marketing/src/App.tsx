@@ -133,12 +133,12 @@ export function App() {
         @media (max-width: 620px) { .marketing-mini-steps { flex-direction: column; gap: 16px; } .marketing-mini-steps > div:not(:first-child) { border-left: none; padding-left: 0; } }
 
         .marketing-steps-row { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 20px; align-items: start; }
-        @media (max-width: 900px) { .marketing-steps-row { grid-template-columns: 1fr; } }
+        @media (max-width: 900px) { .marketing-steps-row { grid-template-columns: 1fr; } .marketing-steps-row h3, .marketing-steps-row p { text-align: center; } }
         .marketing-step-arrow { display: flex; align-items: center; justify-content: center; padding-top: 28px; }
         @media (max-width: 900px) { .marketing-step-arrow { display: none; } }
 
         .marketing-action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; }
-        @media (max-width: 900px) { .marketing-action-grid { grid-template-columns: 1fr; gap: 32px; } }
+        @media (max-width: 900px) { .marketing-action-grid { grid-template-columns: 1fr; gap: 32px; } .marketing-action-grid a { text-align: center; } }
 
         .marketing-spec-row { display: flex; border-top: 1px solid ${colors.border}; border-bottom: 1px solid ${colors.border}; }
         .marketing-spec-row > div { flex: 1; border-left: 1px solid ${colors.border}; }
@@ -157,9 +157,9 @@ export function App() {
         .marketing-dev-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
         @media (max-width: 780px) { .marketing-dev-grid { grid-template-columns: 1fr; } }
 
-        .heading-logo { display: inline-block; vertical-align: middle; margin: 0 8px 0 12px; position: relative; top: 0.04em; }
-        @media (max-width: 620px) { .heading-logo svg { height: 22px !important; width: auto !important; } }
-        .payoff-logo { display: inline-block; vertical-align: middle; margin: 0 6px 0 9px; position: relative; top: 0.04em; }
+        .heading-logo { display: inline-block; vertical-align: middle; margin: 0 8px 0 12px; position: relative; top: 0em; }
+        @media (max-width: 620px) { .heading-logo svg { height: 38px !important; width: auto !important; } }
+        .payoff-logo { display: inline-block; vertical-align: middle; margin: 0 6px 0 9px; position: relative; top: 0.14em; }
 
         @keyframes iconGlow {
           0%, 100% { box-shadow: 0 0 0 0 rgba(23,59,143,0); }
@@ -172,6 +172,7 @@ export function App() {
 
         .systems-flow-pill { flex-wrap: wrap; row-gap: 10px; }
         @media (max-width: 620px) { .systems-flow-pill { padding: 12px 18px !important; gap: 10px !important; } }
+        @media (max-width: 780px) { .systems-bridge-section { display: none; } }
         @keyframes flowArrowTravel { 0%, 100% { transform: translateX(0); opacity: 0.55; } 50% { transform: translateX(6px); opacity: 1; } }
         .systems-flow-arrow { display: inline-block; color: ${colors.navy}; font-size: 22px; animation: flowArrowTravel 1.2s ease-in-out infinite; }
         .systems-flow-arrow:nth-of-type(2) { animation-delay: 0.15s; }
@@ -405,7 +406,7 @@ function HomePage() {
 
       {/* Systems bridge: any existing system already speaks Excel — that's the on-ramp into saleis.live. */}
       <Reveal>
-        <section style={{ ...styles.section, textAlign: "center" }}>
+        <section className="systems-bridge-section" style={{ ...styles.section, textAlign: "center" }}>
           <div style={styles.systemsCard}>
             <div className="systems-flow-pill icon-glow" style={styles.systemsFlowPill}>
               <span style={styles.systemsFlowNode}>
