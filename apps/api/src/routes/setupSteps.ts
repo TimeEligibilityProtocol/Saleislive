@@ -2,7 +2,9 @@ import { Router } from "express";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { SetupStepKey } from "../generated/prisma/client.js";
+import { logAudit } from "../store/auditLog.js";
 import { approveStep, listSetupSteps, rejectStep, SETUP_STEP_ORDER, submitStep } from "../store/setupSteps.js";
+import { getBrandById } from "../store/tenants.js";
 
 function isStepKey(v: string): v is SetupStepKey {
   return (SETUP_STEP_ORDER as string[]).includes(v);
@@ -49,6 +51,8 @@ export function setupStepsRouter(): Router {
       if (!isStepKey(stepKey)) return res.status(400).json({ error: "invalid_step" });
       const result = await approveStep(req.params.brandId, stepKey, req.user!.id);
       if ("error" in result) return res.status(409).json(result);
+      const brand = await getBrandById(req.params.brandId);
+      if (brand) await logAudit({ tenantId: brand.tenantId, brandId: brand.id, userId: req.user!.id, action: "setup_step.approved", entityType: "setup_step", entityId: stepKey });
       res.json({ step: result });
     }),
   );
@@ -64,6 +68,8 @@ export function setupStepsRouter(): Router {
       if (!note?.trim()) return res.status(400).json({ error: "missing_note" });
       const result = await rejectStep(req.params.brandId, stepKey, req.user!.id, note.trim());
       if ("error" in result) return res.status(409).json(result);
+      const brand = await getBrandById(req.params.brandId);
+      if (brand) await logAudit({ tenantId: brand.tenantId, brandId: brand.id, userId: req.user!.id, action: "setup_step.rejected", entityType: "setup_step", entityId: stepKey, metadata: { note: note.trim() } });
       res.json({ step: result });
     }),
   );

@@ -1,5 +1,8 @@
 import { Router } from "express";
 import { asyncHandler } from "../lib/asyncHandler.js";
+import { requireAuth } from "../middleware/auth.js";
+import { logAudit } from "../store/auditLog.js";
+import { createMembership } from "../store/memberships.js";
 import { createBrand, getBrandById, isSlugAvailable, updateBrandIntegration } from "../store/tenants.js";
 
 const SLUG_PATTERN = /^[a-z0-9-]{2,32}$/;
@@ -35,8 +38,14 @@ export function brandsRouter(): Router {
     }),
   );
 
+  /**
+   * Whoever creates a brand becomes its group_owner automatically — a
+   * brand created with no BrandMembership would lock its own creator out
+   * immediately, since every other route now checks membership/role.
+   */
   router.post(
     "/api/brands",
+    requireAuth,
     asyncHandler(async (req, res) => {
       const { tenantId, name, slug, country, currency, language, secondaryLanguage } = req.body as {
         tenantId?: string;
@@ -58,6 +67,8 @@ export function brandsRouter(): Router {
         return res.status(409).json({ error: "slug_taken" });
       }
       const brand = await createBrand({ tenantId, name, slug: normalizedSlug, country, currency, language, secondaryLanguage: secondaryLanguage ?? null });
+      await createMembership({ userId: req.user!.id, brandId: brand.id, tenantId, role: "group_owner" });
+      await logAudit({ tenantId, brandId: brand.id, userId: req.user!.id, action: "brand.created", entityType: "brand", entityId: brand.id, metadata: { name, slug: normalizedSlug } });
       res.status(201).json({ brand });
     }),
   );

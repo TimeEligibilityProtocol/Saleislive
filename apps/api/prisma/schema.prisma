@@ -61,8 +61,32 @@ model Brand {
   orders      Order[]
   setupSteps  BrandSetupStep[]
   importBatches ImportBatch[]
+  auditLogs   AuditLog[]
 
   @@map("brands")
+}
+
+/// Full audit trail of publish/financial-effect actions — blueprint §11
+/// ("Pełny audit log działań o skutku finansowym lub publikacyjnym") and
+/// §12's acceptance criterion ("Każda publikacja, zmiana ceny i refund
+/// wskazuje użytkownika oraz czas"). userId is nullable for the rare
+/// system-initiated action (e.g. a webhook-driven status change with no
+/// human on the other end); action/entityType/entityId together answer
+/// "what happened to what".
+model AuditLog {
+  id         String   @id @default(cuid())
+  tenantId   String
+  brandId    String
+  brand      Brand    @relation(fields: [brandId], references: [id])
+  userId     String?
+  action     String
+  entityType String
+  entityId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([brandId, createdAt])
+  @@map("audit_logs")
 }
 
 enum Role {

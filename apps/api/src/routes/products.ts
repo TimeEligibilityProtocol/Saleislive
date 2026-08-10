@@ -3,6 +3,8 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { productsToWorkbookBuffer } from "../lib/exportCatalogue.js";
+import { requireAuth } from "../middleware/auth.js";
+import { logAudit } from "../store/auditLog.js";
 import { getProductById, getProductBySku, listAllProductsForBrand, upsertProduct } from "../store/products.js";
 import { getBrandById } from "../store/tenants.js";
 
@@ -91,6 +93,7 @@ export function adminProductsRouter(): Router {
    */
   router.patch(
     "/api/brands/:brandId/products/:id",
+    requireAuth,
     asyncHandler(async (req, res) => {
       const brand = await getBrandById(req.params.brandId);
       if (!brand) return res.status(400).json({ error: "unknown_brand" });
@@ -125,6 +128,12 @@ export function adminProductsRouter(): Router {
         updatedAt: now,
       };
       await upsertProduct(updated);
+      if (body.approve) {
+        await logAudit({ tenantId: brand.tenantId, brandId: brand.id, userId: req.user!.id, action: "product.published", entityType: "product", entityId: updated.id, metadata: { sku: updated.sku } });
+      }
+      if (body.price !== undefined || body.salePrice !== undefined) {
+        await logAudit({ tenantId: brand.tenantId, brandId: brand.id, userId: req.user!.id, action: "product.price_changed", entityType: "product", entityId: updated.id, metadata: { price: updated.price, salePrice: updated.salePrice } });
+      }
       res.json({ product: updated });
     }),
   );

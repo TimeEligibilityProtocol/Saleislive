@@ -1,4 +1,4 @@
-import { Brand, Campaign, DeliveryMethod, ImportBatch, IntakeMethod, MatchMethod, Order, ParsedImportRow, PhotoTreatment, Product } from "@saleis-live/domain";
+import { Brand, BrandMembership, Campaign, DeliveryMethod, ImportBatch, IntakeMethod, MatchMethod, Order, ParsedImportRow, PhotoTreatment, Product, Role, User } from "@saleis-live/domain";
 
 export interface ApiClientConfig {
   baseUrl: string;
@@ -38,6 +38,21 @@ export interface ProductPhotoAnalysis {
   material: string;
   category: string;
   description: string;
+}
+
+/** Mirrors apps/api's Prisma enums as plain string unions — API-response shapes, not domain objects, same reasoning as ImportColumnMapping above. */
+export type SetupStepKey = "brand_setup" | "stock_intake" | "ai_catalogue_review" | "launch_setup" | "preview_publish";
+export type SetupStepStatus = "not_started" | "in_progress" | "submitted" | "approved" | "rejected";
+
+export interface SetupStepView {
+  stepKey: SetupStepKey;
+  status: SetupStepStatus;
+  submittedByUserId: string | null;
+  submittedAt: string | null;
+  approvedByUserId: string | null;
+  approvedAt: string | null;
+  note: string | null;
+  unlocked: boolean;
 }
 
 export class ApiClient {
@@ -255,5 +270,51 @@ export class ApiClient {
   async confirmTestPayment(orderId: string): Promise<Order> {
     const { order } = await this.request<{ order: Order }>(`/api/checkout/${orderId}/confirm-test-payment`, { method: "POST" });
     return order;
+  }
+
+  // ---------------------------------------------------------------------
+  // Auth
+  // ---------------------------------------------------------------------
+
+  async login(email: string, password: string): Promise<{ user: User; token: string; expiresAt: string }> {
+    return this.request("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+  }
+
+  async logout(): Promise<void> {
+    await this.request("/api/auth/logout", { method: "POST" });
+  }
+
+  async me(): Promise<{ user: User; memberships: BrandMembership[] }> {
+    return this.request("/api/auth/me");
+  }
+
+  /** Only callable by a caller who is already brand_admin/group_owner on `brandId` — the server re-checks this, this isn't just a client-side gate. */
+  async inviteTeamMember(input: { email: string; displayName: string; password: string; brandId: string; role: Role; tenantId: string }): Promise<{ user: User; membership: BrandMembership }> {
+    return this.request("/api/auth/invite", { method: "POST", body: JSON.stringify(input) });
+  }
+
+  // ---------------------------------------------------------------------
+  // Setup wizard steps + approval
+  // ---------------------------------------------------------------------
+
+  async listSetupSteps(brandId: string): Promise<SetupStepView[]> {
+    const { steps } = await this.request<{ steps: SetupStepView[] }>(`/api/brands/${brandId}/setup-steps`);
+    return steps;
+  }
+
+  async submitSetupStep(brandId: string, stepKey: SetupStepKey, note?: string): Promise<SetupStepView> {
+    const { step } = await this.request<{ step: SetupStepView }>(`/api/brands/${brandId}/setup-steps/${stepKey}/submit`, { method: "POST", body: JSON.stringify({ note }) });
+    return step;
+  }
+
+  /** 403s server-side if the caller's role on `brandId` isn't at least brand_admin. */
+  async approveSetupStep(brandId: string, stepKey: SetupStepKey): Promise<SetupStepView> {
+    const { step } = await this.request<{ step: SetupStepView }>(`/api/brands/${brandId}/setup-steps/${stepKey}/approve`, { method: "POST" });
+    return step;
+  }
+
+  async rejectSetupStep(brandId: string, stepKey: SetupStepKey, note: string): Promise<SetupStepView> {
+    const { step } = await this.request<{ step: SetupStepView }>(`/api/brands/${brandId}/setup-steps/${stepKey}/reject`, { method: "POST", body: JSON.stringify({ note }) });
+    return step;
   }
 }

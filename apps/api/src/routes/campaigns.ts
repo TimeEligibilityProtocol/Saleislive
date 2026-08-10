@@ -1,7 +1,9 @@
 import { CampaignAccess, CampaignStatus, ThemePresetId } from "@saleis-live/domain";
 import { Router } from "express";
 import { asyncHandler } from "../lib/asyncHandler.js";
-import { getOrCreateCurrentCampaign, updateCampaign } from "../store/campaigns.js";
+import { requireAuth } from "../middleware/auth.js";
+import { logAudit } from "../store/auditLog.js";
+import { getCampaignById, getOrCreateCurrentCampaign, updateCampaign } from "../store/campaigns.js";
 import { getBrandById, updateBrandPolicies } from "../store/tenants.js";
 
 /**
@@ -24,6 +26,7 @@ export function campaignsRouter(): Router {
 
   router.patch(
     "/api/campaigns/:id",
+    requireAuth,
     asyncHandler(async (req, res) => {
       const body = req.body as Partial<{
         name: string;
@@ -39,8 +42,12 @@ export function campaignsRouter(): Router {
         heroMobileUrl: string | null;
         themePreset: ThemePresetId;
       }>;
+      const before = await getCampaignById(req.params.id);
       const updated = await updateCampaign(req.params.id, body);
       if (!updated) return res.status(404).json({ error: "not_found" });
+      if (body.status === "live" && before?.status !== "live") {
+        await logAudit({ tenantId: updated.tenantId, brandId: updated.brandId, userId: req.user!.id, action: "campaign.published", entityType: "campaign", entityId: updated.id, metadata: { name: updated.name, slug: updated.slug } });
+      }
       res.json({ campaign: updated });
     }),
   );

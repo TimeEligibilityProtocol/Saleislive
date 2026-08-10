@@ -1,6 +1,8 @@
 import { FulfilmentStatus } from "@saleis-live/domain";
 import { Router } from "express";
 import { asyncHandler } from "../lib/asyncHandler.js";
+import { requireAuth } from "../middleware/auth.js";
+import { logAudit } from "../store/auditLog.js";
 import { getOrderById, listOrdersForBrand, updateOrder } from "../store/orders.js";
 import { getBrandById } from "../store/tenants.js";
 
@@ -43,6 +45,7 @@ export function ordersRouter(): Router {
 
   router.post(
     "/api/orders/:id/advance-fulfilment",
+    requireAuth,
     asyncHandler(async (req, res) => {
       const order = await getOrderById(req.params.id);
       if (!order) return res.status(404).json({ error: "not_found" });
@@ -55,22 +58,26 @@ export function ordersRouter(): Router {
 
   router.post(
     "/api/orders/:id/refund",
+    requireAuth,
     asyncHandler(async (req, res) => {
       const order = await getOrderById(req.params.id);
       if (!order) return res.status(404).json({ error: "not_found" });
       if (order.status !== "paid" && order.status !== "fulfilled") return res.status(409).json({ error: "not_refundable" });
       const updated = await updateOrder(order.id, { status: "refunded" }, "Refunded");
+      await logAudit({ tenantId: order.tenantId, brandId: order.brandId, userId: req.user!.id, action: "order.refunded", entityType: "order", entityId: order.id, metadata: { total: order.total } });
       res.json({ order: updated });
     }),
   );
 
   router.post(
     "/api/orders/:id/cancel",
+    requireAuth,
     asyncHandler(async (req, res) => {
       const order = await getOrderById(req.params.id);
       if (!order) return res.status(404).json({ error: "not_found" });
       if (order.status === "refunded" || order.status === "canceled") return res.status(409).json({ error: "already_closed" });
       const updated = await updateOrder(order.id, { status: "canceled" }, "Cancelled");
+      await logAudit({ tenantId: order.tenantId, brandId: order.brandId, userId: req.user!.id, action: "order.canceled", entityType: "order", entityId: order.id });
       res.json({ order: updated });
     }),
   );

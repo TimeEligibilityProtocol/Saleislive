@@ -1,11 +1,18 @@
 import { Router } from "express";
 import { asyncHandler } from "../lib/asyncHandler.js";
-import { requireAuth } from "../middleware/auth.js";
-import { createMembership, getMembership, listMembershipsForUser, roleAtLeast } from "../store/memberships.js";
+import { requireAuth, requireRole } from "../middleware/auth.js";
+import { clearLoginAttempts, isLoginRateLimited, recordLoginAttempt } from "../lib/loginRateLimit.js";
+import { listAuditLog, logAudit } from "../store/auditLog.js";
+import { createMembership, getMembership, listMembershipsForUser, listTeamForBrand, removeMembership, roleAtLeast, updateMembershipRole } from "../store/memberships.js";
 import { createSession, revokeSession } from "../store/sessions.js";
-import { createUserWithPassword, getUserByEmail, verifyPassword } from "../store/users.js";
+import { changePassword, createUserWithPassword, getUserByEmail, resetPasswordForUser, verifyPassword } from "../store/users.js";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const ROLE_VALUES = ["group_owner", "brand_admin", "merchandiser", "order_manager", "analyst", "read_only"] as const;
+type RoleValue = (typeof ROLE_VALUES)[number];
+function isRole(v: unknown): v is RoleValue {
+  return typeof v === "string" && (ROLE_VALUES as readonly string[]).includes(v);
+}
 
 export function authRouter(): Router {
   const router = Router();
@@ -15,8 +22,13 @@ export function authRouter(): Router {
     asyncHandler(async (req, res) => {
       const { email, password } = req.body as { email?: string; password?: string };
       if (!email || !password) return res.status(400).json({ error: "missing_fields" });
+      if (isLoginRateLimited(email)) return res.status(429).json({ error: "too_many_attempts" });
       const user = await verifyPassword(email, password);
-      if (!user) return res.status(401).json({ error: "invalid_credentials" });
+      if (!user) {
+        recordLoginAttempt(email);
+        return res.status(401).json({ error: "invalid_credentials" });
+      }
+      clearLoginAttempts(email);
       const { token, expiresAt } = await createSession(user.id);
       res.json({ user, token, expiresAt });
     }),
@@ -42,6 +54,20 @@ export function authRouter(): Router {
     }),
   );
 
+  /** Self-service — requires the current password. */
+  router.post(
+    "/api/auth/change-password",
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const { currentPassword, newPassword } = req.body as { currentPassword?: string; newPassword?: string };
+      if (!currentPassword || !newPassword) return res.status(400).json({ error: "missing_fields" });
+      if (newPassword.length < 8) return res.status(400).json({ error: "weak_password" });
+      const ok = await changePassword(req.user!.id, currentPassword, newPassword);
+      if (!ok) return res.status(401).json({ error: "invalid_current_password" });
+      res.json({ ok: true });
+    }),
+  );
+
   /**
    * Adds a new team member to a brand — the "several people at one
    * company" case Ola asked for. Requires an authenticated caller who is
@@ -59,7 +85,7 @@ export function authRouter(): Router {
         displayName?: string;
         password?: string;
         brandId?: string;
-        role?: "group_owner" | "brand_admin" | "merchandiser" | "order_manager" | "analyst" | "read_only";
+        role?: RoleValue;
         tenantId?: string;
       };
       if (!email || !EMAIL_PATTERN.test(email)) return res.status(400).json({ error: "invalid_email" });
@@ -77,7 +103,72 @@ export function authRouter(): Router {
 
       const user = await createUserWithPassword({ email, displayName: displayName.trim(), password, tenantId });
       const membership = await createMembership({ userId: user.id, brandId, tenantId, role });
+      await logAudit({ tenantId, brandId, userId: req.user!.id, action: "membership.created", entityType: "user", entityId: user.id, metadata: { role, email } });
       res.status(201).json({ user, membership });
+    }),
+  );
+
+  router.get(
+    "/api/brands/:brandId/team",
+    requireAuth,
+    requireRole("read_only"),
+    asyncHandler(async (req, res) => {
+      res.json({ team: await listTeamForBrand(req.params.brandId) });
+    }),
+  );
+
+  router.patch(
+    "/api/brands/:brandId/team/:userId",
+    requireAuth,
+    requireRole("brand_admin"),
+    asyncHandler(async (req, res) => {
+      const { role } = req.body as { role?: unknown };
+      if (!isRole(role)) return res.status(400).json({ error: "invalid_role" });
+      const updated = await updateMembershipRole(req.params.userId, req.params.brandId, role);
+      if (!updated) return res.status(404).json({ error: "not_found" });
+      await logAudit({ tenantId: updated.tenantId, brandId: updated.brandId, userId: req.user!.id, action: "membership.role_changed", entityType: "user", entityId: req.params.userId, metadata: { role } });
+      res.json({ membership: updated });
+    }),
+  );
+
+  /** A group_owner can't be locked out of their own brand by another brand_admin, and can't accidentally remove themselves this way either — both blocked below. */
+  router.delete(
+    "/api/brands/:brandId/team/:userId",
+    requireAuth,
+    requireRole("brand_admin"),
+    asyncHandler(async (req, res) => {
+      if (req.params.userId === req.user!.id) return res.status(400).json({ error: "cannot_remove_self" });
+      const target = await getMembership(req.params.userId, req.params.brandId);
+      if (!target) return res.status(404).json({ error: "not_found" });
+      if (target.role === "group_owner") return res.status(403).json({ error: "cannot_remove_owner" });
+      const ok = await removeMembership(req.params.userId, req.params.brandId);
+      if (!ok) return res.status(404).json({ error: "not_found" });
+      await logAudit({ tenantId: target.tenantId, brandId: target.brandId, userId: req.user!.id, action: "membership.removed", entityType: "user", entityId: req.params.userId });
+      res.json({ ok: true });
+    }),
+  );
+
+  /** Locked-out teammate: an admin regenerates their password and hands it off manually — same reasoning as invite, no email infra exists yet. */
+  router.post(
+    "/api/brands/:brandId/team/:userId/reset-password",
+    requireAuth,
+    requireRole("brand_admin"),
+    asyncHandler(async (req, res) => {
+      const target = await getMembership(req.params.userId, req.params.brandId);
+      if (!target) return res.status(404).json({ error: "not_found" });
+      const newPassword = await resetPasswordForUser(req.params.userId);
+      await logAudit({ tenantId: target.tenantId, brandId: target.brandId, userId: req.user!.id, action: "membership.password_reset", entityType: "user", entityId: req.params.userId });
+      res.json({ newPassword });
+    }),
+  );
+
+  /** Blueprint §12: "Każda publikacja, zmiana ceny i refund wskazuje użytkownika oraz czas." Restricted to brand_admin+ since it can reveal who did what to sensitive data (prices, refunds). */
+  router.get(
+    "/api/brands/:brandId/audit-log",
+    requireAuth,
+    requireRole("brand_admin"),
+    asyncHandler(async (req, res) => {
+      res.json({ entries: await listAuditLog(req.params.brandId) });
     }),
   );
 
