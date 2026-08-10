@@ -1,12 +1,20 @@
 import { ApiClient } from "@saleis-live/api-client";
 
+const PRODUCTION_API_BASE_URL = "https://saleislive-api.onrender.com";
+
+/**
+ * Local dev: same host, API's port. Production: the API is a separate
+ * Render service, not reachable at the admin app's own hostname on port
+ * 4100 — falls back to the real API host instead of guessing one that
+ * doesn't exist. VITE_API_BASE_URL still wins if set at build time.
+ */
 function resolveApiBaseUrl(): string {
   const override = import.meta.env.VITE_API_BASE_URL;
   if (override) return override;
-  if (typeof window !== "undefined" && window.location?.hostname) {
+  if (typeof window !== "undefined" && (window.location?.hostname === "localhost" || window.location?.hostname?.endsWith(".localhost"))) {
     return `http://${window.location.hostname}:4100`;
   }
-  return "http://localhost:4100";
+  return PRODUCTION_API_BASE_URL;
 }
 
 /**
@@ -18,8 +26,11 @@ function resolveApiBaseUrl(): string {
  */
 export function resolveStorefrontPreviewUrl(slug: string): string {
   const override = import.meta.env.VITE_STOREFRONT_BASE_URL;
-  const base = override || (typeof window !== "undefined" && window.location?.hostname ? `http://${window.location.hostname}:5274` : "http://localhost:5274");
-  return `${base}/?brand=${encodeURIComponent(slug)}`;
+  if (override) return `${override}/?brand=${encodeURIComponent(slug)}`;
+  if (typeof window !== "undefined" && (window.location?.hostname === "localhost" || window.location?.hostname?.endsWith(".localhost"))) {
+    return `http://${window.location.hostname}:5274/?brand=${encodeURIComponent(slug)}`;
+  }
+  return `https://demo.saleis.live/?brand=${encodeURIComponent(slug)}`;
 }
 
 export const AUTH_TOKEN_KEY = "saleislive:authToken";

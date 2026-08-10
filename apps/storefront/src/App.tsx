@@ -1,6 +1,6 @@
 import { colors, typography } from "@saleis-live/ui";
 import { Brand, DeliveryMethod, Money, Order, Product } from "@saleis-live/domain";
-import { useEffect, useState } from "react";
+import { SyntheticEvent, useEffect, useState } from "react";
 import { Logo } from "./components/Logo";
 import { apiClient } from "./config/apiClient";
 
@@ -20,6 +20,16 @@ function formatMoney(m: Money): string {
 function discountPercent(price: Money, salePrice: Money): number {
   if (price.amountMinor === 0 || price.amountMinor === salePrice.amountMinor) return 0;
   return Math.round((1 - salePrice.amountMinor / price.amountMinor) * 100);
+}
+
+/** New photos are appended, not prepended (Product Studio, re-imports) — images[0] is not reliably the merchant's chosen main shot, only the isMain flag is. */
+function mainImage(product: Product) {
+  return product.images.find((i) => i.isMain) ?? product.images[0];
+}
+
+/** A stale/deleted photo URL should never show the browser's broken-image glyph — hide the element instead. */
+function hideOnError(e: SyntheticEvent<HTMLImageElement>) {
+  e.currentTarget.style.visibility = "hidden";
 }
 
 function useHashRoute(): string {
@@ -222,7 +232,7 @@ function ProductCard({ product, onAddToBag }: { product: Product; onAddToBag: ()
     <div style={styles.card}>
       <a href={`#/product/${encodeURIComponent(product.id)}`} style={{ textDecoration: "none", color: "inherit" }}>
         <div style={styles.cardImageWrap}>
-          <img src={apiClient.resolveAssetUrl(product.images[0]?.url ?? "")} alt={product.images[0]?.alt ?? ""} style={styles.cardImage} />
+          <img src={apiClient.resolveAssetUrl(mainImage(product)?.url ?? "")} alt={mainImage(product)?.alt ?? ""} style={styles.cardImage} onError={hideOnError} />
         </div>
         <p style={styles.cardName}>{product.name.value}</p>
       </a>
@@ -250,7 +260,7 @@ function ProductDetailView({ product, onAddToBag }: { product: Product; onAddToB
         ← Back
       </a>
       <div style={{ ...styles.cardImageWrap, aspectRatio: "1/1", marginBottom: 24 }}>
-        <img src={apiClient.resolveAssetUrl(product.images[0]?.url ?? "")} alt={product.images[0]?.alt ?? ""} style={styles.cardImage} />
+        <img src={apiClient.resolveAssetUrl(mainImage(product)?.url ?? "")} alt={mainImage(product)?.alt ?? ""} style={styles.cardImage} onError={hideOnError} />
       </div>
       {pct > 0 ? <p style={styles.eyebrowSmall}>PRIVATE SALE · −{pct}%</p> : null}
       <h1 style={{ ...styles.h1, fontSize: 30 }}>{product.name.value}</h1>
@@ -316,7 +326,7 @@ function BagView({
           {items.map(({ product, qty }) => (
             <div key={product.id} style={styles.bagRow}>
               <div style={{ ...styles.cardImageWrap, width: 90, aspectRatio: "1/1", flexShrink: 0 }}>
-                <img src={apiClient.resolveAssetUrl(product.images[0]?.url ?? "")} alt="" style={styles.cardImage} />
+                <img src={apiClient.resolveAssetUrl(mainImage(product)?.url ?? "")} alt="" style={styles.cardImage} onError={hideOnError} />
               </div>
               <div style={{ flex: 1 }}>
                 <p style={{ fontSize: 14, fontWeight: 600, margin: "0 0 4px" }}>{product.name.value}</p>
