@@ -16,12 +16,6 @@ const NAV_LINKS = [
   { label: "Developers", href: "#/developers" },
 ];
 
-const MINI_STEPS = [
-  { icon: "upload", title: "Upload any stock", body: "Excel, CSV or photos." },
-  { icon: "sparkle", title: "AI prepares catalogue", body: "Clean, enrich, translate." },
-  { icon: "store", title: "Launch your sale", body: "Storefront, payments, delivery." },
-];
-
 const STEPS = [
   { icon: "file", title: "Upload your stock", body: "Add inventory via Excel, CSV or product photos." },
   { icon: "sparkle", title: "AI prepares your catalogue", body: "saleis.live maps data, matches product images, cleans and enriches content and flags anything that needs review." },
@@ -128,10 +122,6 @@ export function App() {
           .hero-mobile { display: block; }
         }
 
-        .marketing-mini-steps { display: flex; gap: 24px; }
-        .marketing-mini-steps > div:not(:first-child) { border-left: 1px solid rgba(23,59,143,0.18); padding-left: 24px; }
-        @media (max-width: 620px) { .marketing-mini-steps { flex-direction: column; gap: 16px; } .marketing-mini-steps > div:not(:first-child) { border-left: none; padding-left: 0; } }
-
         .marketing-steps-row { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 20px; align-items: start; }
         @media (max-width: 900px) { .marketing-steps-row { grid-template-columns: 1fr; } .marketing-steps-row h3, .marketing-steps-row p { text-align: center; } }
         .marketing-step-arrow { display: flex; align-items: center; justify-content: center; padding-top: 28px; }
@@ -175,12 +165,6 @@ export function App() {
         .systems-flow-arrow:nth-of-type(2) { animation-delay: 0.15s; }
         .systems-flow-arrow:nth-of-type(4) { animation-delay: 0.3s; }
         .systems-flow-arrow:nth-of-type(6) { animation-delay: 0.45s; }
-        @keyframes flowLogoGlow {
-          0%, 100% { filter: drop-shadow(0 0 0 rgba(23,59,143,0)); transform: scale(1); }
-          50% { filter: drop-shadow(0 0 10px rgba(23,59,143,0.55)); transform: scale(1.06); }
-        }
-        .systems-flow-logo svg { animation: flowLogoGlow 1.8s ease-in-out infinite; }
-
         .systems-payoff { position: relative; padding-bottom: 14px; }
         .systems-payoff::after {
           content: "";
@@ -196,7 +180,7 @@ export function App() {
         }
         @keyframes payoffUnderline { 0%, 100% { width: 64px; opacity: 0.5; } 50% { width: 140px; opacity: 1; } }
 
-        @media (prefers-reduced-motion: reduce) { .systems-flow-arrow, .systems-flow-logo svg, .systems-payoff::after { animation: none; } }
+        @media (prefers-reduced-motion: reduce) { .systems-flow-arrow, .systems-payoff::after { animation: none; } }
 
         @keyframes heroEnter { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: translateY(0); } }
         .hero-enter { animation: heroEnter 1s cubic-bezier(0.16, 1, 0.3, 1) both; }
@@ -278,17 +262,6 @@ function HomePage() {
                 View demo
               </a>
             </div>
-            <div className="marketing-mini-steps" style={{ marginTop: 48 }}>
-              {MINI_STEPS.map((s) => (
-                <div key={s.title} style={styles.miniStepItem}>
-                  <div className="icon-glow" style={styles.miniStepIcon}>
-                    <StepIcon name={s.icon} size={20} />
-                  </div>
-                  <p style={styles.miniStepTitle}>{s.title}</p>
-                  <p style={styles.miniStepBody}>{s.body}</p>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </section>
@@ -310,14 +283,6 @@ function HomePage() {
               View demo
             </a>
           </div>
-        </div>
-        <div className="marketing-mini-steps" style={{ padding: "28px 24px 40px", textAlign: "center" }}>
-          {MINI_STEPS.map((s) => (
-            <div key={s.title} style={{ ...styles.miniStepItem, alignItems: "center" }}>
-              <p style={styles.miniStepTitle}>{s.title}</p>
-              <p style={styles.miniStepBody}>{s.body}</p>
-            </div>
-          ))}
         </div>
       </section>
 
@@ -413,9 +378,7 @@ function HomePage() {
                 <span style={styles.systemsFlowLabel}>Excel / CSV</span>
               </span>
               <span className="systems-flow-arrow" style={styles.systemsFlowArrow}>→</span>
-              <span className="systems-flow-logo">
-                <Logo height={22} />
-              </span>
+              <span style={styles.systemsFlowLabel}>saleis.live</span>
               <span className="systems-flow-arrow" style={styles.systemsFlowArrow}>→</span>
               <span style={styles.systemsFlowNode}>
                 <StepIcon name="store" size={20} />
@@ -713,10 +676,6 @@ const styles: Record<string, React.CSSProperties> = {
   primaryButton: { display: "inline-block", background: colors.navy, color: colors.white, fontSize: 14, fontWeight: 700, padding: "15px 28px", borderRadius: 999, textDecoration: "none" },
   secondaryButton: { display: "inline-block", background: "transparent", color: colors.ink, fontSize: 14, fontWeight: 700, padding: "15px 28px", borderRadius: 999, textDecoration: "none", border: `1px solid ${colors.border}` },
 
-  miniStepItem: { flex: 1, minWidth: 160 },
-  miniStepIcon: { width: 40, height: 40, borderRadius: 12, background: colors.bluepale, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10 },
-  miniStepTitle: { fontSize: 14, fontWeight: 700, color: colors.navy, margin: "0 0 4px" },
-  miniStepBody: { fontSize: 13, color: colors.muted, margin: 0, lineHeight: 1.5 },
 
   tickerBand: { background: colors.navy, padding: "16px 0", overflow: "hidden" },
   tickerItem: { display: "inline-flex", alignItems: "center", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 16, fontWeight: 500, color: colors.white, padding: "0 28px", whiteSpace: "nowrap" },

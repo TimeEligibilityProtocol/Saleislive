@@ -162,45 +162,35 @@ function HomeView({ brand, products, onAddToBag }: { brand: Brand; products: Pro
   return (
     <>
       <style>{`
-        /* Mobile matches the source image's own aspect ratio exactly (no
-           crop needed there — Ola confirmed it looks right). Desktop is
-           deliberately shorter than the source photo's 1774:887 — crops
-           from the top only (empty background/drape, never the text or
-           products), via heroImage's "center bottom" object-position. */
-        .hero-frame { aspect-ratio: 1774 / 680; max-width: 1600px; margin: 0 auto; }
-        @media (max-width: 700px) { .hero-frame { aspect-ratio: 1080 / 1290; max-width: 100%; } }
+        /* Same container strategy as the marketing site's hero: a generous
+           viewport-relative min-height (not the image's own short aspect
+           ratio), so the identical 88px/40px type scale always has room to
+           flow without colliding with the CTA below it. */
+        .hero-frame { min-height: min(70vh, 620px); max-width: 1600px; margin: 0 auto; }
+        @media (max-width: 700px) { .hero-frame { min-height: 0; aspect-ratio: 1080 / 1290; max-width: 100%; } }
         /* The tall mobile crop needs a different horizontal window than the wide
            desktop crop, or the diagonal silk sweep drapes straight across the
            headline instead of framing it. */
         @media (max-width: 700px) { .hero-image { object-position: 35% center !important; } }
-
-        /* Live text overlaid on the clean photo (not baked into the image),
-           so the hero always renders in the current brand font — matches
-           the marketing site's hero pattern for typographic consistency. */
-        .hero-copy { left: 4.5%; top: 22%; max-width: 40%; }
-        @media (max-width: 700px) {
-          .hero-copy { left: 6.5%; right: 6.5%; max-width: none; top: 6%; }
-        }
-        .hero-shop-cta { left: 4.5%; top: 68%; }
-        @media (max-width: 700px) {
-          .hero-shop-cta { left: 6.5%; top: auto; bottom: 13%; }
-        }
         @media (max-width: 700px) { .hero-title { font-size: 40px !important; } }
+        @media (max-width: 700px) { .hero-copy { padding: 0 6.5% !important; } }
       `}</style>
       <section style={{ background: colors.background }}>
         <div className="hero-frame" style={styles.hero}>
           <img src="/images/hero-clean.png" alt="Products staged for a branded sale" className="hero-image" style={styles.heroImage} />
           <div className="hero-copy" style={styles.heroCopy}>
-            <h1 className="hero-title" style={styles.heroTitle}>
-              Stock in.
-              <br />
-              Sale live.
-            </h1>
-            <p style={styles.heroSub}>A new AI-powered way to turn your catalogue into a complete branded sale.</p>
+            <div style={{ maxWidth: 480 }}>
+              <h1 className="hero-title" style={styles.heroTitle}>
+                Stock in.
+                <br />
+                Sale live.
+              </h1>
+              <p style={styles.heroSub}>A new AI-powered way to turn your catalogue into a complete branded sale.</p>
+              <a href="#products-grid" className="hero-shop-cta" style={styles.heroCta}>
+                Shop the sale
+              </a>
+            </div>
           </div>
-          <a href="#products-grid" className="hero-shop-cta" style={styles.heroCta}>
-            Shop the sale
-          </a>
         </div>
       </section>
 
@@ -611,15 +601,14 @@ const styles: Record<string, React.CSSProperties> = {
 
   hero: { position: "relative", overflow: "hidden", background: colors.background },
   heroImage: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "68% center" },
-  heroCopy: { position: "absolute", zIndex: 1 },
+  heroCopy: { position: "absolute", inset: 0, zIndex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 4.5%" },
   heroTitle: { fontFamily: "'Cormorant Garamond', 'Instrument Serif', Georgia, serif", fontWeight: 500, fontSize: 88, color: colors.navy, margin: "0 0 22px", lineHeight: 1.02, maxWidth: 560 },
   heroSub: { fontSize: 18, color: colors.muted, margin: 0, maxWidth: 420, lineHeight: 1.55 },
   eyebrowSmall: { fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: colors.ultramarine, margin: "0 0 8px" },
   h1: { fontFamily: typography.fontFamily.display, fontSize: 44, margin: "0 0 8px", lineHeight: 1.1 },
   heroCta: {
-    position: "absolute",
-    zIndex: 1,
     display: "inline-block",
+    marginTop: 28,
     padding: "12px 24px",
     borderRadius: 8,
     background: colors.navy,
