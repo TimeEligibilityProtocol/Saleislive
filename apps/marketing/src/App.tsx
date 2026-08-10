@@ -157,9 +157,9 @@ export function App() {
         .marketing-dev-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
         @media (max-width: 780px) { .marketing-dev-grid { grid-template-columns: 1fr; } }
 
-        .heading-logo { display: inline-block; vertical-align: middle; margin: 0 10px; position: relative; top: -0.06em; }
+        .heading-logo { display: inline-block; vertical-align: middle; margin: 0 8px 0 12px; position: relative; top: -0.06em; }
         @media (max-width: 620px) { .heading-logo svg { height: 22px !important; width: auto !important; } }
-        .payoff-logo { display: inline-block; vertical-align: middle; margin: 0 7px; position: relative; top: -0.05em; }
+        .payoff-logo { display: inline-block; vertical-align: middle; margin: 0 6px 0 9px; position: relative; top: -0.05em; }
 
         @keyframes iconGlow {
           0%, 100% { box-shadow: 0 0 0 0 rgba(23,59,143,0); }
@@ -342,7 +342,7 @@ function HomePage() {
       <Reveal>
         <section id="how-it-works" style={{ ...styles.howSection, background: colors.paper }}>
           <h2 style={styles.h2}>
-            How<span className="heading-logo"><Logo height={58} /></span>works
+            How<span className="heading-logo"><Logo height={50} /></span>works
           </h2>
           <p style={styles.sectionSub}>Three simple steps from stock to sale.</p>
           <div className="marketing-steps-row" style={{ marginTop: 56 }}>
@@ -373,7 +373,7 @@ function HomePage() {
       <Reveal>
         <section id="demo" style={styles.actionSection}>
           <h2 style={styles.h2}>
-            See<span className="heading-logo"><Logo height={58} /></span>in action
+            See<span className="heading-logo"><Logo height={50} /></span>in action
           </h2>
           <p style={styles.sectionSub}>Real screenshots of the actual product — your own store, on your own subdomain, is what you get after "Get saleis.live".</p>
           <div style={styles.actionFrame}>
@@ -475,7 +475,7 @@ function HomePage() {
       <Reveal>
         <section id="why" style={styles.whySection}>
           <h2 style={styles.h2}>
-            Why<span className="heading-logo"><Logo height={58} /></span>
+            Why<span className="heading-logo"><Logo height={50} /></span>
           </h2>
           <div className="marketing-why-grid">
             {TRUST_BAR.map((t) => (
@@ -750,9 +750,9 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 8,
     flexWrap: "wrap",
   },
-  tickerBandLight: { marginTop: 40, background: colors.navy, borderRadius: 16, padding: "18px 0", overflow: "hidden" },
-  systemsTickerItem: { display: "inline-flex", alignItems: "center", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 16, fontWeight: 600, color: colors.white, padding: "0 24px", whiteSpace: "nowrap" },
-  systemsTickerDot: { marginLeft: 24, color: "rgba(255,255,255,0.35)" },
+  tickerBandLight: { marginTop: 40, background: colors.bluepale, borderRadius: 16, padding: "18px 0", overflow: "hidden" },
+  systemsTickerItem: { display: "inline-flex", alignItems: "center", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 16, fontWeight: 600, color: colors.navy, padding: "0 24px", whiteSpace: "nowrap" },
+  systemsTickerDot: { marginLeft: 24, color: "rgba(23,59,143,0.3)" },
 
   section: { padding: "96px 32px", maxWidth: 1320, margin: "0 auto" },
   sectionSub: { fontSize: 16, color: colors.muted, textAlign: "center", maxWidth: 560, margin: "16px auto 0" },
