@@ -185,12 +185,13 @@ function HomeView({ brand, products, onAddToBag }: { brand: Brand; products: Pro
         @media (max-width: 700px) {
           .hero-shop-cta { left: 6.5%; top: auto; bottom: 13%; }
         }
+        @media (max-width: 700px) { .hero-title { font-size: 40px !important; } }
       `}</style>
       <section style={{ background: colors.background }}>
         <div className="hero-frame" style={styles.hero}>
           <img src="/images/hero-clean.png" alt="Products staged for a branded sale" className="hero-image" style={styles.heroImage} />
           <div className="hero-copy" style={styles.heroCopy}>
-            <h1 style={styles.heroTitle}>
+            <h1 className="hero-title" style={styles.heroTitle}>
               Stock in.
               <br />
               Sale live.
@@ -611,8 +612,8 @@ const styles: Record<string, React.CSSProperties> = {
   hero: { position: "relative", overflow: "hidden", background: colors.background },
   heroImage: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "68% center" },
   heroCopy: { position: "absolute", zIndex: 1 },
-  heroTitle: { fontFamily: "'Cormorant Garamond', 'Instrument Serif', Georgia, serif", fontWeight: 500, fontSize: "clamp(28px, 4.5vw, 56px)", color: colors.navy, margin: "0 0 12px", lineHeight: 1.05 },
-  heroSub: { fontSize: "clamp(13px, 1.6vw, 16px)", color: colors.muted, margin: 0, lineHeight: 1.5 },
+  heroTitle: { fontFamily: "'Cormorant Garamond', 'Instrument Serif', Georgia, serif", fontWeight: 500, fontSize: 88, color: colors.navy, margin: "0 0 22px", lineHeight: 1.02, maxWidth: 560 },
+  heroSub: { fontSize: 18, color: colors.muted, margin: 0, maxWidth: 420, lineHeight: 1.55 },
   eyebrowSmall: { fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: colors.ultramarine, margin: "0 0 8px" },
   h1: { fontFamily: typography.fontFamily.display, fontSize: 44, margin: "0 0 8px", lineHeight: 1.1 },
   heroCta: {
