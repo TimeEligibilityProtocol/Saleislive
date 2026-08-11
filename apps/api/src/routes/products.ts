@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { autoAnalyzeIfNeeded } from "../lib/autoAnalyze.js";
 import { readLocalAsset, saveUploadedAsset } from "../lib/assetStorage.js";
-import { BACKGROUND_PRESET_KEYS, compositeOntoBackground, removeImageBackground } from "../lib/backgroundRemoval.js";
+import { BACKGROUND_PRESET_KEYS, BACKGROUND_PRESET_META, compositeOntoBackground, removeImageBackground } from "../lib/backgroundRemoval.js";
 import { productsToWorkbookBuffer } from "../lib/exportCatalogue.js";
 import { requireAuth } from "../middleware/auth.js";
 import { logAudit } from "../store/auditLog.js";
@@ -252,7 +252,13 @@ export function adminProductsRouter(anthropicClient: Anthropic | null): Router {
     }),
   );
 
-  /** "Branded background" — composites an already-removed cutout onto a flat brand-colour backdrop. Flat colour presets only (see BACKGROUND_PRESET_KEYS); a generated scene/texture background would need an image-generation API this project doesn't have configured. */
+  /** Keeps a caller-supplied 0-1 fraction inside a sane range regardless of what the client sends — a wild value would otherwise feed straight into sharp's canvas maths below. */
+  function clampFraction(value: unknown, fallback: number, min: number, max: number): number {
+    const n = typeof value === "number" && Number.isFinite(value) ? value : fallback;
+    return Math.min(max, Math.max(min, n));
+  }
+
+  /** "Branded background" — composites an already-removed cutout onto a flat brand-colour backdrop, one of the real photographed scene backgrounds, or a merchant-uploaded custom background (see POST .../backgrounds below), at a caller-chosen position/scale. */
   router.post(
     "/api/brands/:brandId/products/:id/images/apply-background",
     requireAuth,
@@ -261,24 +267,53 @@ export function adminProductsRouter(anthropicClient: Anthropic | null): Router {
       if (!brand) return res.status(400).json({ error: "unknown_brand" });
       const existing = await getProductById(req.params.id);
       if (!existing || existing.brandId !== brand.id) return res.status(404).json({ error: "not_found" });
-      const { url, preset } = req.body as { url?: string; preset?: string };
+      const { url, preset, customBackgroundUrl, offsetX, offsetY, scale } = req.body as {
+        url?: string;
+        preset?: string;
+        customBackgroundUrl?: string;
+        offsetX?: number;
+        offsetY?: number;
+        scale?: number;
+      };
       const source = existing.images.find((i) => i.url === url);
       if (!source) return res.status(400).json({ error: "unknown_image" });
-      if (!preset || !BACKGROUND_PRESET_KEYS.includes(preset)) return res.status(400).json({ error: "unknown_preset" });
+      if (!customBackgroundUrl && (!preset || !BACKGROUND_PRESET_KEYS.includes(preset))) return res.status(400).json({ error: "unknown_preset" });
 
       const asset = await readLocalAsset(source.url);
       if (!asset) return res.status(422).json({ error: "image_unavailable" });
 
-      const composited = await compositeOntoBackground(asset.buffer, preset);
+      const options = {
+        offsetX: clampFraction(offsetX, 0.5, 0.05, 0.95),
+        offsetY: clampFraction(offsetY, 0.5, 0.05, 0.95),
+        scale: clampFraction(scale, 0.72, 0.15, 0.95),
+        customBackgroundUrl,
+      };
+      const composited = await compositeOntoBackground(asset.buffer, preset ?? "white", options);
       const compositedUrl = await saveUploadedAsset(composited, "png", "branded");
-      const image = { url: compositedUrl, alt: `${source.alt} (${preset} background)`, isMain: false };
+      const label = customBackgroundUrl ? "custom background" : `${preset} background`;
+      const image = { url: compositedUrl, alt: `${source.alt} (${label})`, isMain: false };
       const updated = { ...existing, images: [...existing.images, image], updatedAt: new Date().toISOString() };
       await upsertProduct(updated);
       res.status(201).json({ product: updated });
     }),
   );
 
-  router.get("/api/background-presets", (_req, res) => res.json({ presets: BACKGROUND_PRESET_KEYS }));
+  /** Merchant-uploaded custom background — saved exactly like a product photo, then addressable by URL from apply-background's customBackgroundUrl. */
+  router.post(
+    "/api/brands/:brandId/backgrounds",
+    requireAuth,
+    photoUpload.single("file"),
+    asyncHandler(async (req, res) => {
+      const brand = await getBrandById(req.params.brandId);
+      if (!brand) return res.status(400).json({ error: "unknown_brand" });
+      if (!req.file) return res.status(400).json({ error: "missing_file" });
+      const extension = (req.file.originalname.split(".").pop() || "jpg").toLowerCase();
+      const url = await saveUploadedAsset(req.file.buffer, extension, "custom-bg");
+      res.status(201).json({ url });
+    }),
+  );
+
+  router.get("/api/background-presets", (_req, res) => res.json({ presets: BACKGROUND_PRESET_META }));
 
   /** Product Studio's "add another photo" — a product can have several images, not just the one main shot from import. New photos land at the end of the gallery, not main, unless it's the very first photo the product has. */
   router.post(

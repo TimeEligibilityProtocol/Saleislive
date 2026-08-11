@@ -2,6 +2,7 @@ import { removeBackground } from "@imgly/background-removal-node";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
+import { readLocalAsset } from "./assetStorage.js";
 
 /**
  * Ported from Cirka's apps/api/src/routes/backgroundRemoval.ts — same
@@ -68,8 +69,31 @@ const BACKGROUND_IMAGE_PRESETS: Record<string, string> = {
 
 export const BACKGROUND_PRESET_KEYS = [...Object.keys(BACKGROUND_PRESETS), ...Object.keys(BACKGROUND_IMAGE_PRESETS)];
 
-/** Composites a cutout (transparent PNG) onto either a flat brand-colour backdrop or one of the real photographed scene backgrounds, centered with generous margin so the product reads clearly. */
-export async function compositeOntoBackground(cutoutPng: Buffer, presetKey: string): Promise<Buffer> {
+function hex(n: number): string {
+  return n.toString(16).padStart(2, "0");
+}
+
+/** Feeds the admin's visual preset picker (thumbnail grid, not a text dropdown) — the frontend has no other way to know which key is a flat colour vs. which PNG backs an image preset. */
+export type BackgroundPresetMeta = { key: string; kind: "color"; color: string } | { key: string; kind: "image"; thumbnailUrl: string };
+
+export const BACKGROUND_PRESET_META: BackgroundPresetMeta[] = [
+  ...Object.entries(BACKGROUND_PRESETS).map(([key, { r, g, b }]) => ({ key, kind: "color" as const, color: `#${hex(r)}${hex(g)}${hex(b)}` })),
+  ...Object.entries(BACKGROUND_IMAGE_PRESETS).map(([key, file]) => ({ key, kind: "image" as const, thumbnailUrl: `/assets/backgrounds/${file}` })),
+];
+
+export interface CompositeOptions {
+  /** Fraction (0-1) of the canvas where the product's own center should land. 0.5/0.5 reproduces the old always-centered behaviour. */
+  offsetX?: number;
+  offsetY?: number;
+  /** Fraction (0-1) of the canvas the product's longest side should occupy. */
+  scale?: number;
+  /** A merchant-uploaded background image, addressed the same way as a saved product photo (see readLocalAsset). Takes priority over presetKey when set. */
+  customBackgroundUrl?: string;
+}
+
+/** Composites a cutout (transparent PNG) onto either a flat brand-colour backdrop, one of the real photographed scene backgrounds, or a merchant-uploaded custom background — at a caller-chosen position/scale (defaults reproduce the old fixed centering) so the product reads clearly without ever touching the product's own pixels. */
+export async function compositeOntoBackground(cutoutPng: Buffer, presetKey: string, options: CompositeOptions = {}): Promise<Buffer> {
+  const { offsetX = 0.5, offsetY = 0.5, scale = 0.72, customBackgroundUrl } = options;
   const cutout = sharp(cutoutPng);
   const meta = await cutout.metadata();
   const width = meta.width ?? 1200;
@@ -77,16 +101,19 @@ export async function compositeOntoBackground(cutoutPng: Buffer, presetKey: stri
   // Canvas a bit larger than the cutout so the product doesn't touch the edges.
   const canvasSize = Math.round(Math.max(width, height) * 1.35);
   const resized = await cutout
-    .resize({ width: Math.round(canvasSize * 0.72), height: Math.round(canvasSize * 0.72), fit: "inside", withoutEnlargement: false })
+    .resize({ width: Math.round(canvasSize * scale), height: Math.round(canvasSize * scale), fit: "inside", withoutEnlargement: false })
     .toBuffer();
   const resizedMeta = await sharp(resized).metadata();
-  const left = Math.round((canvasSize - (resizedMeta.width ?? 0)) / 2);
-  const top = Math.round((canvasSize - (resizedMeta.height ?? 0)) / 2);
+  const left = Math.round(canvasSize * offsetX - (resizedMeta.width ?? 0) / 2);
+  const top = Math.round(canvasSize * offsetY - (resizedMeta.height ?? 0) / 2);
 
+  const customAsset = customBackgroundUrl ? await readLocalAsset(customBackgroundUrl) : null;
   const imageFile = BACKGROUND_IMAGE_PRESETS[presetKey];
-  const base = imageFile
-    ? sharp(path.join(BACKGROUND_IMAGE_DIR, imageFile)).resize({ width: canvasSize, height: canvasSize, fit: "cover" })
-    : sharp({ create: { width: canvasSize, height: canvasSize, channels: 4, background: { ...(BACKGROUND_PRESETS[presetKey] ?? BACKGROUND_PRESETS.white), alpha: 1 } } });
+  const base = customAsset
+    ? sharp(customAsset.buffer).resize({ width: canvasSize, height: canvasSize, fit: "cover" })
+    : imageFile
+      ? sharp(path.join(BACKGROUND_IMAGE_DIR, imageFile)).resize({ width: canvasSize, height: canvasSize, fit: "cover" })
+      : sharp({ create: { width: canvasSize, height: canvasSize, channels: 4, background: { ...(BACKGROUND_PRESETS[presetKey] ?? BACKGROUND_PRESETS.white), alpha: 1 } } });
 
   return base
     .composite([{ input: resized, left, top }])

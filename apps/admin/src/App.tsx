@@ -17,7 +17,7 @@ import {
   ThemePresetId,
   User,
 } from "@saleis-live/domain";
-import { ApiError, ImportPreview, SetupStepKey, SetupStepView, TeamMemberView } from "@saleis-live/api-client";
+import { ApiError, BackgroundPresetMeta, ImportPreview, SetupStepKey, SetupStepView, TeamMemberView } from "@saleis-live/api-client";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Logo } from "./components/Logo";
 import { apiClient, AUTH_TOKEN_KEY, resolveCatalogueExportUrl, resolveStorefrontPreviewUrl } from "./config/apiClient";
@@ -1699,6 +1699,122 @@ function AddStockPage() {
   );
 }
 
+/** A transparent PNG against this app's own near-white surfaces is visually indistinguishable from an opaque photo at a glance — this makes transparency itself visible, the same way design tools show it. */
+const CHECKERBOARD_BG: React.CSSProperties = {
+  backgroundImage:
+    "linear-gradient(45deg, #e2e2e2 25%, transparent 25%), linear-gradient(-45deg, #e2e2e2 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e2e2e2 75%), linear-gradient(-45deg, transparent 75%, #e2e2e2 75%)",
+  backgroundColor: colors.white,
+  backgroundSize: "16px 16px",
+  backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0px",
+};
+
+type PositionerBackground = { kind: "color"; color: string } | { kind: "image"; url: string } | null;
+
+/**
+ * Canva-style drag-to-move / drag-corner-to-resize product placement. Only ever
+ * moves/scales the whole cutout as a rigid layer (CSS transform, no crop/filter/
+ * re-encode) — the product image itself is never touched, matching what the
+ * server-side compositor will do with the same offsetX/offsetY/scale fractions.
+ */
+function BackgroundPositioner({
+  cutoutUrl,
+  background,
+  offsetX,
+  offsetY,
+  scale,
+  onChange,
+}: {
+  cutoutUrl: string;
+  background: PositionerBackground;
+  offsetX: number;
+  offsetY: number;
+  scale: number;
+  onChange: (next: { offsetX: number; offsetY: number; scale: number }) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ mode: "move" | "resize"; startX: number; startY: number; startOffsetX: number; startOffsetY: number; startScale: number } | null>(null);
+
+  const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
+
+  const beginDrag = (mode: "move" | "resize") => (e: React.PointerEvent) => {
+    e.preventDefault();
+    if (mode === "resize") e.stopPropagation();
+    // Best-effort: capture keeps the drag tracking correctly if the pointer moves fast enough to leave this element, but a capture failure shouldn't block the drag itself.
+    try {
+      (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    dragRef.current = { mode, startX: e.clientX, startY: e.clientY, startOffsetX: offsetX, startOffsetY: offsetY, startScale: scale };
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    const drag = dragRef.current;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!drag || !rect) return;
+    const dx = (e.clientX - drag.startX) / rect.width;
+    const dy = (e.clientY - drag.startY) / rect.height;
+    if (drag.mode === "move") {
+      onChange({ offsetX: clamp(drag.startOffsetX + dx, 0.05, 0.95), offsetY: clamp(drag.startOffsetY + dy, 0.05, 0.95), scale });
+    } else {
+      onChange({ offsetX, offsetY, scale: clamp(drag.startScale + (dx + dy) / 2, 0.15, 0.95) });
+    }
+  };
+
+  const onPointerUp = () => {
+    dragRef.current = null;
+  };
+
+  const backgroundStyle: React.CSSProperties = !background
+    ? CHECKERBOARD_BG
+    : background.kind === "color"
+      ? { background: background.color }
+      : { backgroundImage: `url(${background.url})`, backgroundSize: "cover", backgroundPosition: "center" };
+
+  return (
+    <div
+      ref={containerRef}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerLeave={onPointerUp}
+      style={{ position: "relative", width: "100%", aspectRatio: "1", borderRadius: 10, overflow: "hidden", border: `1px solid ${colors.border}`, ...backgroundStyle }}
+    >
+      <div
+        onPointerDown={beginDrag("move")}
+        title="Drag to move"
+        style={{
+          position: "absolute",
+          left: `${offsetX * 100}%`,
+          top: `${offsetY * 100}%`,
+          width: `${scale * 100}%`,
+          height: `${scale * 100}%`,
+          transform: "translate(-50%, -50%)",
+          cursor: "move",
+          touchAction: "none",
+        }}
+      >
+        <img src={cutoutUrl} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none" }} />
+        <div
+          onPointerDown={beginDrag("resize")}
+          title="Drag to resize"
+          style={{
+            position: "absolute",
+            right: -7,
+            bottom: -7,
+            width: 16,
+            height: 16,
+            borderRadius: 999,
+            background: colors.navy,
+            border: `2px solid ${colors.white}`,
+            cursor: "nwse-resize",
+            touchAction: "none",
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function ProductStudioPage({ productId }: { productId: string }) {
   const [brandId] = useState(() => window.localStorage.getItem(LAST_BRAND_ID_KEY) ?? "b_demo");
   const [product, setProduct] = useState<Product | null>(null);
@@ -1724,20 +1840,37 @@ function ProductStudioPage({ productId }: { productId: string }) {
   const [photoError, setPhotoError] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
-  const [presets, setPresets] = useState<string[]>([]);
+  const [presetsMeta, setPresetsMeta] = useState<BackgroundPresetMeta[]>([]);
   const [preset, setPreset] = useState<string>("white");
+  const [customBgUrl, setCustomBgUrl] = useState<string | null>(null);
+  const [uploadingBg, setUploadingBg] = useState(false);
   const [removingBg, setRemovingBg] = useState(false);
   const [applyingBg, setApplyingBg] = useState(false);
+  const [offsetX, setOffsetX] = useState(0.5);
+  const [offsetY, setOffsetY] = useState(0.5);
+  const [scale, setScale] = useState(0.72);
+  const bgFileInputRef = useRef<HTMLInputElement>(null);
+  // Cutouts have a transparent background — against this page's own near-white
+  // background that can look identical to the original at a glance, so a
+  // click can silently seem to do nothing. This is the only signal that it
+  // didn't: a plain "add a photo" success line would look the same either way.
+  const [photoToolNotice, setPhotoToolNotice] = useState<string | null>(null);
 
   useEffect(() => {
     apiClient
       .listBackgroundPresets()
       .then((p) => {
-        setPresets(p);
-        if (p.length > 0) setPreset(p[0]);
+        setPresetsMeta(p);
+        if (p.length > 0) setPreset(p[0].key);
       })
-      .catch(() => setPresets([]));
+      .catch(() => setPresetsMeta([]));
   }, []);
+
+  const resetPosition = () => {
+    setOffsetX(0.5);
+    setOffsetY(0.5);
+    setScale(0.72);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -1840,12 +1973,38 @@ function ProductStudioPage({ productId }: { productId: string }) {
     if (!url) return;
     setRemovingBg(true);
     setPhotoError(null);
+    setPhotoToolNotice(null);
     try {
-      setProduct(await apiClient.removeImageBackground(brandId, productId, url));
+      const updated = await apiClient.removeImageBackground(brandId, productId, url);
+      const cutout = updated.images[updated.images.length - 1];
+      const withCutoutMain = await apiClient.setMainProductImage(brandId, productId, cutout.url);
+      setProduct(withCutoutMain);
+      resetPosition();
+      setPhotoToolNotice("Background removed — this cutout is now the main photo (shown on a checkered pattern above so the transparency is visible). Pick a background below, then drag it into place.");
     } catch (err) {
       setPhotoError(err instanceof ApiError && err.status === 422 ? "Couldn't find a clear product in that photo — try a different one." : "Background removal failed.");
     } finally {
       setRemovingBg(false);
+    }
+  };
+
+  const onSelectPreset = (key: string) => {
+    setPreset(key);
+    setCustomBgUrl(null);
+    setPhotoToolNotice(null);
+  };
+
+  const onUploadCustomBackground = async (file: File | null) => {
+    if (!file) return;
+    setUploadingBg(true);
+    setPhotoError(null);
+    try {
+      setCustomBgUrl(await apiClient.uploadCustomBackground(brandId, file));
+      setPhotoToolNotice(null);
+    } catch {
+      setPhotoError("Couldn't upload that background.");
+    } finally {
+      setUploadingBg(false);
     }
   };
 
@@ -1856,7 +2015,8 @@ function ProductStudioPage({ productId }: { productId: string }) {
     setApplyingBg(true);
     setPhotoError(null);
     try {
-      setProduct(await apiClient.applyBackgroundPreset(brandId, productId, url, preset));
+      setProduct(await apiClient.applyBackgroundPreset(brandId, productId, url, customBgUrl ? null : preset, { offsetX, offsetY, scale, customBackgroundUrl: customBgUrl ?? undefined }));
+      setPhotoToolNotice("Background applied — added as a new photo in the gallery below.");
     } catch {
       setPhotoError("Couldn't apply that background.");
     } finally {
@@ -1900,11 +2060,12 @@ function ProductStudioPage({ productId }: { productId: string }) {
       <hr style={styles.divider} />
 
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap" }}>
-        <div style={{ ...styles.sectionCard, width: 260, flexShrink: 0 }}>
+        <div style={{ ...styles.sectionCard, width: 320, flexShrink: 0 }}>
           <h2 style={{ ...styles.h1, fontSize: 15, marginBottom: 16 }}>Product media</h2>
           {mainImage ? (
             // objectFit: "contain" (not "cover") — shows the whole photo, never crops it; the box just letterboxes around whatever shape the photo is.
-            <img src={resolveImg(mainImage.url)} alt={mainImage.alt} style={{ width: "100%", aspectRatio: "1", objectFit: "contain", borderRadius: 10, background: colors.background }} />
+            // Checkerboard, not a flat colour: a transparent cutout on a flat surface looks identical to an opaque photo at a glance — see CHECKERBOARD_BG's comment.
+            <img src={resolveImg(mainImage.url)} alt={mainImage.alt} style={{ width: "100%", aspectRatio: "1", objectFit: "contain", borderRadius: 10, ...CHECKERBOARD_BG }} />
           ) : (
             <div
               style={{
@@ -1939,12 +2100,12 @@ function ProductStudioPage({ productId }: { productId: string }) {
                       padding: 0,
                       borderRadius: 8,
                       border: img.isMain ? `2px solid ${colors.navy}` : `1px solid ${colors.border}`,
-                      background: colors.white,
                       cursor: "pointer",
                       overflow: "hidden",
+                      ...CHECKERBOARD_BG,
                     }}
                   >
-                    <img src={resolveImg(img.url)} alt={img.alt} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    <img src={resolveImg(img.url)} alt={img.alt} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
                   </button>
                   {product.images.length > 1 ? (
                     <button
@@ -2006,29 +2167,115 @@ function ProductStudioPage({ productId }: { productId: string }) {
           >
             {removingBg ? "Removing background…" : "Remove background"}
           </button>
-          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-            <select style={{ ...styles.input, padding: "8px 10px", fontSize: 12 }} value={preset} onChange={(e) => setPreset(e.target.value)}>
-              {presets.map((p) => (
-                <option key={p} value={p}>
-                  {p
-                    .split("-")
-                    .map((w) => w[0].toUpperCase() + w.slice(1))
-                    .join(" ")}{" "}
-                  background
-                </option>
-              ))}
-            </select>
+
+          <p style={{ fontSize: 11, fontWeight: 600, color: colors.muted, margin: "12px 0 6px" }}>Choose a background</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {presetsMeta.map((p) => {
+              const active = !customBgUrl && preset === p.key;
+              const label = p.key
+                .split("-")
+                .map((w) => w[0].toUpperCase() + w.slice(1))
+                .join(" ");
+              return (
+                <button
+                  key={p.key}
+                  type="button"
+                  title={`${label} background`}
+                  onClick={() => onSelectPreset(p.key)}
+                  style={{
+                    width: 42,
+                    height: 42,
+                    padding: 0,
+                    borderRadius: 8,
+                    border: active ? `2px solid ${colors.navy}` : `1px solid ${colors.border}`,
+                    cursor: "pointer",
+                    overflow: "hidden",
+                    background: p.kind === "color" ? p.color : undefined,
+                  }}
+                >
+                  {p.kind === "image" ? <img src={apiClient.resolveAssetUrl(p.thumbnailUrl)} alt={label} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
+                </button>
+              );
+            })}
             <button
               type="button"
-              disabled={applyingBg || !mainImage || presets.length === 0}
-              onClick={() => void onApplyBackground()}
-              style={{ ...styles.button, ...styles.buttonAuto, opacity: applyingBg || !mainImage ? 0.5 : 1 }}
+              title="Upload your own background"
+              disabled={uploadingBg}
+              onClick={() => bgFileInputRef.current?.click()}
+              style={{
+                width: 42,
+                height: 42,
+                padding: 0,
+                borderRadius: 8,
+                border: customBgUrl ? `2px solid ${colors.navy}` : `1px dashed ${colors.border}`,
+                cursor: "pointer",
+                background: customBgUrl ? undefined : colors.background,
+                overflow: "hidden",
+                fontSize: 18,
+                color: colors.muted,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: uploadingBg ? 0.5 : 1,
+              }}
             >
-              {applyingBg ? "Applying…" : "Apply"}
+              {customBgUrl ? <img src={apiClient.resolveAssetUrl(customBgUrl)} alt="Custom background" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "+"}
             </button>
+            <input
+              ref={bgFileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                e.target.value = "";
+                void onUploadCustomBackground(file);
+              }}
+            />
           </div>
+
+          {mainImage ? (
+            <div style={{ marginTop: 10 }}>
+              <BackgroundPositioner
+                cutoutUrl={resolveImg(mainImage.url)}
+                background={
+                  customBgUrl
+                    ? { kind: "image", url: apiClient.resolveAssetUrl(customBgUrl) }
+                    : (() => {
+                        const meta = presetsMeta.find((p) => p.key === preset);
+                        if (!meta) return null;
+                        return meta.kind === "color" ? { kind: "color", color: meta.color } : { kind: "image", url: apiClient.resolveAssetUrl(meta.thumbnailUrl) };
+                      })()
+                }
+                offsetX={offsetX}
+                offsetY={offsetY}
+                scale={scale}
+                onChange={(next) => {
+                  setOffsetX(next.offsetX);
+                  setOffsetY(next.offsetY);
+                  setScale(next.scale);
+                }}
+              />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
+                <p style={{ fontSize: 11, color: colors.muted, margin: 0 }}>Drag to move, drag the dot to resize</p>
+                <button type="button" onClick={resetPosition} style={{ ...styles.previewLink, fontSize: 11, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                  Reset position
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            disabled={applyingBg || !mainImage || (presetsMeta.length === 0 && !customBgUrl)}
+            onClick={() => void onApplyBackground()}
+            style={{ ...styles.button, ...styles.buttonAuto, width: "100%", marginTop: 10, opacity: applyingBg || !mainImage ? 0.5 : 1 }}
+          >
+            {applyingBg ? "Applying…" : "Apply background"}
+          </button>
+          {photoToolNotice ? <p style={{ fontSize: 11, color: colors.navy, marginTop: 8 }}>{photoToolNotice}</p> : null}
           <p style={{ fontSize: 11, color: colors.muted, marginTop: 8 }}>
-            Both add a new photo to the gallery above rather than replacing the original — pick "Remove background" first, then set that cutout as main before applying a background to it.
+            "Remove background" makes the cutout the main photo above. "Apply background" adds the result as a new photo in the gallery rather than replacing the cutout.
           </p>
         </div>
 

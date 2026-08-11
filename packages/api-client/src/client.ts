@@ -40,6 +40,9 @@ export interface ProductPhotoAnalysis {
   description: string;
 }
 
+/** Mirrors apps/api's BackgroundPresetMeta (backgroundRemoval.ts) — lets the picker show real swatches/thumbnails instead of a text-only dropdown. */
+export type BackgroundPresetMeta = { key: string; kind: "color"; color: string } | { key: string; kind: "image"; thumbnailUrl: string };
+
 /** Mirrors apps/api's Prisma enums as plain string unions — API-response shapes, not domain objects, same reasoning as ImportColumnMapping above. */
 export type SetupStepKey = "brand_setup" | "stock_intake" | "ai_catalogue_review" | "launch_setup" | "preview_publish";
 export type SetupStepStatus = "not_started" | "in_progress" | "submitted" | "approved" | "rejected";
@@ -270,14 +273,36 @@ export class ApiClient {
     return product;
   }
 
-  async applyBackgroundPreset(brandId: string, id: string, url: string, preset: string): Promise<Product> {
-    const { product } = await this.request<{ product: Product }>(`/api/brands/${brandId}/products/${id}/images/apply-background`, { method: "POST", body: JSON.stringify({ url, preset }) });
+  async applyBackgroundPreset(
+    brandId: string,
+    id: string,
+    url: string,
+    preset: string | null,
+    options?: { offsetX?: number; offsetY?: number; scale?: number; customBackgroundUrl?: string },
+  ): Promise<Product> {
+    const { product } = await this.request<{ product: Product }>(`/api/brands/${brandId}/products/${id}/images/apply-background`, {
+      method: "POST",
+      body: JSON.stringify({ url, preset, ...options }),
+    });
     return product;
   }
 
-  async listBackgroundPresets(): Promise<string[]> {
-    const { presets } = await this.request<{ presets: string[] }>("/api/background-presets");
+  async listBackgroundPresets(): Promise<BackgroundPresetMeta[]> {
+    const { presets } = await this.request<{ presets: BackgroundPresetMeta[] }>("/api/background-presets");
     return presets;
+  }
+
+  /** Product Studio's "upload your own background" — saved the same way as a product photo, then addressable via applyBackgroundPreset's customBackgroundUrl. Raw fetch, not this.request(): see addProductImage's comment on FormData. */
+  async uploadCustomBackground(brandId: string, file: File): Promise<string> {
+    const token = await this.config.getAuthToken?.();
+    const form = new FormData();
+    form.append("file", file);
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`${this.config.baseUrl}/api/brands/${brandId}/backgrounds`, { method: "POST", body: form, headers });
+    if (!res.ok) throw new ApiError(res.status, await res.text());
+    const { url } = (await res.json()) as { url: string };
+    return url;
   }
 
   /** Product Studio's "Suggest with AI" — fetches the product's own image and sends it for real vision analysis. Throws ApiError(503) if ANTHROPIC_API_KEY isn't configured server-side. */
