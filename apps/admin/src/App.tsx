@@ -657,6 +657,8 @@ const LANGUAGES = [
 
 const LAST_BRAND_ID_KEY = "saleislive:lastBrandId";
 const LAST_BRAND_SLUG_KEY = "saleislive:lastBrandSlug";
+/** One-shot banner carried across a hash navigation (e.g. Add Stock → Catalogue Center) — read once on mount, then cleared, so a refresh doesn't keep re-showing it. */
+const CATALOGUE_BANNER_KEY = "saleislive:catalogueBanner";
 
 /**
  * The "New brand" tab's real destination — Ola's "musi być opcja powrotu i
@@ -1329,6 +1331,16 @@ function AddStockPage() {
       setBatch(result.batch);
       setSummary(result.summary);
       await loadProducts(brandId);
+      // No row in this batch carried a photo — send her straight to the products
+      // that need one instead of leaving her to notice and hunt for them later.
+      const hadAnyPhoto = result.batch.rows.some((row) => "images" in row.changes);
+      if (!hadAnyPhoto && result.summary.created + result.summary.updated > 0) {
+        window.sessionStorage.setItem(
+          CATALOGUE_BANNER_KEY,
+          `Done — ${result.summary.created} added, ${result.summary.updated} updated. None of these rows had a photo — add one below for each.`,
+        );
+        window.location.hash = "#/catalogue-center";
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Commit failed.");
     } finally {
@@ -2138,6 +2150,20 @@ function CatalogueCenterPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<CatalogueTab>("attention");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [uploadingPhotoFor, setUploadingPhotoFor] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  // One-shot: carried from Add Stock after a photo-less Excel import (see onCommit) — read once, then gone, so refreshing this page doesn't keep re-showing it.
+  // Must live in an effect, not a useState initializer — React 18 StrictMode double-invokes initializers in dev, and the second call would find sessionStorage already cleared by the first.
+  const [banner, setBanner] = useState<string | null>(null);
+  useEffect(() => {
+    const msg = window.sessionStorage.getItem(CATALOGUE_BANNER_KEY);
+    if (msg) {
+      window.sessionStorage.removeItem(CATALOGUE_BANNER_KEY);
+      setBanner(msg);
+    }
+  }, []);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const photoTargetRef = useRef<string | null>(null);
 
   const reloadProducts = () => apiClient.listBrandProducts(brandId).then(setProducts);
 
@@ -2169,16 +2195,41 @@ function CatalogueCenterPage() {
     }
   };
 
+  const handleAddPhotoClick = (productId: string) => {
+    photoTargetRef.current = productId;
+    photoInputRef.current?.click();
+  };
+
+  const handlePhotoFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const productId = photoTargetRef.current;
+    e.target.value = "";
+    if (!file || !productId) return;
+    setUploadingPhotoFor(productId);
+    setPhotoError(null);
+    try {
+      await apiClient.addProductImage(brandId, productId, file);
+      await reloadProducts();
+    } catch {
+      setPhotoError("Couldn't upload that photo. Try again.");
+    } finally {
+      setUploadingPhotoFor(null);
+    }
+  };
+
   if (loading) return <p style={styles.sub}>Loading…</p>;
 
   const all = products ?? [];
   const ready = all.filter(isCatalogueReady);
   const needsAttention = all.filter((p) => !isCatalogueReady(p));
   const missingPhoto = all.filter((p) => p.images.length === 0);
-  const rows = tab === "ready" ? ready : tab === "all" ? all : needsAttention;
+  const unsorted = tab === "ready" ? ready : tab === "all" ? all : needsAttention;
+  // Missing-photo rows first — that's the fix most merchants are here to make in one pass.
+  const rows = [...unsorted].sort((a, b) => Number(a.images.length > 0) - Number(b.images.length > 0));
 
   return (
     <div>
+      <input ref={photoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhotoFileChosen} />
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
         <div>
           <h1 style={styles.h1}>Check your products</h1>
@@ -2188,6 +2239,10 @@ function CatalogueCenterPage() {
           Export to Excel
         </a>
       </div>
+      {banner && (
+        <p style={{ fontSize: 13, color: colors.navy, background: colors.bluepale, padding: "10px 14px", borderRadius: 8, marginTop: 12 }}>{banner}</p>
+      )}
+      {photoError && <p style={{ fontSize: 13, color: colors.error, marginTop: 12 }}>{photoError}</p>}
       <hr style={styles.divider} />
 
       <div style={styles.tileGrid}>
@@ -2234,12 +2289,23 @@ function CatalogueCenterPage() {
               <tbody>
                 {rows.map((p) => {
                   const issues = describeProductIssues(p);
+                  const missingPhotoRow = p.images.length === 0;
                   return (
                     <tr key={p.id}>
                       <td style={styles.td}>{p.name.value ?? "—"}</td>
                       <td style={styles.td}>{p.sku}</td>
                       <td style={{ ...styles.td, fontSize: 11, color: issues.length ? colors.error : colors.success }}>{issues.length ? issues.join(", ") : "All good"}</td>
                       <td style={{ ...styles.td, display: "flex", gap: 12, alignItems: "center" }}>
+                        {missingPhotoRow && (
+                          <button
+                            type="button"
+                            onClick={() => handleAddPhotoClick(p.id)}
+                            disabled={uploadingPhotoFor === p.id}
+                            style={{ background: "none", border: `1px solid ${colors.navy}`, color: colors.navy, fontSize: 12, cursor: "pointer", padding: "4px 10px", borderRadius: 999 }}
+                          >
+                            {uploadingPhotoFor === p.id ? "Uploading…" : "Add photo"}
+                          </button>
+                        )}
                         <a href={`#/products/${encodeURIComponent(p.id)}`} style={styles.previewLink}>
                           Fix in Product Studio →
                         </a>
