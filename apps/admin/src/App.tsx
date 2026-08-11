@@ -1226,10 +1226,84 @@ const IMPORT_FIELD_LABELS: Record<keyof ParsedImportRow, string> = {
   imageUrl: "Image",
 };
 
+/** The two ways stock actually enters the catalogue — a spreadsheet, or photos with AI filling the details. A third "add manually" form used to exist as a separate card; it's gone because every product still needs a photo to publish either way, so a single photo *is* the manual-add flow, just with AI doing more of the typing. */
+type StockIntakeMethod = "excel" | "photos";
+
+function StockIntakeCard({
+  active,
+  onToggle,
+  icon,
+  title,
+  description,
+  children,
+}: {
+  active: boolean;
+  onToggle: () => void;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ ...styles.sectionCard, marginTop: 16, padding: 0, overflow: "hidden" }}>
+      <button
+        type="button"
+        onClick={onToggle}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+          width: "100%",
+          padding: "20px 24px",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          textAlign: "left",
+        }}
+      >
+        <div style={{ flexShrink: 0, width: 40, height: 40, borderRadius: 10, background: colors.bluepale, display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</div>
+        <div style={{ flex: 1 }}>
+          <p style={{ ...styles.h1, fontSize: 16, margin: 0 }}>{title}</p>
+          <p style={{ ...styles.sub, margin: "2px 0 0" }}>{description}</p>
+        </div>
+        <span style={{ fontSize: 20, color: colors.muted, transform: active ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }}>⌄</span>
+      </button>
+      {active && <div style={{ padding: "0 24px 24px" }}>{children}</div>}
+    </div>
+  );
+}
+
+function SpreadsheetIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={colors.navy} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 9h18M9 9v11" />
+    </svg>
+  );
+}
+
+function PhotosIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={colors.navy} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="6" width="15" height="14" rx="2" />
+      <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h7A1.5 1.5 0 0 1 18 4.5V16" />
+      <circle cx="10.5" cy="13" r="2" />
+    </svg>
+  );
+}
+
+function AiBadge() {
+  return (
+    <span style={{ ...styles.pill, background: colors.bluepale, color: colors.navy, fontSize: 10, fontWeight: 700, letterSpacing: 0.3 }}>✦ AI</span>
+  );
+}
+
 function AddStockPage() {
   const [brandId] = useState(() => window.localStorage.getItem(LAST_BRAND_ID_KEY) ?? "b_demo");
   const [brandSlug] = useState(() => window.localStorage.getItem(LAST_BRAND_SLUG_KEY));
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeMethod, setActiveMethod] = useState<StockIntakeMethod | null>(null);
+  const toggleMethod = (m: StockIntakeMethod) => setActiveMethod((cur) => (cur === m ? null : m));
 
   const [batch, setBatch] = useState<ImportBatch | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -1244,17 +1318,6 @@ function AddStockPage() {
   const [excelPreview, setExcelPreview] = useState<ImportPreview | null>(null);
   const [excelFieldByHeader, setExcelFieldByHeader] = useState<Record<string, string>>({});
   const [previewing, setPreviewing] = useState(false);
-
-  const [manualSku, setManualSku] = useState("");
-  const [manualName, setManualName] = useState("");
-  const [manualCategory, setManualCategory] = useState("");
-  const [manualSize, setManualSize] = useState("");
-  const [manualDimensions, setManualDimensions] = useState("");
-  const [manualPrice, setManualPrice] = useState("");
-  const [manualStock, setManualStock] = useState("");
-  const [manualImageUrl, setManualImageUrl] = useState("");
-  const [manualSubmitting, setManualSubmitting] = useState(false);
-  const [manualSaved, setManualSaved] = useState<Product | null>(null);
 
   const photosInputRef = useRef<HTMLInputElement>(null);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
@@ -1348,38 +1411,6 @@ function AddStockPage() {
     }
   };
 
-  const onManualSubmit = async () => {
-    if (!manualSku.trim()) return;
-    setManualSubmitting(true);
-    setError(null);
-    try {
-      const product = await apiClient.createManualProduct(brandId, {
-        sku: manualSku.trim(),
-        name: manualName || undefined,
-        category: manualCategory || undefined,
-        size: manualSize || undefined,
-        dimensions: manualDimensions || undefined,
-        price: manualPrice || undefined,
-        stock: manualStock || undefined,
-        imageUrl: manualImageUrl || undefined,
-      });
-      setManualSaved(product);
-      setManualSku("");
-      setManualName("");
-      setManualCategory("");
-      setManualSize("");
-      setManualDimensions("");
-      setManualPrice("");
-      setManualStock("");
-      setManualImageUrl("");
-      await loadProducts(brandId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't save that product.");
-    } finally {
-      setManualSubmitting(false);
-    }
-  };
-
   const onPhotosPicked = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setUploadingPhotos(true);
@@ -1426,137 +1457,104 @@ function AddStockPage() {
         }}
       />
 
-      <div style={{ ...styles.sectionCard, marginTop: 24 }}>
-        <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 4 }}>Excel / CSV</h2>
-
-          {!excelPreview ? (
-            <>
-              <p style={{ ...styles.sub, marginBottom: 0 }}>Upload a file — nothing changes in your catalogue until you review and confirm the mapping.</p>
-              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
-                <button style={{ ...styles.button, ...styles.buttonAuto, opacity: previewing ? 0.4 : 1 }} disabled={previewing} onClick={() => fileInputRef.current?.click()}>
-                  {previewing ? "Reading…" : "Choose file"}
-                </button>
-              </div>
-            </>
-          ) : batch ? (
-            <>
-              <p style={{ ...styles.sub, marginBottom: 0 }}>Mapping confirmed for {excelFile?.name} — review the staged rows below.</p>
-              <button type="button" onClick={onPickDifferentFile} style={{ ...styles.previewLink, marginTop: 12, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                Start a new import
+      <StockIntakeCard
+        active={activeMethod === "excel"}
+        onToggle={() => toggleMethod("excel")}
+        icon={<SpreadsheetIcon />}
+        title="Upload your spreadsheet"
+        description="Have an Excel or CSV of your products? Photos pasted into the file are picked up automatically."
+      >
+        {!excelPreview ? (
+          <>
+            <p style={{ ...styles.sub, marginBottom: 0 }}>Upload a file — nothing changes in your catalogue until you review and confirm the mapping.</p>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+              <button style={{ ...styles.button, ...styles.buttonAuto, opacity: previewing ? 0.4 : 1 }} disabled={previewing} onClick={() => fileInputRef.current?.click()}>
+                {previewing ? "Reading…" : "Choose file"}
               </button>
-            </>
-          ) : (
-            <>
-              <p style={{ ...styles.sub, marginBottom: 4 }}>
-                {excelFile?.name} — {excelPreview.rowCount} rows. Review what each column maps to before we process anything.
-              </p>
-              <div style={{ overflowX: "auto", marginTop: 12 }}>
-                <table style={styles.table}>
-                  <thead>
-                    <tr>
-                      <th style={styles.th}>Source column</th>
-                      <th style={styles.th}>Saleis.live field</th>
-                      <th style={styles.th}>Example</th>
-                      <th style={styles.th}>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {excelPreview.headers.map((header) => {
-                      const currentField = excelFieldByHeader[header] ?? "";
-                      const autoField = Object.entries(excelPreview.mapping.fields).find(([, h]) => h === header)?.[0];
-                      const status = !currentField ? "Unmapped" : currentField === autoField ? "Matched" : "Mapped manually";
-                      return (
-                        <tr key={header}>
-                          <td style={styles.td}>{header}</td>
-                          <td style={styles.td}>
-                            <select
-                              style={{ ...styles.input, padding: "6px 8px", fontSize: 12 }}
-                              value={currentField}
-                              onChange={(e) => setExcelFieldByHeader((prev) => ({ ...prev, [header]: e.target.value }))}
-                            >
-                              <option value="">— Ignore —</option>
-                              {(Object.entries(IMPORT_FIELD_LABELS) as [keyof ParsedImportRow, string][]).map(([field, label]) => (
-                                <option key={field} value={field}>
-                                  {label}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td style={{ ...styles.td, fontSize: 11, color: colors.muted }}>{excelPreview.exampleRow[header] || "—"}</td>
-                          <td style={styles.td}>
-                            <span style={{ ...styles.pill, background: status === "Unmapped" ? colors.pale : colors.bluepale, color: status === "Unmapped" ? colors.muted : colors.navy }}>{status}</span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              {!Object.values(excelFieldByHeader).includes("sku") ? <p style={{ ...styles.error, marginTop: 12 }}>Map a column to SKU before continuing — it's required to match products.</p> : null}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
-                <button type="button" onClick={onPickDifferentFile} style={{ ...styles.previewLink, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                  Choose a different file
-                </button>
-                <button
-                  style={{ ...styles.button, ...styles.buttonAuto, opacity: uploading || !Object.values(excelFieldByHeader).includes("sku") ? 0.4 : 1 }}
-                  disabled={uploading || !Object.values(excelFieldByHeader).includes("sku")}
-                  onClick={onConfirmMapping}
-                >
-                  {uploading ? "Processing…" : "Confirm & process"}
-                </button>
-              </div>
-            </>
-          )}
-      </div>
-
-      <div style={{ ...styles.sectionCard, marginTop: 24 }}>
-          <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 4 }}>Add one product by hand</h2>
-          <p style={{ ...styles.sub, marginBottom: 12 }}>For a single item, or to fix one thing without redoing the whole file.</p>
-          <div style={styles.fieldGrid}>
-            <div>
-              <label style={styles.label}>SKU *</label>
-              <input style={styles.input} value={manualSku} onChange={(e) => setManualSku(e.target.value)} placeholder="e.g. MN-001" />
             </div>
-            <div>
-              <label style={styles.label}>Name</label>
-              <input style={styles.input} value={manualName} onChange={(e) => setManualName(e.target.value)} />
-            </div>
-            <div>
-              <label style={styles.label}>Category</label>
-              <input style={styles.input} value={manualCategory} onChange={(e) => setManualCategory(e.target.value)} />
-            </div>
-            <div>
-              <label style={styles.label}>Size</label>
-              <input style={styles.input} value={manualSize} onChange={(e) => setManualSize(e.target.value)} placeholder="e.g. S/M, 37–41" />
-            </div>
-            <div>
-              <label style={styles.label}>Dimensions</label>
-              <input style={styles.input} value={manualDimensions} onChange={(e) => setManualDimensions(e.target.value)} placeholder="e.g. 30 x 20 x 10 cm" />
-            </div>
-            <div>
-              <label style={styles.label}>Price</label>
-              <input style={styles.input} value={manualPrice} onChange={(e) => setManualPrice(e.target.value)} placeholder="e.g. 460" />
-            </div>
-            <div>
-              <label style={styles.label}>Stock</label>
-              <input style={styles.input} value={manualStock} onChange={(e) => setManualStock(e.target.value)} placeholder="e.g. 6" />
-            </div>
-            <div>
-              <label style={styles.label}>Image URL</label>
-              <input style={styles.input} value={manualImageUrl} onChange={(e) => setManualImageUrl(e.target.value)} placeholder="optional" />
-            </div>
-          </div>
-          {manualSaved ? <p style={{ ...styles.sub, color: colors.success, fontWeight: 600, marginTop: 16, marginBottom: 0 }}>Saved — {manualSaved.sku} is in your catalogue as a draft.</p> : null}
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
-            <button style={{ ...styles.button, ...styles.buttonAuto, opacity: manualSubmitting || !manualSku.trim() ? 0.4 : 1 }} disabled={manualSubmitting || !manualSku.trim()} onClick={onManualSubmit}>
-              {manualSubmitting ? "Saving…" : "Add product"}
+          </>
+        ) : batch ? (
+          <>
+            <p style={{ ...styles.sub, marginBottom: 0 }}>Mapping confirmed for {excelFile?.name} — review the staged rows below.</p>
+            <button type="button" onClick={onPickDifferentFile} style={{ ...styles.previewLink, marginTop: 12, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+              Start a new import
             </button>
-          </div>
-      </div>
+          </>
+        ) : (
+          <>
+            <p style={{ ...styles.sub, marginBottom: 4 }}>
+              {excelFile?.name} — {excelPreview.rowCount} rows. Review what each column maps to before we process anything.
+            </p>
+            <div style={{ overflowX: "auto", marginTop: 12 }}>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Source column</th>
+                    <th style={styles.th}>Saleis.live field</th>
+                    <th style={styles.th}>Example</th>
+                    <th style={styles.th}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {excelPreview.headers.map((header) => {
+                    const currentField = excelFieldByHeader[header] ?? "";
+                    const autoField = Object.entries(excelPreview.mapping.fields).find(([, h]) => h === header)?.[0];
+                    const status = !currentField ? "Unmapped" : currentField === autoField ? "AI matched" : "Mapped manually";
+                    return (
+                      <tr key={header}>
+                        <td style={styles.td}>{header}</td>
+                        <td style={styles.td}>
+                          <select
+                            style={{ ...styles.input, padding: "6px 8px", fontSize: 12 }}
+                            value={currentField}
+                            onChange={(e) => setExcelFieldByHeader((prev) => ({ ...prev, [header]: e.target.value }))}
+                          >
+                            <option value="">— Ignore —</option>
+                            {(Object.entries(IMPORT_FIELD_LABELS) as [keyof ParsedImportRow, string][]).map(([field, label]) => (
+                              <option key={field} value={field}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td style={{ ...styles.td, fontSize: 11, color: colors.muted }}>{excelPreview.exampleRow[header] || "—"}</td>
+                        <td style={styles.td}>
+                          <span style={{ ...styles.pill, background: status === "Unmapped" ? colors.pale : colors.bluepale, color: status === "Unmapped" ? colors.muted : colors.navy }}>{status}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {!Object.values(excelFieldByHeader).includes("sku") ? <p style={{ ...styles.error, marginTop: 12 }}>Map a column to SKU before continuing — it's required to match products.</p> : null}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
+              <button type="button" onClick={onPickDifferentFile} style={{ ...styles.previewLink, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                Choose a different file
+              </button>
+              <button
+                style={{ ...styles.button, ...styles.buttonAuto, opacity: uploading || !Object.values(excelFieldByHeader).includes("sku") ? 0.4 : 1 }}
+                disabled={uploading || !Object.values(excelFieldByHeader).includes("sku")}
+                onClick={onConfirmMapping}
+              >
+                {uploading ? "Processing…" : "Confirm & process"}
+              </button>
+            </div>
+          </>
+        )}
+      </StockIntakeCard>
 
-      <div style={{ ...styles.sectionCard, marginTop: 24 }}>
-        <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 4 }}>Upload photos</h2>
-        <p style={{ ...styles.sub, marginBottom: 12 }}>No spreadsheet — just photos, from a folder or your phone. Each one becomes a draft product; AI fills in what it can see. You still set price and stock afterward.</p>
+      <StockIntakeCard
+        active={activeMethod === "photos"}
+        onToggle={() => toggleMethod("photos")}
+        icon={<PhotosIcon />}
+        title="Add photos"
+        description="One item or many — no spreadsheet needed. AI reads each photo and fills in the details."
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <AiBadge />
+          <p style={{ ...styles.sub, margin: 0 }}>Each photo becomes a draft product with category, colour, material and description already filled in — you review and set price and stock afterward.</p>
+        </div>
         <input
           ref={photosInputRef}
           type="file"
@@ -1586,7 +1584,7 @@ function AddStockPage() {
             </a>
           </p>
         ) : null}
-      </div>
+      </StockIntakeCard>
 
       {error ? <p style={styles.error}>{error}</p> : null}
 
