@@ -2010,7 +2010,11 @@ function ProductStudioPage({ productId }: { productId: string }) {
             <select style={{ ...styles.input, padding: "8px 10px", fontSize: 12 }} value={preset} onChange={(e) => setPreset(e.target.value)}>
               {presets.map((p) => (
                 <option key={p} value={p}>
-                  {p[0].toUpperCase() + p.slice(1)} background
+                  {p
+                    .split("-")
+                    .map((w) => w[0].toUpperCase() + w.slice(1))
+                    .join(" ")}{" "}
+                  background
                 </option>
               ))}
             </select>

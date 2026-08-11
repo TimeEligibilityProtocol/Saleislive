@@ -50,11 +50,26 @@ const BACKGROUND_PRESETS: Record<string, { r: number; g: number; b: number }> = 
   navy: { r: 23, g: 59, b: 143 },
 };
 
-export const BACKGROUND_PRESET_KEYS = Object.keys(BACKGROUND_PRESETS);
+/**
+ * Real photographed backdrops (Ola's own source images, from
+ * SALEIS.LIVE/assets/backgrounds) — studio-style scenes with their own
+ * lighting/shadow, not a flat-colour fill. Filenames double as the label
+ * shown in the admin dropdown (see api-client's listBackgroundPresets doc).
+ */
+const BACKGROUND_IMAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "public", "assets", "backgrounds");
+const BACKGROUND_IMAGE_PRESETS: Record<string, string> = {
+  "stone-texture": "01-stone-texture.png",
+  studio: "02-studio.png",
+  "architectural-niche": "03-architectural-niche.png",
+  "light-halo": "04-light-halo.png",
+  "palm-shadow": "05-palm-shadow.png",
+  "glass-light": "06-glass-light.png",
+};
 
-/** Composites a cutout (transparent PNG) onto a flat brand-colour backdrop, centered with generous margin so the product reads clearly. Simple flat-colour presets only — no scene/texture generation, which would need a real image-generation API this project doesn't have configured. */
+export const BACKGROUND_PRESET_KEYS = [...Object.keys(BACKGROUND_PRESETS), ...Object.keys(BACKGROUND_IMAGE_PRESETS)];
+
+/** Composites a cutout (transparent PNG) onto either a flat brand-colour backdrop or one of the real photographed scene backgrounds, centered with generous margin so the product reads clearly. */
 export async function compositeOntoBackground(cutoutPng: Buffer, presetKey: string): Promise<Buffer> {
-  const color = BACKGROUND_PRESETS[presetKey] ?? BACKGROUND_PRESETS.white;
   const cutout = sharp(cutoutPng);
   const meta = await cutout.metadata();
   const width = meta.width ?? 1200;
@@ -68,7 +83,12 @@ export async function compositeOntoBackground(cutoutPng: Buffer, presetKey: stri
   const left = Math.round((canvasSize - (resizedMeta.width ?? 0)) / 2);
   const top = Math.round((canvasSize - (resizedMeta.height ?? 0)) / 2);
 
-  return sharp({ create: { width: canvasSize, height: canvasSize, channels: 4, background: { ...color, alpha: 1 } } })
+  const imageFile = BACKGROUND_IMAGE_PRESETS[presetKey];
+  const base = imageFile
+    ? sharp(path.join(BACKGROUND_IMAGE_DIR, imageFile)).resize({ width: canvasSize, height: canvasSize, fit: "cover" })
+    : sharp({ create: { width: canvasSize, height: canvasSize, channels: 4, background: { ...(BACKGROUND_PRESETS[presetKey] ?? BACKGROUND_PRESETS.white), alpha: 1 } } });
+
+  return base
     .composite([{ input: resized, left, top }])
     .png()
     .toBuffer();
