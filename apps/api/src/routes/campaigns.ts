@@ -4,7 +4,7 @@ import { asyncHandler } from "../lib/asyncHandler.js";
 import { requireAuth } from "../middleware/auth.js";
 import { logAudit } from "../store/auditLog.js";
 import { getCampaignById, getOrCreateCurrentCampaign, updateCampaign } from "../store/campaigns.js";
-import { getBrandById, updateBrandPolicies } from "../store/tenants.js";
+import { getBrandById, publishBrand, updateBrandPolicies } from "../store/tenants.js";
 
 /**
  * Screen 06 (Launch Studio) — Sale + Store + Policies tabs. Payments and
@@ -46,6 +46,11 @@ export function campaignsRouter(): Router {
       const updated = await updateCampaign(req.params.id, body);
       if (!updated) return res.status(404).json({ error: "not_found" });
       if (body.status === "live" && before?.status !== "live") {
+        // The moment a merchant's very first sale actually goes live is also
+        // the moment their storefront should stop being preview-only and
+        // start serving real customers (routes/storefront.ts) — publishing
+        // a campaign with no public store behind it would be a silent no-op.
+        await publishBrand(updated.brandId);
         await logAudit({ tenantId: updated.tenantId, brandId: updated.brandId, userId: req.user!.id, action: "campaign.published", entityType: "campaign", entityId: updated.id, metadata: { name: updated.name, slug: updated.slug } });
       }
       res.json({ campaign: updated });

@@ -31,4 +31,28 @@ function resolveBrandSlugOverride(): string | null {
   return new URLSearchParams(window.location.search).get("brand");
 }
 
-export const apiClient = new ApiClient({ baseUrl: resolveApiBaseUrl(), brandSlug: resolveBrandSlugOverride() });
+const PREVIEW_TOKEN_KEY = "saleislive:previewToken";
+
+/**
+ * The admin app's "Preview your store" link carries the owner's own
+ * session token in the URL *fragment* (see resolveStorefrontPreviewUrl's
+ * doc comment) — never in a query param, so it never reaches server
+ * access logs. Read it once on load, stash it for the rest of this tab's
+ * session, then scrub it from the visible URL so it doesn't linger in
+ * browser history or get shared if the link is copied.
+ */
+function capturePreviewToken(): void {
+  if (typeof window === "undefined") return;
+  const match = /(?:^|#)preview_token=([^&]+)/.exec(window.location.hash);
+  if (!match) return;
+  window.sessionStorage.setItem(PREVIEW_TOKEN_KEY, decodeURIComponent(match[1]));
+  window.history.replaceState(null, "", window.location.pathname + window.location.search);
+}
+capturePreviewToken();
+
+export const apiClient = new ApiClient({
+  baseUrl: resolveApiBaseUrl(),
+  brandSlug: resolveBrandSlugOverride(),
+  // eslint-disable-next-line @typescript-eslint/require-await
+  getAuthToken: async () => window.sessionStorage.getItem(PREVIEW_TOKEN_KEY),
+});

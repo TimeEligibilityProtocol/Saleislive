@@ -93,11 +93,25 @@ export async function createBrand(
       currency: input.currency,
       language: input.language,
       secondaryLanguage: input.secondaryLanguage,
-      status: "active",
+      // Not "active" — a brand new to the platform has no products yet and
+      // must not be reachable by real customers until its owner explicitly
+      // goes live (see publishBrand). The demo brand is the one deliberate
+      // exception, seeded "active" above so it stays public.
+      status: "draft",
       slugVerified: false,
     },
   });
   return toDomainBrand(row);
+}
+
+/** Called the moment a brand's Launch Studio campaign first goes live (routes/campaigns.ts) — this is what actually makes the public storefront serve real catalog data instead of a "coming soon" page (routes/storefront.ts). */
+export async function publishBrand(id: string): Promise<Brand | undefined> {
+  try {
+    const row = await prisma.brand.update({ where: { id }, data: { status: "active" } });
+    return toDomainBrand(row);
+  } catch {
+    return undefined;
+  }
 }
 
 /** Editing an already-created brand's step-1 fields — everything from screen 01 except the slug, which storefront URLs already depend on so it stays fixed once created. */

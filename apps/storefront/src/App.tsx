@@ -48,6 +48,7 @@ type CheckoutInfo = { name: string; phone: string; location: string; deliveryMet
 export function App() {
   const [state, setState] = useState<LoadState>("loading");
   const [brand, setBrand] = useState<Brand | null>(null);
+  const [previewing, setPreviewing] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [checkoutInfo, setCheckoutInfo] = useState<CheckoutInfo>({ name: "", phone: "", location: "", deliveryMethod: "courier" });
@@ -57,8 +58,9 @@ export function App() {
   useEffect(() => {
     apiClient
       .getCurrentStorefrontBrand()
-      .then((b) => {
+      .then(({ brand: b, previewing: p }) => {
         setBrand(b);
+        setPreviewing(p);
         return apiClient.listStorefrontProducts();
       })
       .then((p) => {
@@ -83,6 +85,21 @@ export function App() {
           <p style={{ fontSize: 13, color: "#8A8578" }}>
             Try <code>demo.{window.location.host.replace(/^[^.]*\./, "")}</code>
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Not gated on the products list (an already-live brand can legitimately
+  // have an empty catalogue) — brand.status is the actual publish state,
+  // server-enforced in routes/storefront.ts, not inferred client-side.
+  const notPublished = brand.status !== "active";
+  if (notPublished && !previewing) {
+    return (
+      <div style={styles.centeredPage}>
+        <div style={{ textAlign: "center" }}>
+          <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>{brand.name}</p>
+          <p style={{ fontSize: 14, color: "#8A8578" }}>This store isn't live yet — check back soon.</p>
         </div>
       </div>
     );
@@ -137,6 +154,11 @@ export function App() {
           .storefront-brand-placeholder-short { display: inline-block; }
         }
       `}</style>
+      {notPublished && previewing ? (
+        <div style={{ background: "#173B8F", color: "#fff", textAlign: "center", fontSize: 12, fontWeight: 700, padding: "6px 12px" }}>
+          PREVIEW — this store is not public yet. Only you can see this.
+        </div>
+      ) : null}
       <header style={styles.header}>
         <a href="#/" style={{ ...styles.brandLockup, minWidth: 0 }}>
           <span className="storefront-logo" style={{ display: "inline-flex" }}>

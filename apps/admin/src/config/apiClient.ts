@@ -18,19 +18,25 @@ function resolveApiBaseUrl(): string {
 }
 
 /**
- * Where the buyer-facing storefront lives — used only to build a "preview
- * your store" link right after brand creation. Real per-brand subdomains
- * (chanel.saleis.live) need wildcard DNS that isn't wired up yet, so
- * until then the link points at the shared storefront with ?brand=slug,
- * which actually works today instead of 404ing.
+ * Where the buyer-facing storefront lives — used to build a "preview your
+ * store" link. Real per-brand subdomains (chanel.saleis.live) need
+ * wildcard DNS that isn't wired up yet, so until then the link points at
+ * the shared storefront with ?brand=slug, which actually works today
+ * instead of 404ing. The caller's own session token rides along in the
+ * URL *fragment* (never sent to any server, unlike a query param) so the
+ * storefront can prove to the API it's the brand's own owner previewing —
+ * a not-yet-published brand (see publishBrand) otherwise shows a "coming
+ * soon" page to everyone, including this same link with the token missing
+ * or wrong. See apps/storefront/src/config/apiClient.ts for the read side.
  */
-export function resolveStorefrontPreviewUrl(slug: string): string {
+export function resolveStorefrontPreviewUrl(slug: string, previewToken: string | null): string {
+  const fragment = previewToken ? `#preview_token=${encodeURIComponent(previewToken)}` : "";
   const override = import.meta.env.VITE_STOREFRONT_BASE_URL;
-  if (override) return `${override}/?brand=${encodeURIComponent(slug)}`;
+  if (override) return `${override}/?brand=${encodeURIComponent(slug)}${fragment}`;
   if (typeof window !== "undefined" && (window.location?.hostname === "localhost" || window.location?.hostname?.endsWith(".localhost"))) {
-    return `http://${window.location.hostname}:5274/?brand=${encodeURIComponent(slug)}`;
+    return `http://${window.location.hostname}:5274/?brand=${encodeURIComponent(slug)}${fragment}`;
   }
-  return `https://demo.saleis.live/?brand=${encodeURIComponent(slug)}`;
+  return `https://demo.saleis.live/?brand=${encodeURIComponent(slug)}${fragment}`;
 }
 
 export const AUTH_TOKEN_KEY = "saleislive:authToken";

@@ -115,3 +115,18 @@ export interface Product {
   createdAt: string;
   updatedAt: string;
 }
+
+/**
+ * The single source of truth for "is this product complete enough to sell" —
+ * shared by the server (which auto-derives `status` from it on every save,
+ * so "active" always means "actually ready", not "someone once clicked
+ * Approve") and the admin catalogue table (which uses it to sort/filter and
+ * to show the same status the merchant would see on the product itself).
+ * Deliberately broader than a bare "can this appear on the storefront at
+ * all" check (photo/name/price>0) — also requires the catalogue-completeness
+ * fields (category/colour/material) a merchant would expect a "ready"
+ * product to have filled in.
+ */
+export function isCatalogueReady(product: Product): boolean {
+  return product.images.length > 0 && product.name.value != null && product.price.amountMinor > 0 && !!product.category.value && !!product.color.value && !!product.material.value;
+}

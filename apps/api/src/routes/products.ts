@@ -1,4 +1,4 @@
-import { buildProductFromImportRow, editField, ParsedImportRow, Product } from "@saleis-live/domain";
+import { buildProductFromImportRow, editField, isCatalogueReady, ParsedImportRow, Product } from "@saleis-live/domain";
 import Anthropic from "@anthropic-ai/sdk";
 import { Router } from "express";
 import multer from "multer";
@@ -157,12 +157,18 @@ export function adminProductsRouter(anthropicClient: Anthropic | null): Router {
   );
 
   /**
-   * Screen 05 (Product Studio) — "Save" edits fields without touching
-   * status; "Approve" (approve: true) also flips status to "active",
-   * which is what makes a product visible on the storefront (see
-   * listProductsForBrand's filter in store/products.ts). SKU is
-   * deliberately not editable here — it's the stable identity re-imports
-   * match on (blueprint §4), changing it is a delete+recreate, not an edit.
+   * Screen 05 (Product Studio) — "Save" edits fields and re-derives
+   * `status` from isCatalogueReady on every save: a product becomes
+   * "active" (visible on the storefront, see listProductsForBrand's
+   * filter in store/products.ts) the moment it's actually complete, and
+   * drops back to "draft" if a later edit makes it incomplete again.
+   * There is deliberately no separate manual "approve" step — a status
+   * the merchant can't see anywhere used to require a click that did
+   * nothing visible, which is exactly the confusion this replaced (Ola,
+   * 2026-08-11: "I don't know where that shows up... I don't understand
+   * which ones are accepted"). SKU is deliberately not editable here —
+   * it's the stable identity re-imports match on (blueprint §4), changing
+   * it is a delete+recreate, not an edit.
    */
   router.patch(
     "/api/brands/:brandId/products/:id",
@@ -184,12 +190,11 @@ export function adminProductsRouter(anthropicClient: Anthropic | null): Router {
         price: number;
         salePrice: number;
         stock: number;
-        approve: boolean;
       }>;
       const now = new Date().toISOString();
       const editOpts = { updatedBy: "product_studio", now };
 
-      const updated = {
+      const edited = {
         ...existing,
         name: body.name !== undefined ? editField(existing.name, body.name, editOpts) : existing.name,
         description: body.description !== undefined ? editField(existing.description, body.description, editOpts) : existing.description,
@@ -201,11 +206,13 @@ export function adminProductsRouter(anthropicClient: Anthropic | null): Router {
         price: body.price !== undefined ? { amountMinor: Math.round(body.price * 100), currency: existing.price.currency } : existing.price,
         salePrice: body.salePrice !== undefined ? { amountMinor: Math.round(body.salePrice * 100), currency: existing.salePrice.currency } : existing.salePrice,
         stock: body.stock !== undefined ? body.stock : existing.stock,
-        status: body.approve ? ("active" as const) : existing.status,
         updatedAt: now,
       };
+      const wasActive = existing.status === "active";
+      const nextStatus: Product["status"] = existing.status === "archived" ? "archived" : isCatalogueReady(edited) ? "active" : "draft";
+      const updated = { ...edited, status: nextStatus };
       await upsertProduct(updated);
-      if (body.approve) {
+      if (updated.status === "active" && !wasActive) {
         await logAudit({ tenantId: brand.tenantId, brandId: brand.id, userId: req.user!.id, action: "product.published", entityType: "product", entityId: updated.id, metadata: { sku: updated.sku } });
       }
       if (body.price !== undefined || body.salePrice !== undefined) {

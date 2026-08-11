@@ -127,9 +127,9 @@ export class ApiClient {
     return brand;
   }
 
-  async getCurrentStorefrontBrand(): Promise<Brand> {
-    const { brand } = await this.request<{ brand: Brand }>("/api/storefront/me");
-    return brand;
+  /** `previewing` is true only when this request carries a valid session for a member of this exact brand — see apps/api/src/routes/storefront.ts's isPreviewAuthorized. Lets the storefront show a "coming soon" page to real visitors while still letting the brand owner see their own unpublished store. */
+  async getCurrentStorefrontBrand(): Promise<{ brand: Brand; previewing: boolean }> {
+    return this.request<{ brand: Brand; previewing: boolean }>("/api/storefront/me");
   }
 
   async listStorefrontProducts(): Promise<Product[]> {
@@ -217,11 +217,11 @@ export class ApiClient {
     await this.request(`/api/brands/${brandId}/products/${id}`, { method: "DELETE" });
   }
 
-  /** Screen 05 (Product Studio). `approve: true` also publishes the product to the storefront. */
+  /** Screen 05 (Product Studio) — the server re-derives `status` from whether the saved result is actually catalogue-complete (see isCatalogueReady), so there's no separate publish flag to pass here. */
   async updateProduct(
     brandId: string,
     id: string,
-    patch: Partial<{ name: string; description: string; category: string; color: string; size: string; material: string; dimensions: string; price: number; salePrice: number; stock: number; approve: boolean }>,
+    patch: Partial<{ name: string; description: string; category: string; color: string; size: string; material: string; dimensions: string; price: number; salePrice: number; stock: number }>,
   ): Promise<Product> {
     const { product } = await this.request<{ product: Product }>(`/api/brands/${brandId}/products/${id}`, {
       method: "PATCH",

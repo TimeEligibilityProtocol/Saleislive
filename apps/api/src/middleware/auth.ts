@@ -13,6 +13,23 @@ declare global {
   }
 }
 
+/**
+ * Non-blocking version of requireAuth — resolves `Authorization: Bearer`
+ * to a User if it's present and valid, or returns undefined otherwise.
+ * Used by the (public, unauthenticated) storefront routes to let a brand
+ * owner preview their own not-yet-published store: the request either
+ * carries no token at all (a real customer) or a valid one for a member
+ * of the specific brand being viewed (see routes/storefront.ts).
+ */
+export async function resolveOptionalUser(req: Request): Promise<User | undefined> {
+  const header = req.header("authorization") ?? "";
+  const token = header.startsWith("Bearer ") ? header.slice("Bearer ".length) : null;
+  if (!token) return undefined;
+  const userId = await getUserIdForToken(token);
+  if (!userId) return undefined;
+  return getUserById(userId);
+}
+
 /** Reads `Authorization: Bearer <token>`, resolves it to a User, and sets req.user. 401s if missing/invalid/expired — every route behind this can assume req.user exists. */
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const header = req.header("authorization") ?? "";

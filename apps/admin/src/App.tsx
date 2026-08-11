@@ -8,7 +8,7 @@ import {
   HttpIntegrationConfig,
   ImportBatch,
   ImportRowDiff,
-  isProductReadyToPublish,
+  isCatalogueReady,
   Order,
   OrderStatus,
   ParsedImportRow,
@@ -1438,7 +1438,7 @@ function AddStockPage() {
           <p style={styles.sub}>Tell saleis.live what you have. Choose one or several sources.</p>
         </div>
         {brandSlug ? (
-          <a href={resolveStorefrontPreviewUrl(brandSlug)} target="_blank" rel="noreferrer" style={styles.previewLink}>
+          <a href={resolveStorefrontPreviewUrl(brandSlug, window.localStorage.getItem(AUTH_TOKEN_KEY))} target="_blank" rel="noreferrer" style={styles.previewLink}>
             Preview your store →
           </a>
         ) : null}
@@ -1777,7 +1777,8 @@ function BackgroundPositioner({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerLeave={onPointerUp}
-      style={{ position: "relative", width: "100%", aspectRatio: "1", borderRadius: 10, overflow: "hidden", border: `1px solid ${colors.border}`, ...backgroundStyle }}
+      // No overflow:hidden here — the div's own background (this box's rounded corners) clips fine without it, but clipping children would also cut off the resize handle whenever it's dragged near an edge, making it invisible/ungrabbable (real report, 2026-08-11).
+      style={{ position: "relative", width: "100%", aspectRatio: "1", borderRadius: 10, border: `1px solid ${colors.border}`, ...backgroundStyle }}
     >
       <div
         onPointerDown={beginDrag("move")}
@@ -1821,7 +1822,7 @@ function ProductStudioPage({ productId }: { productId: string }) {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState<"save" | "approve" | null>(null);
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   const [name, setName] = useState("");
@@ -1903,8 +1904,8 @@ function ProductStudioPage({ productId }: { productId: string }) {
     };
   }, [brandId, productId]);
 
-  const onSave = async (approve: boolean) => {
-    setSaving(approve ? "approve" : "save");
+  const onSave = async () => {
+    setSaving(true);
     setError(null);
     setSaved(false);
     try {
@@ -1919,14 +1920,13 @@ function ProductStudioPage({ productId }: { productId: string }) {
         price: Number(price) || 0,
         salePrice: Number(salePrice) || 0,
         stock: Number(stock) || 0,
-        approve,
       });
       setProduct(updated);
       setSaved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save.");
     } finally {
-      setSaving(null);
+      setSaving(false);
     }
   };
 
@@ -2055,7 +2055,20 @@ function ProductStudioPage({ productId }: { productId: string }) {
       <a href="#/catalogue-center" style={{ ...styles.previewLink, display: "inline-block", marginBottom: 12 }}>
         ← Back to Check your products
       </a>
-      <h1 style={styles.h1}>Product Studio</h1>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <h1 style={styles.h1}>Product Studio</h1>
+        <span
+          style={{
+            ...styles.pill,
+            background: productStatusBadge(product).bg,
+            color: productStatusBadge(product).color,
+            fontSize: 11,
+            fontWeight: 700,
+          }}
+        >
+          {productStatusBadge(product).label}
+        </span>
+      </div>
       <p style={styles.sub}>Edit one product, its images, copy and variants.</p>
       <hr style={styles.divider} />
 
@@ -2340,7 +2353,7 @@ function ProductStudioPage({ productId }: { productId: string }) {
                 <p style={{ ...styles.reassuranceBody, color: colors.error, marginTop: 8 }}>AI isn't configured on this server (missing ANTHROPIC_API_KEY).</p>
               ) : (
                 <p style={styles.reassuranceBody}>
-                  Reads the product photo and suggests colour, material, category and a description above — review before saving. AR/EN translation isn't wired up yet. Nothing is written until you click Save or Approve.
+                  Reads the product photo and suggests colour, material, category and a description above — review before saving. AR/EN translation isn't wired up yet. Nothing is written until you click Save.
                 </p>
               )}
               <label style={{ ...styles.label, marginTop: 16 }}>Description</label>
@@ -2353,18 +2366,15 @@ function ProductStudioPage({ productId }: { productId: string }) {
             </div>
 
             {error ? <p style={styles.error}>{error}</p> : null}
-            {saved ? <p style={{ ...styles.sub, color: colors.success, fontWeight: 600, marginTop: 12, marginBottom: 0 }}>Saved.</p> : null}
+            {saved ? (
+              <p style={{ ...styles.sub, color: colors.success, fontWeight: 600, marginTop: 12, marginBottom: 0 }}>
+                {product.status === "active" ? "Saved — live on your store." : "Saved — still incomplete, so not visible on your store yet."}
+              </p>
+            ) : null}
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 24 }}>
-              <button
-                style={{ ...styles.button, ...styles.buttonAuto, background: colors.white, color: colors.ink, border: `1px solid ${colors.border}`, opacity: saving ? 0.4 : 1 }}
-                disabled={!!saving}
-                onClick={() => onSave(false)}
-              >
-                {saving === "save" ? "Saving…" : "Save"}
-              </button>
-              <button style={{ ...styles.button, ...styles.buttonAuto, opacity: saving ? 0.4 : 1 }} disabled={!!saving} onClick={() => onSave(true)}>
-                {saving === "approve" ? "Approving…" : product.status === "active" ? "Approved" : "Approve"}
+              <button style={{ ...styles.button, ...styles.buttonAuto, opacity: saving ? 0.4 : 1 }} disabled={saving} onClick={() => void onSave()}>
+                {saving ? "Saving…" : "Save"}
               </button>
             </div>
           </div>
@@ -2376,6 +2386,25 @@ function ProductStudioPage({ productId }: { productId: string }) {
 
 type CatalogueTab = "attention" | "ready" | "all";
 
+/**
+ * The one status badge shown everywhere a product appears — Catalogue
+ * Center's table and the top of Product Studio. There used to be a
+ * separate manual "Approve" step that flipped `product.status` with no
+ * visible result anywhere; the server now derives status from
+ * isCatalogueReady on every save (see routes/products.ts), so this
+ * reflects reality directly instead of a click nobody could see the
+ * effect of (Ola, 2026-08-11: "I don't understand which are accepted,
+ * which aren't, or whether they're published"). "Ready — save to
+ * publish" only shows for a product that's complete but has never been
+ * saved in Product Studio yet (e.g. straight off an Excel import, which
+ * deliberately never auto-publishes — see buildProductFromImportRow).
+ */
+function productStatusBadge(p: Product): { label: string; color: string; bg: string } {
+  if (p.status === "active") return { label: "Live", color: colors.success, bg: "#E6F4EA" };
+  if (isCatalogueReady(p)) return { label: "Ready — save to publish", color: colors.navy, bg: colors.bluepale };
+  return { label: "Incomplete", color: colors.error, bg: "#FBE9E7" };
+}
+
 /** What's actually missing on this product — plain field checks, not a simulated AI conversation. */
 function describeProductIssues(p: Product): string[] {
   const issues: string[] = [];
@@ -2386,11 +2415,6 @@ function describeProductIssues(p: Product): string[] {
   if (!p.material.value) issues.push("Missing material");
   if (p.price.amountMinor <= 0) issues.push("Missing price");
   return issues;
-}
-
-/** isProductReadyToPublish (domain) covers publish-blocking fields (price/stock/image/name); this adds catalogue completeness (category/colour/material) for the readiness stat here. */
-function isCatalogueReady(p: Product): boolean {
-  return isProductReadyToPublish(p) && !!p.category.value && !!p.color.value && !!p.material.value;
 }
 
 function CatalogueCenterPage() {
@@ -2530,6 +2554,7 @@ function CatalogueCenterPage() {
               <thead>
                 <tr>
                   <th style={styles.th}>Product</th>
+                  <th style={styles.th}>Status</th>
                   <th style={styles.th}>SKU</th>
                   <th style={styles.th}>Issue</th>
                   <th style={styles.th}></th>
@@ -2539,9 +2564,13 @@ function CatalogueCenterPage() {
                 {rows.map((p) => {
                   const issues = describeProductIssues(p);
                   const missingPhotoRow = p.images.length === 0;
+                  const badge = productStatusBadge(p);
                   return (
                     <tr key={p.id}>
                       <td style={styles.td}>{p.name.value ?? "—"}</td>
+                      <td style={styles.td}>
+                        <span style={{ ...styles.pill, background: badge.bg, color: badge.color, fontSize: 11, fontWeight: 700 }}>{badge.label}</span>
+                      </td>
                       <td style={styles.td}>{p.sku}</td>
                       <td style={{ ...styles.td, fontSize: 11, color: issues.length ? colors.error : colors.success }}>{issues.length ? issues.join(", ") : "All good"}</td>
                       <td style={{ ...styles.td, display: "flex", gap: 12, alignItems: "center" }}>
@@ -2619,25 +2648,25 @@ function ImportHistorySection({ brandId }: { brandId: string }) {
     }
   };
 
-  const relevant = (batches ?? []).filter((b) => b.fileName);
+  const relevant = (batches ?? []).filter((b) => b.fileName && b.status !== "staged");
   if (batches !== null && relevant.length === 0) return null;
 
   return (
     <div style={{ marginTop: 24 }}>
-      <h2 style={{ ...styles.h1, fontSize: 18 }}>Import history</h2>
-      <p style={styles.sub}>Uploaded the wrong file? Undo it here — it only affects what that import actually changed.</p>
-      {notice && <p style={{ fontSize: 13, color: colors.success }}>{notice}</p>}
-      {batches === null ? (
-        <p style={styles.sub}>Loading…</p>
-      ) : (
-        <div style={styles.sectionCard}>
-          <div style={{ overflowX: "auto" }}>
+      {/* Collapsed by default and reframed around the one thing a merchant would come here for — not labelled as "Import history", which reads as an engineering log, not a tool (Ola, 2026-08-11: "I don't know what this is"). */}
+      <details style={{ ...styles.sectionCard }}>
+        <summary style={{ cursor: "pointer", fontWeight: 700, fontSize: 14 }}>Fix a wrong upload</summary>
+        <p style={{ ...styles.sub, marginTop: 8 }}>Uploaded the wrong file? Undo it here — it only affects what that import actually changed.</p>
+        {notice && <p style={{ fontSize: 13, color: colors.success }}>{notice}</p>}
+        {batches === null ? (
+          <p style={styles.sub}>Loading…</p>
+        ) : (
+          <div style={{ overflowX: "auto", marginTop: 8 }}>
             <table style={styles.table}>
               <thead>
                 <tr>
                   <th style={styles.th}>File</th>
                   <th style={styles.th}>Uploaded</th>
-                  <th style={styles.th}>Rows</th>
                   <th style={styles.th}>Status</th>
                   <th style={styles.th}></th>
                 </tr>
@@ -2647,8 +2676,7 @@ function ImportHistorySection({ brandId }: { brandId: string }) {
                   <tr key={b.id}>
                     <td style={styles.td}>{b.fileName}</td>
                     <td style={styles.td}>{new Date(b.createdAt).toLocaleString()}</td>
-                    <td style={styles.td}>{b.rows.length}</td>
-                    <td style={styles.td}>{b.status === "committed" ? "Applied" : b.status === "rolled_back" ? "Undone" : "Staged"}</td>
+                    <td style={styles.td}>{b.status === "committed" ? "Added to your catalogue" : "Undone"}</td>
                     <td style={styles.td}>
                       {b.status === "committed" && (
                         <button
@@ -2666,8 +2694,8 @@ function ImportHistorySection({ brandId }: { brandId: string }) {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        )}
+      </details>
     </div>
   );
 }
@@ -3241,8 +3269,15 @@ function PreviewPublishPage() {
 
   return (
     <div>
-      <h1 style={styles.h1}>Go live</h1>
-      <p style={styles.sub}>Final check before the sale goes live.</p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <h1 style={styles.h1}>Go live</h1>
+          <p style={styles.sub}>Final check before the sale goes live. Until then, your store is only visible to you.</p>
+        </div>
+        <a href={resolveStorefrontPreviewUrl(brand.slug, window.localStorage.getItem(AUTH_TOKEN_KEY))} target="_blank" rel="noreferrer" style={styles.previewLink}>
+          Preview your store →
+        </a>
+      </div>
       <hr style={styles.divider} />
 
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap" }}>
