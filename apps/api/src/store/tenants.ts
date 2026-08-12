@@ -61,6 +61,12 @@ export async function ensureSeedData(): Promise<void> {
   });
 }
 
+/** One per real customer signing up for themselves (see routes/auth.ts's /api/auth/signup) — a "group" that can later own more than one Brand, same shape as the seeded demo tenant above. */
+export async function createTenant(name: string): Promise<Tenant> {
+  const row = await prisma.tenant.create({ data: { id: `t_${randomUUID()}`, name } });
+  return toDomainTenant(row);
+}
+
 export async function getBrandBySlug(slug: string): Promise<Brand | undefined> {
   const row = await prisma.brand.findUnique({ where: { slug } });
   return row ? toDomainBrand(row) : undefined;

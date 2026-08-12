@@ -447,6 +447,16 @@ export class ApiClient {
     return this.request("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
   }
 
+  /** A brand-new customer's own front door — creates their User, a fresh Tenant they own, their first Brand, and a group_owner membership tying them together, all in one call. Distinct from inviteTeamMember, which only ever adds someone to a tenant/brand that already exists. */
+  async signup(input: {
+    email: string;
+    password: string;
+    displayName: string;
+    brand: { name: string; slug: string; country: string; currency: string; language: string; secondaryLanguage?: string | null };
+  }): Promise<{ user: User; token: string; expiresAt: string; brand: Brand }> {
+    return this.request("/api/auth/signup", { method: "POST", body: JSON.stringify(input) });
+  }
+
   async logout(): Promise<void> {
     await this.request("/api/auth/logout", { method: "POST" });
   }

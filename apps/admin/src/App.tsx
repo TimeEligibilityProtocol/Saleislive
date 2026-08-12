@@ -26,7 +26,6 @@ import { Logo } from "./components/Logo";
 import { apiClient, AUTH_TOKEN_KEY, resolveCatalogueExportUrl, resolveStorefrontPreviewUrl } from "./config/apiClient";
 
 const ROOT_DOMAIN = "saleis.live";
-const DEMO_TENANT_ID = "t_demo";
 
 /**
  * The approved final nav — architecture.docx: "Final navigation must stay
@@ -126,6 +125,7 @@ interface AuthState {
   user: User | null;
   memberships: BrandMembership[];
   login: (email: string, password: string) => Promise<void>;
+  signup: (input: { email: string; password: string; displayName: string; brand: { name: string; slug: string; country: string; currency: string; language: string; secondaryLanguage: string | null } }) => Promise<void>;
   logout: () => void;
 }
 
@@ -174,6 +174,19 @@ function useAuth(): AuthState {
     setMemberships(me.memberships);
   };
 
+  const signup: AuthState["signup"] = async (input) => {
+    const res = await apiClient.signup(input);
+    window.localStorage.setItem(AUTH_TOKEN_KEY, res.token);
+    // Without this, AppRoutes' brandId falls back to "b_demo" (its default
+    // when nothing is stored yet) and a brand-new customer would land
+    // straight in Demo Brand's data instead of the one they just created.
+    window.localStorage.setItem(LAST_BRAND_ID_KEY, res.brand.id);
+    window.localStorage.setItem(LAST_BRAND_SLUG_KEY, res.brand.slug);
+    setUser(res.user);
+    const me = await apiClient.me();
+    setMemberships(me.memberships);
+  };
+
   const logout = () => {
     apiClient.logout().catch(() => {});
     window.localStorage.removeItem(AUTH_TOKEN_KEY);
@@ -181,7 +194,7 @@ function useAuth(): AuthState {
     setMemberships([]);
   };
 
-  return { loading, user, memberships, login, logout };
+  return { loading, user, memberships, login, signup, logout };
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -205,7 +218,7 @@ const QUICK_SIGNIN_NAMES = ["ola", "admin"];
  * password, so a real teammate's login stays exactly as protected as
  * before.
  */
-function LoginPage({ onLogin }: { onLogin: (email: string, password: string) => Promise<void> }) {
+function LoginPage({ onLogin, onCreateAccount }: { onLogin: (email: string, password: string) => Promise<void>; onCreateAccount: () => void }) {
   const [quickName, setQuickName] = useState("");
   const [quickError, setQuickError] = useState<string | null>(null);
   const [quickSubmitting, setQuickSubmitting] = useState(false);
@@ -288,6 +301,197 @@ function LoginPage({ onLogin }: { onLogin: (email: string, password: string) => 
             </button>
           </form>
         )}
+        <hr style={{ ...styles.divider, margin: "20px 0" }} />
+        <p style={{ fontSize: 13, color: colors.muted, textAlign: "center", margin: 0 }}>
+          New here?{" "}
+          <button type="button" onClick={onCreateAccount} style={{ ...styles.linkButton, fontSize: 13, fontWeight: 700 }}>
+            Create an account
+          </button>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The real front door for a brand-new customer — everyone before this was
+ * either the seeded demo account or someone an existing admin invited (see
+ * /api/auth/invite). Account + first brand in one screen, deliberately not
+ * split into two steps: they're a single decision ("I'm starting my own
+ * store on saleis.live"), not two.
+ */
+function SignUpPage({ onSignup, onBackToLogin }: { onSignup: AuthState["signup"]; onBackToLogin: () => void }) {
+  const [displayName, setDisplayName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [brandName, setBrandName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [slugTouched, setSlugTouched] = useState(false);
+  const [countryCode, setCountryCode] = useState<(typeof COUNTRIES)[number]["code"]>("AE");
+  const [currency, setCurrency] = useState("AED");
+  const [language, setLanguage] = useState("en");
+  const [secondaryLanguage, setSecondaryLanguage] = useState("ar");
+  const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
+  const [checkingSlug, setCheckingSlug] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!slugTouched) setSlug(slugify(brandName));
+  }, [brandName, slugTouched]);
+
+  useEffect(() => {
+    if (!slug) {
+      setSlugAvailable(null);
+      return;
+    }
+    let cancelled = false;
+    setCheckingSlug(true);
+    const timer = setTimeout(() => {
+      apiClient
+        .isSlugAvailable(slug)
+        .then((available) => {
+          if (!cancelled) setSlugAvailable(available);
+        })
+        .catch(() => {
+          if (!cancelled) setSlugAvailable(null);
+        })
+        .finally(() => {
+          if (!cancelled) setCheckingSlug(false);
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [slug]);
+
+  const canSubmit = displayName.trim().length > 0 && email.trim().length > 0 && password.length >= 8 && brandName.trim().length > 0 && slug.length >= 2 && slugAvailable === true && !submitting;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onSignup({
+        email: email.trim(),
+        password,
+        displayName: displayName.trim(),
+        brand: { name: brandName.trim(), slug, country: countryCode, currency, language, secondaryLanguage: secondaryLanguage || null },
+      });
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) setError(err.message.includes("slug") ? "That storefront address was just taken — pick another." : "That email already has an account — sign in instead.");
+      else setError(err instanceof Error ? err.message : "Couldn't create your account.");
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div style={styles.loginRoot}>
+      <div style={{ ...styles.loginCard, maxWidth: 420 }}>
+        <Logo height={40} />
+        <h1 style={{ ...styles.h1, fontSize: 22, marginTop: 24 }}>Create your account</h1>
+        <p style={{ ...styles.sub, marginTop: 4 }}>Your account and your first store, in one step.</p>
+
+        <form onSubmit={(e) => void handleSubmit(e)}>
+          <label style={styles.label} htmlFor="signup-name">
+            Your name
+          </label>
+          <input id="signup-name" type="text" autoFocus required value={displayName} onChange={(e) => setDisplayName(e.target.value)} style={styles.input} />
+
+          <label style={styles.label} htmlFor="signup-email">
+            Email
+          </label>
+          <input id="signup-email" type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} style={styles.input} />
+
+          <label style={styles.label} htmlFor="signup-password">
+            Password
+          </label>
+          <input id="signup-password" type="password" autoComplete="new-password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} style={styles.input} placeholder="At least 8 characters" />
+
+          <hr style={{ ...styles.divider, margin: "16px 0" }} />
+
+          <label style={styles.label} htmlFor="signup-brand-name">
+            Store name
+          </label>
+          <input id="signup-brand-name" type="text" required value={brandName} onChange={(e) => setBrandName(e.target.value)} style={styles.input} placeholder="e.g. Olenka's Closet" />
+
+          <label style={styles.label} htmlFor="signup-slug">
+            Storefront address
+          </label>
+          <input
+            id="signup-slug"
+            type="text"
+            required
+            value={slug}
+            onChange={(e) => {
+              setSlug(slugify(e.target.value));
+              setSlugTouched(true);
+            }}
+            style={styles.input}
+          />
+          {slug ? (
+            <p style={{ fontSize: 12, marginTop: 4, color: checkingSlug ? colors.muted : slugAvailable ? colors.success : colors.error }}>
+              {checkingSlug ? "Checking…" : slugAvailable ? `${slug}.${ROOT_DOMAIN} is available` : "That address is taken"}
+            </p>
+          ) : null}
+
+          <div style={styles.fieldGrid}>
+            <div>
+              <label style={styles.label}>Country</label>
+              <select
+                style={styles.input}
+                value={countryCode}
+                onChange={(e) => {
+                  const next = COUNTRIES.find((c) => c.code === e.target.value);
+                  if (!next) return;
+                  setCountryCode(next.code);
+                  setCurrency(next.currency);
+                }}
+              >
+                {COUNTRIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={styles.label}>Currency</label>
+              <input style={styles.input} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} maxLength={3} />
+            </div>
+            <div>
+              <label style={styles.label}>Primary language</label>
+              <select style={styles.input} value={language} onChange={(e) => setLanguage(e.target.value)}>
+                {LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={styles.label}>Secondary language</label>
+              <select style={styles.input} value={secondaryLanguage} onChange={(e) => setSecondaryLanguage(e.target.value)}>
+                <option value="">None</option>
+                {LANGUAGES.filter((l) => l.code !== language).map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {error ? <p style={{ color: colors.error, fontSize: 13, marginTop: 12 }}>{error}</p> : null}
+          <button type="submit" disabled={!canSubmit} style={{ ...styles.button, marginTop: 24, width: "100%", opacity: canSubmit ? 1 : 0.5 }}>
+            {submitting ? "Creating your account…" : "Create account and start"}
+          </button>
+          <button type="button" onClick={onBackToLogin} style={{ ...styles.linkButton, fontSize: 12, marginTop: 16, display: "block", textAlign: "center", width: "100%" }}>
+            Already have an account? Sign in
+          </button>
+        </form>
       </div>
     </div>
   );
@@ -296,13 +500,18 @@ function LoginPage({ onLogin }: { onLogin: (email: string, password: string) => 
 export function App() {
   const hash = useHashRoute();
   const auth = useAuth();
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
 
   if (auth.loading) {
     return <div style={styles.loginRoot} />;
   }
 
   if (!auth.user) {
-    return <LoginPage onLogin={auth.login} />;
+    return authMode === "signup" ? (
+      <SignUpPage onSignup={auth.signup} onBackToLogin={() => setAuthMode("login")} />
+    ) : (
+      <LoginPage onLogin={auth.login} onCreateAccount={() => setAuthMode("signup")} />
+    );
   }
 
   return (
@@ -870,7 +1079,10 @@ function EditBrandForm({ brand, onSaved }: { brand: Brand; onSaved: (b: Brand) =
   );
 }
 
+/** Reached only by an already-authenticated user with no valid brand in localStorage — either an invited teammate who's never picked one, or a group_owner adding a second brand to their own tenant (a first-time signup never lands here at all, see SignUpPage/useAuth's signup). */
 function CreateBrandPage() {
+  const auth = useAuthContext();
+  const ownedTenantId = auth.memberships.find((m) => m.role === "group_owner")?.tenantId ?? null;
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
@@ -913,18 +1125,18 @@ function CreateBrandPage() {
     };
   }, [slug]);
 
-  const canSubmit = name.trim().length > 0 && slug.length >= 2 && slugAvailable === true && !submitting;
+  const canSubmit = !!ownedTenantId && name.trim().length > 0 && slug.length >= 2 && slugAvailable === true && !submitting;
 
   // architecture.docx's onboarding-order correction: the CTA lands directly
   // on Add Stock (screen 02), never a dashboard — the brand id is handed
   // off via localStorage so screen 02 knows which brand it's stocking.
   const onSubmit = async () => {
-    if (!canSubmit) return;
+    if (!canSubmit || !ownedTenantId) return;
     setSubmitting(true);
     setError(null);
     try {
       const brand = await apiClient.createBrand({
-        tenantId: DEMO_TENANT_ID,
+        tenantId: ownedTenantId,
         name: name.trim(),
         slug,
         country: countryCode,
@@ -940,6 +1152,16 @@ function CreateBrandPage() {
       setSubmitting(false);
     }
   };
+
+  if (!ownedTenantId) {
+    return (
+      <div>
+        <h1 style={styles.h1}>Create your brand space</h1>
+        <hr style={styles.divider} />
+        <p style={styles.sub}>Only the owner of a group can add another brand to it. Ask whoever invited you to do this, or create your own account from the sign-in screen.</p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -1085,11 +1307,16 @@ function TeamPage() {
     e.preventDefault();
     setError(null);
     setNotice(null);
+    const tenantId = auth.memberships.find((m) => m.brandId === brandId)?.tenantId;
+    if (!tenantId) {
+      setError("Couldn't determine this brand's tenant — try reloading the page.");
+      return;
+    }
     setInviting(true);
     try {
       const password = generateTempPassword();
       const email = inviteEmail.trim();
-      await apiClient.inviteTeamMember({ email, displayName: inviteName.trim(), password, brandId, role: inviteRole, tenantId: DEMO_TENANT_ID });
+      await apiClient.inviteTeamMember({ email, displayName: inviteName.trim(), password, brandId, role: inviteRole, tenantId });
       setNotice(`${email} added as ${ROLE_LABELS[inviteRole]}. Temporary password: ${password} — share this with them directly, it won't be shown again.`);
       setInviteEmail("");
       setInviteName("");

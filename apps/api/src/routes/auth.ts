@@ -5,9 +5,11 @@ import { clearLoginAttempts, isLoginRateLimited, recordLoginAttempt } from "../l
 import { listAuditLog, logAudit } from "../store/auditLog.js";
 import { createMembership, getMembership, listMembershipsForUser, listTeamForBrand, removeMembership, roleAtLeast, updateMembershipRole } from "../store/memberships.js";
 import { createSession, revokeSession } from "../store/sessions.js";
+import { createBrand, createTenant, isSlugAvailable } from "../store/tenants.js";
 import { changePassword, createUserWithPassword, getUserByEmail, resetPasswordForUser, verifyPassword } from "../store/users.js";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const SLUG_PATTERN = /^[a-z0-9-]{2,32}$/;
 const ROLE_VALUES = ["group_owner", "brand_admin", "merchandiser", "order_manager", "analyst", "read_only"] as const;
 type RoleValue = (typeof ROLE_VALUES)[number];
 function isRole(v: unknown): v is RoleValue {
@@ -31,6 +33,57 @@ export function authRouter(): Router {
       clearLoginAttempts(email);
       const { token, expiresAt } = await createSession(user.id);
       res.json({ user, token, expiresAt });
+    }),
+  );
+
+  /**
+   * The one and only self-service account-creation route — everyone before
+   * this was either the seeded demo user or someone invited by an existing
+   * admin (see /api/auth/invite's doc comment, now out of date). Creates a
+   * brand-new Tenant + User + Brand + group_owner membership together in
+   * one call: a person who owns nothing yet can't create a Brand without
+   * also getting a Tenant to own it and a membership to access it, so
+   * there's no valid halfway state to leave lying around if any step here
+   * fails partway (kept simple with try/best-effort rather than a full DB
+   * transaction, since this is a brand-new, low-contention row set).
+   */
+  router.post(
+    "/api/auth/signup",
+    asyncHandler(async (req, res) => {
+      const { email, password, displayName, brand } = req.body as {
+        email?: string;
+        password?: string;
+        displayName?: string;
+        brand?: { name?: string; slug?: string; country?: string; currency?: string; language?: string; secondaryLanguage?: string | null };
+      };
+      if (!email || !EMAIL_PATTERN.test(email)) return res.status(400).json({ error: "invalid_email" });
+      if (!password || password.length < 8) return res.status(400).json({ error: "weak_password" });
+      if (!displayName?.trim()) return res.status(400).json({ error: "missing_display_name" });
+      if (!brand?.name?.trim() || !brand.slug || !brand.country || !brand.currency || !brand.language) {
+        return res.status(400).json({ error: "missing_brand_fields" });
+      }
+      const slug = brand.slug.toLowerCase();
+      if (!SLUG_PATTERN.test(slug)) return res.status(400).json({ error: "invalid_slug" });
+
+      if (await getUserByEmail(email)) return res.status(409).json({ error: "email_taken" });
+      if (!(await isSlugAvailable(slug))) return res.status(409).json({ error: "slug_taken" });
+
+      const tenant = await createTenant(brand.name.trim());
+      const user = await createUserWithPassword({ email, displayName: displayName.trim(), password, tenantId: tenant.id });
+      const newBrand = await createBrand({
+        tenantId: tenant.id,
+        name: brand.name.trim(),
+        slug,
+        country: brand.country,
+        currency: brand.currency,
+        language: brand.language,
+        secondaryLanguage: brand.secondaryLanguage ?? null,
+      });
+      await createMembership({ userId: user.id, brandId: newBrand.id, tenantId: tenant.id, role: "group_owner" });
+      await logAudit({ tenantId: tenant.id, brandId: newBrand.id, userId: user.id, action: "brand.created", entityType: "brand", entityId: newBrand.id, metadata: { name: newBrand.name, slug, viaSignup: true } });
+
+      const { token, expiresAt } = await createSession(user.id);
+      res.status(201).json({ user, token, expiresAt, brand: newBrand });
     }),
   );
 

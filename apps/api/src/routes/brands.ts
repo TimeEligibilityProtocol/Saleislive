@@ -2,7 +2,7 @@ import { Router } from "express";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { logAudit } from "../store/auditLog.js";
-import { createMembership } from "../store/memberships.js";
+import { createMembership, listMembershipsForUser } from "../store/memberships.js";
 import { createBrand, getBrandById, isSlugAvailable, updateBrandIntegration, updateBrandProfile } from "../store/tenants.js";
 
 const SLUG_PATTERN = /^[a-z0-9-]{2,32}$/;
@@ -39,9 +39,13 @@ export function brandsRouter(): Router {
   );
 
   /**
-   * Whoever creates a brand becomes its group_owner automatically — a
-   * brand created with no BrandMembership would lock its own creator out
-   * immediately, since every other route now checks membership/role.
+   * Adds a SECOND (or third, etc.) brand to a tenant the caller already
+   * owns — a real first brand for a brand-new customer is created by
+   * /api/auth/signup instead, which mints its own Tenant. This route used
+   * to trust whatever tenantId the client sent, which meant any logged-in
+   * user could plant a brand (and grant themselves group_owner on it)
+   * inside a tenant they had nothing to do with — fixed below by requiring
+   * proof of an existing group_owner membership on that exact tenant.
    */
   router.post(
     "/api/brands",
@@ -59,6 +63,8 @@ export function brandsRouter(): Router {
       if (!tenantId || !name || !slug || !country || !currency || !language) {
         return res.status(400).json({ error: "missing_fields" });
       }
+      const ownsTenant = (await listMembershipsForUser(req.user!.id)).some((m) => m.tenantId === tenantId && m.role === "group_owner");
+      if (!ownsTenant) return res.status(403).json({ error: "not_tenant_owner" });
       const normalizedSlug = slug.toLowerCase();
       if (!SLUG_PATTERN.test(normalizedSlug)) {
         return res.status(400).json({ error: "invalid_slug" });
