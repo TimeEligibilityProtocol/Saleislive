@@ -4,6 +4,21 @@ import { ThemePresetId } from "./theme.js";
 export type CampaignAccess = "public" | "private" | "invite" | "password";
 export type CampaignStatus = "draft" | "scheduled" | "live" | "ended" | "canceled";
 
+/**
+ * A few ready-made hero colour pairings (background/text) — not a free
+ * colour picker, so every sale's hero still reads as "on-brand for
+ * saleis.live" rather than an arbitrary hex value. Ola, 2026-08-12: "pare
+ * kolorow... najbardziej popularne", so these lean on well-worn
+ * fashion-retail hero looks rather than anything exotic.
+ */
+export const HERO_COLOR_PRESETS = {
+  ivory: { label: "Ivory", background: "#F5F2EB", text: "#111111" },
+  charcoal: { label: "Charcoal", background: "#111111", text: "#F5F2EB" },
+  blush: { label: "Blush", background: "#F3E4E0", text: "#3A2A26" },
+  navy: { label: "Navy", background: "#173B8F", text: "#FFFFFF" },
+} as const;
+export type HeroColorPresetId = keyof typeof HERO_COLOR_PRESETS;
+
 export interface Campaign {
   id: string;
   tenantId: string;
@@ -22,5 +37,8 @@ export interface Campaign {
   heroDesktopUrl: string | null;
   heroMobileUrl: string | null;
   themePreset: ThemePresetId;
+  /** Null means "use the platform default" (ivory bg / Instrument Serif) — these only apply to this sale's own hero, not the whole brand. */
+  heroColorPreset: HeroColorPresetId | null;
+  heroFontPreset: string | null;
   createdAt: string;
 }

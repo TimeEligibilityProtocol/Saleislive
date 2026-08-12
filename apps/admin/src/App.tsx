@@ -6,6 +6,9 @@ import {
   CampaignAccess,
   FulfilmentStatus,
   HttpIntegrationConfig,
+  APPROVED_FONTS,
+  HERO_COLOR_PRESETS,
+  HeroColorPresetId,
   ImportBatch,
   ImportRowDiff,
   isCatalogueReady,
@@ -43,7 +46,7 @@ const NAV_ITEMS = [
   { label: "New brand", route: "#/shop" },
   { label: "Team", route: "#/team" },
   { label: "Add your stock", route: "#/add-stock" },
-  { label: "Check your products", route: "#/catalogue-center" },
+  { label: "Review your products with AI", route: "#/catalogue-center" },
   { label: "Set up your sale", route: "#/launch-studio" },
   { label: "Go live", route: "#/preview-publish" },
   { label: "Orders", route: "#/orders" },
@@ -60,12 +63,12 @@ type NavLabel = (typeof NAV_ITEMS)[number]["label"];
  * enforced yet (see the read_only gap noted where this is used).
  */
 const ROLE_NAV_ACCESS: Record<Role, NavLabel[]> = {
-  group_owner: ["New brand", "Team", "Add your stock", "Check your products", "Set up your sale", "Go live", "Orders", "Dashboard", "Store"],
-  brand_admin: ["New brand", "Team", "Add your stock", "Check your products", "Set up your sale", "Go live", "Orders", "Dashboard", "Store"],
-  merchandiser: ["Add your stock", "Check your products", "Set up your sale", "Go live"],
+  group_owner: ["New brand", "Team", "Add your stock", "Review your products with AI", "Set up your sale", "Go live", "Orders", "Dashboard", "Store"],
+  brand_admin: ["New brand", "Team", "Add your stock", "Review your products with AI", "Set up your sale", "Go live", "Orders", "Dashboard", "Store"],
+  merchandiser: ["Add your stock", "Review your products with AI", "Set up your sale", "Go live"],
   order_manager: ["Orders"],
   analyst: ["Dashboard"],
-  read_only: ["New brand", "Team", "Add your stock", "Check your products", "Set up your sale", "Go live", "Orders", "Dashboard", "Store"],
+  read_only: ["New brand", "Team", "Add your stock", "Review your products with AI", "Set up your sale", "Go live", "Orders", "Dashboard", "Store"],
 };
 
 /** Where each wizard step's real work happens — used both to link the setup bar's step label and to redirect someone who jumps ahead to a step that isn't unlocked yet. */
@@ -319,9 +322,9 @@ function resolveRoute(hash: string): { active: NavLabel; stepKey: SetupStepKey |
   if (hash === "#/add-stock") return { active: "Add your stock", stepKey: "stock_intake", page: <AddStockPage /> };
   if (hash.startsWith("#/products/")) {
     const productId = decodeURIComponent(hash.slice("#/products/".length));
-    return { active: "Check your products", stepKey: "ai_catalogue_review", page: <ProductStudioPage productId={productId} /> };
+    return { active: "Review your products with AI", stepKey: "ai_catalogue_review", page: <ProductStudioPage productId={productId} /> };
   }
-  if (hash === "#/catalogue-center") return { active: "Check your products", stepKey: "ai_catalogue_review", page: <CatalogueCenterPage /> };
+  if (hash === "#/catalogue-center") return { active: "Review your products with AI", stepKey: "ai_catalogue_review", page: <CatalogueCenterPage /> };
   if (hash === "#/launch-studio") return { active: "Set up your sale", stepKey: "launch_setup", page: <LaunchStudioPage /> };
   if (hash === "#/preview-publish") return { active: "Go live", stepKey: "preview_publish", page: <PreviewPublishPage /> };
   if (hash === "#/orders") return { active: "Orders", stepKey: null, page: <OrdersPage /> };
@@ -385,7 +388,7 @@ function AppRoutes({ hash }: { hash: string }) {
 const SETUP_STEP_LABELS: Record<SetupStepKey, string> = {
   brand_setup: "Set up your shop",
   stock_intake: "Add your stock",
-  ai_catalogue_review: "Check your products",
+  ai_catalogue_review: "Review your products with AI",
   launch_setup: "Set up your sale",
   preview_publish: "Go live",
 };
@@ -1580,7 +1583,7 @@ function AddStockPage() {
           <p style={{ ...styles.sub, color: colors.success, fontWeight: 600, marginTop: 12, marginBottom: 0 }}>
             Created {photosCreated.length} draft product{photosCreated.length === 1 ? "" : "s"} —{" "}
             <a href="#/catalogue-center" style={styles.previewLink}>
-              set price and stock in Check your products →
+              set price and stock in Review your products with AI →
             </a>
           </p>
         ) : null}
@@ -1667,26 +1670,23 @@ function AddStockPage() {
                   <th style={styles.th}>Status</th>
                   <th style={styles.th}>Price</th>
                   <th style={styles.th}>Stock</th>
-                  <th style={styles.th}></th>
                 </tr>
               </thead>
               <tbody>
-                {products.map((p) => (
-                  <tr key={p.id}>
-                    <td style={styles.td}>{p.sku}</td>
-                    <td style={styles.td}>{p.name.value ?? "—"}</td>
-                    <td style={styles.td}>
-                      <span style={{ ...styles.pill, background: colors.pale, color: colors.ink }}>{p.status}</span>
-                    </td>
-                    <td style={styles.td}>{formatChange(p.price)}</td>
-                    <td style={styles.td}>{p.stock}</td>
-                    <td style={styles.td}>
-                      <a href={`#/products/${encodeURIComponent(p.id)}`} style={styles.previewLink}>
-                        Edit →
-                      </a>
-                    </td>
-                  </tr>
-                ))}
+                {products.map((p) => {
+                  const badge = productStatusBadge(p);
+                  return (
+                    <tr key={p.id}>
+                      <td style={styles.td}>{p.sku}</td>
+                      <td style={styles.td}>{p.name.value ?? "—"}</td>
+                      <td style={styles.td}>
+                        <span style={{ ...styles.pill, background: badge.bg, color: badge.color, fontSize: 11, fontWeight: 700 }}>{badge.label}</span>
+                      </td>
+                      <td style={styles.td}>{formatChange(p.price)}</td>
+                      <td style={styles.td}>{p.stock}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1757,7 +1757,8 @@ function BackgroundPositioner({
     if (drag.mode === "move") {
       onChange({ offsetX: clamp(drag.startOffsetX + dx, 0.05, 0.95), offsetY: clamp(drag.startOffsetY + dy, 0.05, 0.95), scale });
     } else {
-      onChange({ offsetX, offsetY, scale: clamp(drag.startScale + (dx + dy) / 2, 0.15, 0.95) });
+      // No upper cap on scale (beyond a sane ceiling) — Ola wants to be able to zoom a product past the frame on purpose, e.g. to show a detail shot, not just shrink it to fit (2026-08-12).
+      onChange({ offsetX, offsetY, scale: clamp(drag.startScale + (dx + dy) / 2, 0.15, 3) });
     }
   };
 
@@ -1816,6 +1817,9 @@ function BackgroundPositioner({
   );
 }
 
+/** Mirrors apps/api's PRODUCT_CATEGORY_OPTIONS (routes/analyzeProduct.ts) — the fixed department list "Suggest with AI" is now constrained to, kept in sync manually since this is a plain admin-only UI constant, not a shared package export. */
+const CATEGORY_OPTIONS = ["Men", "Women", "Kids", "Home", "Jewellery", "Beauty"];
+
 function ProductStudioPage({ productId }: { productId: string }) {
   const [brandId] = useState(() => window.localStorage.getItem(LAST_BRAND_ID_KEY) ?? "b_demo");
   const [product, setProduct] = useState<Product | null>(null);
@@ -1838,6 +1842,7 @@ function ProductStudioPage({ productId }: { productId: string }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [aiNotConfigured, setAiNotConfigured] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [zoomOpen, setZoomOpen] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
@@ -2053,7 +2058,7 @@ function ProductStudioPage({ productId }: { productId: string }) {
   return (
     <div>
       <a href="#/catalogue-center" style={{ ...styles.previewLink, display: "inline-block", marginBottom: 12 }}>
-        ← Back to Check your products
+        ← Back to Review your products with AI
       </a>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <h1 style={styles.h1}>Product Studio</h1>
@@ -2076,9 +2081,36 @@ function ProductStudioPage({ productId }: { productId: string }) {
         <div style={{ ...styles.sectionCard, width: 320, flexShrink: 0 }}>
           <h2 style={{ ...styles.h1, fontSize: 15, marginBottom: 16 }}>Product media</h2>
           {mainImage ? (
-            // objectFit: "contain" (not "cover") — shows the whole photo, never crops it; the box just letterboxes around whatever shape the photo is.
-            // Checkerboard, not a flat colour: a transparent cutout on a flat surface looks identical to an opaque photo at a glance — see CHECKERBOARD_BG's comment.
-            <img src={resolveImg(mainImage.url)} alt={mainImage.alt} style={{ width: "100%", aspectRatio: "1", objectFit: "contain", borderRadius: 10, ...CHECKERBOARD_BG }} />
+            <div style={{ position: "relative" }}>
+              {/* objectFit: "contain" (not "cover") — shows the whole photo, never crops it; the box just letterboxes around whatever shape the photo is. */}
+              {/* Checkerboard, not a flat colour: a transparent cutout on a flat surface looks identical to an opaque photo at a glance — see CHECKERBOARD_BG's comment. */}
+              <img
+                src={resolveImg(mainImage.url)}
+                alt={mainImage.alt}
+                onClick={() => setZoomOpen(true)}
+                style={{ width: "100%", aspectRatio: "1", objectFit: "contain", borderRadius: 10, cursor: "zoom-in", ...CHECKERBOARD_BG }}
+              />
+              <button
+                type="button"
+                onClick={() => setZoomOpen(true)}
+                title="Zoom in to check detail"
+                style={{
+                  position: "absolute",
+                  top: 8,
+                  right: 8,
+                  border: "none",
+                  borderRadius: 999,
+                  background: "rgba(17,17,17,0.65)",
+                  color: colors.white,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  padding: "4px 10px",
+                  cursor: "pointer",
+                }}
+              >
+                🔍 Zoom
+              </button>
+            </div>
           ) : (
             <div
               style={{
@@ -2168,6 +2200,7 @@ function ProductStudioPage({ productId }: { productId: string }) {
           >
             {uploadingPhoto ? "Uploading…" : "Add a photo"}
           </button>
+          <p style={{ fontSize: 11, color: colors.muted, marginTop: 6 }}>Best results: a square JPEG or PNG, at least 1200 × 1200px, plain background.</p>
           {photoError ? <p style={{ ...styles.error, marginTop: 8 }}>{photoError}</p> : null}
 
           <hr style={{ ...styles.divider, margin: "16px 0" }} />
@@ -2305,7 +2338,16 @@ function ProductStudioPage({ productId }: { productId: string }) {
               </div>
               <div>
                 <label style={styles.label}>Category</label>
-                <input style={styles.input} value={category} onChange={(e) => setCategory(e.target.value)} />
+                <select style={styles.input} value={category} onChange={(e) => setCategory(e.target.value)}>
+                  <option value="">Select…</option>
+                  {/* Keeps whatever this product already had (e.g. from an older import) selectable even if it predates this fixed list, rather than silently changing the value. */}
+                  {category && !CATEGORY_OPTIONS.includes(category) ? <option value={category}>{category}</option> : null}
+                  {CATEGORY_OPTIONS.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label style={styles.label}>Price</label>
@@ -2380,6 +2422,21 @@ function ProductStudioPage({ productId }: { productId: string }) {
           </div>
         </div>
       </div>
+      {zoomOpen && mainImage ? (
+        <div
+          onClick={() => setZoomOpen(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(17,17,17,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, cursor: "zoom-out" }}
+        >
+          <img src={resolveImg(mainImage.url)} alt={mainImage.alt} style={{ maxWidth: "92vw", maxHeight: "92vh", objectFit: "contain", borderRadius: 8 }} />
+          <button
+            type="button"
+            onClick={() => setZoomOpen(false)}
+            style={{ position: "absolute", top: 20, right: 24, border: "none", background: "none", color: colors.white, fontSize: 28, cursor: "pointer", lineHeight: 1 }}
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -2401,7 +2458,7 @@ type CatalogueTab = "attention" | "ready" | "all";
  */
 function productStatusBadge(p: Product): { label: string; color: string; bg: string } {
   if (p.status === "active") return { label: "Live", color: colors.success, bg: "#E6F4EA" };
-  if (isCatalogueReady(p)) return { label: "Ready — save to publish", color: colors.navy, bg: colors.bluepale };
+  if (isCatalogueReady(p)) return { label: "Accepted — save to publish", color: colors.navy, bg: colors.bluepale };
   return { label: "Incomplete", color: colors.error, bg: "#FBE9E7" };
 }
 
@@ -2505,7 +2562,7 @@ function CatalogueCenterPage() {
       <input ref={photoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhotoFileChosen} />
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
         <div>
-          <h1 style={styles.h1}>Check your products</h1>
+          <h1 style={styles.h1}>Review your products with AI</h1>
           <p style={styles.sub}>Real readiness, computed from your actual catalogue data.</p>
         </div>
         <a href={resolveCatalogueExportUrl(brandId)} style={styles.previewLink}>
@@ -2520,7 +2577,7 @@ function CatalogueCenterPage() {
 
       <div style={styles.tileGrid}>
         <div style={styles.sectionCard}>
-          <p style={styles.statLabel}>Ready</p>
+          <p style={styles.statLabel}>Accepted</p>
           <p style={{ ...styles.statValue, color: colors.success }}>{ready.length}</p>
         </div>
         <div style={styles.sectionCard}>
@@ -2538,7 +2595,7 @@ function CatalogueCenterPage() {
           Needs attention ({needsAttention.length})
         </button>
         <button type="button" style={{ ...styles.pillButton, ...(tab === "ready" ? styles.pillButtonActive : {}) }} onClick={() => setTab("ready")}>
-          Ready ({ready.length})
+          Accepted ({ready.length})
         </button>
         <button type="button" style={{ ...styles.pillButton, ...(tab === "all" ? styles.pillButtonActive : {}) }} onClick={() => setTab("all")}>
           All ({all.length})
@@ -2716,6 +2773,14 @@ const THEME_PRESET_OPTIONS: { key: ThemePresetId; label: string }[] = [
   { key: "high_density", label: "Dense" },
 ];
 
+/** Grouped from the platform's fixed licensed font list (packages/domain/src/theme.ts's APPROVED_FONTS) — Ola asked for "a few modern and a few elegant" hero fonts to choose from, not a free font picker. */
+const HERO_FONT_GROUPS: { group: string; fonts: (typeof APPROVED_FONTS)[number][] }[] = [
+  { group: "Modern", fonts: ["Inter", "Manrope", "Space Grotesk"] },
+  { group: "Elegant", fonts: ["Instrument Serif", "Playfair Display"] },
+];
+const DEFAULT_HERO_FONT = "Instrument Serif";
+const HERO_COLOR_OPTIONS = Object.entries(HERO_COLOR_PRESETS) as [HeroColorPresetId, (typeof HERO_COLOR_PRESETS)[HeroColorPresetId]][];
+
 function LaunchStudioPage() {
   const [brandId] = useState(() => window.localStorage.getItem(LAST_BRAND_ID_KEY) ?? "b_demo");
   const [tab, setTab] = useState<LaunchTab>("sale");
@@ -2737,6 +2802,11 @@ function LaunchStudioPage() {
   const [heroDesktopUrl, setHeroDesktopUrl] = useState("");
   const [heroMobileUrl, setHeroMobileUrl] = useState("");
   const [themePreset, setThemePreset] = useState<ThemePresetId>("editorial");
+  const [heroColorPreset, setHeroColorPreset] = useState<HeroColorPresetId | null>(null);
+  const [heroFontPreset, setHeroFontPreset] = useState<string | null>(null);
+  const [uploadingHero, setUploadingHero] = useState<"desktop" | "mobile" | null>(null);
+  const heroDesktopInputRef = useRef<HTMLInputElement>(null);
+  const heroMobileInputRef = useRef<HTMLInputElement>(null);
 
   const [returnPolicy, setReturnPolicy] = useState("");
   const [shippingPolicy, setShippingPolicy] = useState("");
@@ -2761,6 +2831,8 @@ function LaunchStudioPage() {
         setHeroDesktopUrl(c.heroDesktopUrl ?? "");
         setHeroMobileUrl(c.heroMobileUrl ?? "");
         setThemePreset(c.themePreset);
+        setHeroColorPreset(c.heroColorPreset);
+        setHeroFontPreset(c.heroFontPreset);
         setReturnPolicy(b.returnPolicy ?? "");
         setShippingPolicy(b.shippingPolicy ?? "");
         setProducts(p);
@@ -2801,6 +2873,8 @@ function LaunchStudioPage() {
         heroDesktopUrl: heroDesktopUrl || null,
         heroMobileUrl: heroMobileUrl || null,
         themePreset,
+        heroColorPreset,
+        heroFontPreset,
       });
       setCampaign(updated);
       setSaved(true);
@@ -2808,6 +2882,21 @@ function LaunchStudioPage() {
       setError(err instanceof Error ? err.message : "Couldn't save.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const onHeroFilePicked = async (slot: "desktop" | "mobile", file: File | null) => {
+    if (!file) return;
+    setUploadingHero(slot);
+    setError(null);
+    try {
+      const url = await apiClient.uploadHeroImage(brandId, file);
+      if (slot === "desktop") setHeroDesktopUrl(url);
+      else setHeroMobileUrl(url);
+    } catch {
+      setError("Couldn't upload that image.");
+    } finally {
+      setUploadingHero(null);
     }
   };
 
@@ -2942,17 +3031,126 @@ function LaunchStudioPage() {
             <input style={styles.input} value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="e.g. The private sale is live." />
             <label style={styles.label}>Short description</label>
             <input style={styles.input} value={shortDescription} onChange={(e) => setShortDescription(e.target.value)} placeholder="e.g. Selected pieces. Limited time." />
-            <div style={{ display: "flex", gap: 16, marginTop: 16 }}>
+
+            <label style={{ ...styles.label, marginTop: 16 }}>Hero image</label>
+            <input
+              ref={heroDesktopInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                e.target.value = "";
+                void onHeroFilePicked("desktop", file);
+              }}
+            />
+            <input
+              ref={heroMobileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                e.target.value = "";
+                void onHeroFilePicked("mobile", file);
+              }}
+            />
+            <div style={{ display: "flex", gap: 16, marginTop: 4 }}>
               <div style={{ flex: 1 }}>
-                <label style={styles.label}>Desktop hero image URL</label>
-                <input style={styles.input} value={heroDesktopUrl} onChange={(e) => setHeroDesktopUrl(e.target.value)} placeholder="optional" />
+                <div
+                  style={{
+                    aspectRatio: "16/9",
+                    borderRadius: 8,
+                    border: `1px dashed ${colors.border}`,
+                    background: heroDesktopUrl ? `url(${apiClient.resolveAssetUrl(heroDesktopUrl)}) center/cover` : colors.background,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {!heroDesktopUrl ? <span style={{ fontSize: 11, color: colors.muted }}>No image</span> : null}
+                </div>
+                <button
+                  type="button"
+                  disabled={uploadingHero === "desktop"}
+                  onClick={() => heroDesktopInputRef.current?.click()}
+                  style={{ ...styles.button, ...styles.buttonAuto, width: "100%", marginTop: 6, fontSize: 12, padding: "8px 12px", opacity: uploadingHero === "desktop" ? 0.5 : 1 }}
+                >
+                  {uploadingHero === "desktop" ? "Uploading…" : "Upload desktop hero"}
+                </button>
               </div>
               <div style={{ flex: 1 }}>
-                <label style={styles.label}>Mobile hero image URL</label>
-                <input style={styles.input} value={heroMobileUrl} onChange={(e) => setHeroMobileUrl(e.target.value)} placeholder="optional" />
+                <div
+                  style={{
+                    aspectRatio: "16/9",
+                    borderRadius: 8,
+                    border: `1px dashed ${colors.border}`,
+                    background: heroMobileUrl ? `url(${apiClient.resolveAssetUrl(heroMobileUrl)}) center/cover` : colors.background,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {!heroMobileUrl ? <span style={{ fontSize: 11, color: colors.muted }}>No image</span> : null}
+                </div>
+                <button
+                  type="button"
+                  disabled={uploadingHero === "mobile"}
+                  onClick={() => heroMobileInputRef.current?.click()}
+                  style={{ ...styles.button, ...styles.buttonAuto, width: "100%", marginTop: 6, fontSize: 12, padding: "8px 12px", opacity: uploadingHero === "mobile" ? 0.5 : 1 }}
+                >
+                  {uploadingHero === "mobile" ? "Uploading…" : "Upload mobile hero"}
+                </button>
               </div>
             </div>
-            <label style={{ ...styles.label, marginTop: 16 }}>Theme</label>
+            <p style={{ fontSize: 11, color: colors.muted, marginTop: 6 }}>
+              Best results: desktop 1920 × 1080px, mobile 1080 × 1350px, JPG or PNG. Optional — without one, the colour below fills the hero instead.
+            </p>
+
+            <label style={{ ...styles.label, marginTop: 16 }}>Hero colour</label>
+            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              {HERO_COLOR_OPTIONS.map(([key, preset]) => (
+                <button
+                  key={key}
+                  type="button"
+                  title={preset.label}
+                  onClick={() => setHeroColorPreset(key)}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 999,
+                    border: heroColorPreset === key ? `2px solid ${colors.navy}` : `1px solid ${colors.border}`,
+                    background: preset.background,
+                    cursor: "pointer",
+                  }}
+                />
+              ))}
+            </div>
+
+            <label style={{ ...styles.label, marginTop: 16 }}>Hero font</label>
+            {HERO_FONT_GROUPS.map((g) => (
+              <div key={g.group} style={{ marginTop: 6 }}>
+                <p style={{ fontSize: 10, fontWeight: 700, color: colors.muted, textTransform: "uppercase", margin: "0 0 4px" }}>{g.group}</p>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {g.fonts.map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setHeroFontPreset(f)}
+                      style={{
+                        ...styles.pillButton,
+                        ...((heroFontPreset ?? DEFAULT_HERO_FONT) === f ? styles.pillButtonActive : {}),
+                        fontFamily: f,
+                      }}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            <label style={{ ...styles.label, marginTop: 16 }}>Layout</label>
             <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
               {THEME_PRESET_OPTIONS.map((t) => (
                 <button key={t.key} type="button" style={{ ...styles.pillButton, ...(themePreset === t.key ? styles.pillButtonActive : {}) }} onClick={() => setThemePreset(t.key)}>
@@ -2960,6 +3158,15 @@ function LaunchStudioPage() {
                 </button>
               ))}
             </div>
+
+            <div style={{ ...styles.reassuranceCard, marginTop: 20 }}>
+              <h2 style={styles.reassuranceTitle}>Design your hero (Canva / Figma)</h2>
+              <p style={styles.reassuranceBody}>
+                Not connected yet — designing here and having it land at the right size automatically needs a Canva or Figma developer account with an app registered on their side first (their Connect/API program), which only you can set up since it's tied to your own Canva/Figma account. Once you have that, this is where we'd wire it in. For now: design at{" "}
+                <strong>1920 × 1080px (desktop)</strong> / <strong>1080 × 1350px (mobile)</strong> in whatever tool you like, then upload it above.
+              </p>
+            </div>
+
             {error ? <p style={styles.error}>{error}</p> : null}
             {saved ? <p style={{ ...styles.sub, color: colors.success, fontWeight: 600, marginTop: 12, marginBottom: 0 }}>Saved.</p> : null}
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
@@ -2971,10 +3178,33 @@ function LaunchStudioPage() {
 
           <div style={{ ...styles.sectionCard, width: 340, flexShrink: 0 }}>
             <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 16 }}>Live preview</h2>
-            <div style={{ background: colors.background, borderRadius: 12, padding: 28, textAlign: "center" }}>
-              <p style={{ fontFamily: typography.fontFamily.display, fontSize: 26, margin: "0 0 12px", color: colors.ink }}>{headline || "Your headline here"}</p>
-              <p style={{ fontSize: 13, color: colors.muted, margin: "0 0 16px" }}>{shortDescription || "Your short description here"}</p>
-              <span style={{ ...styles.pill, background: colors.navy, color: colors.white, padding: "8px 20px" }}>Shop now</span>
+            <div
+              style={{
+                borderRadius: 12,
+                padding: 28,
+                textAlign: "center",
+                background: heroDesktopUrl ? `url(${apiClient.resolveAssetUrl(heroDesktopUrl)}) center/cover` : (heroColorPreset ? HERO_COLOR_PRESETS[heroColorPreset].background : colors.background),
+                position: "relative",
+                overflow: "hidden",
+              }}
+            >
+              {heroDesktopUrl ? <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} /> : null}
+              <div style={{ position: "relative" }}>
+                <p
+                  style={{
+                    fontFamily: heroFontPreset ?? DEFAULT_HERO_FONT,
+                    fontSize: 26,
+                    margin: "0 0 12px",
+                    color: heroDesktopUrl ? colors.white : heroColorPreset ? HERO_COLOR_PRESETS[heroColorPreset].text : colors.ink,
+                  }}
+                >
+                  {headline || "Your headline here"}
+                </p>
+                <p style={{ fontSize: 13, margin: "0 0 16px", color: heroDesktopUrl ? colors.white : heroColorPreset ? HERO_COLOR_PRESETS[heroColorPreset].text : colors.muted, opacity: 0.85 }}>
+                  {shortDescription || "Your short description here"}
+                </p>
+                <span style={{ ...styles.pill, background: colors.navy, color: colors.white, padding: "8px 20px" }}>Shop now</span>
+              </div>
             </div>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { colors, typography } from "@saleis-live/ui";
-import { Brand, DeliveryMethod, Money, Order, Product } from "@saleis-live/domain";
+import { Brand, Campaign, DeliveryMethod, HERO_COLOR_PRESETS, Money, Order, Product } from "@saleis-live/domain";
 import { SyntheticEvent, useEffect, useState } from "react";
 import { Logo } from "./components/Logo";
 import { apiClient } from "./config/apiClient";
@@ -48,6 +48,7 @@ type CheckoutInfo = { name: string; phone: string; location: string; deliveryMet
 export function App() {
   const [state, setState] = useState<LoadState>("loading");
   const [brand, setBrand] = useState<Brand | null>(null);
+  const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<Record<string, number>>({});
@@ -61,11 +62,13 @@ export function App() {
       .then(({ brand: b, previewing: p }) => {
         setBrand(b);
         setPreviewing(p);
-        return apiClient.listStorefrontProducts();
+        return Promise.all([apiClient.listStorefrontProducts(), apiClient.getCurrentStorefrontCampaign().catch(() => null)]);
       })
-      .then((p) => {
-        if (!p) return;
+      .then((result) => {
+        if (!result) return;
+        const [p, c] = result;
         setProducts(p);
+        setCampaign(c);
         setState("ready");
       })
       .catch(() => {
@@ -141,7 +144,7 @@ export function App() {
   } else if (hash.startsWith("#/order/")) {
     body = <ConfirmationView brand={brand} order={lastOrder} />;
   } else {
-    body = <HomeView brand={brand} products={products} onAddToBag={addToBag} />;
+    body = <HomeView brand={brand} campaign={campaign} products={products} onAddToBag={addToBag} />;
   }
 
   return (
@@ -186,10 +189,22 @@ function NotFound() {
   return <p style={{ padding: 32, fontSize: 14 }}>That item isn't available anymore.</p>;
 }
 
-function HomeView({ brand, products, onAddToBag }: { brand: Brand; products: Product[]; onAddToBag: (id: string) => void }) {
+function HomeView({ brand, campaign, products, onAddToBag }: { brand: Brand; campaign: Campaign | null; products: Product[]; onAddToBag: (id: string) => void }) {
   const categories = Array.from(new Set(products.map((p) => p.category.value).filter((c): c is string => !!c)));
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const visible = activeCategory ? products.filter((p) => p.category.value === activeCategory) : products;
+
+  // A merchant who never touched Launch Studio's Store tab gets the
+  // platform's own demo hero exactly as before (zero visual change) —
+  // this only takes over once they've actually set a headline, custom
+  // image, or colour. A custom photo always gets a dark scrim + white
+  // text (safe on any photo); the demo's own hero-clean.png keeps its
+  // original navy-on-light-negative-space styling, which only works
+  // because that specific photo was composed for it.
+  const customHeroUrl = campaign?.heroDesktopUrl ? apiClient.resolveAssetUrl(campaign.heroDesktopUrl) : null;
+  const colorPreset = campaign?.heroColorPreset ? HERO_COLOR_PRESETS[campaign.heroColorPreset] : null;
+  const heroFont = campaign?.heroFontPreset || undefined;
+  const hasCustomHero = !!(customHeroUrl || colorPreset || campaign?.headline);
 
   return (
     <>
@@ -207,17 +222,36 @@ function HomeView({ brand, products, onAddToBag }: { brand: Brand; products: Pro
         @media (max-width: 700px) { .hero-title { font-size: 40px !important; } }
         @media (max-width: 700px) { .hero-copy { padding: 0 6.5% !important; } }
       `}</style>
-      <section style={{ background: colors.background }}>
+      <section style={{ background: !hasCustomHero ? colors.background : colorPreset ? colorPreset.background : colors.ink }}>
         <div className="hero-frame" style={styles.hero}>
-          <img src="/images/hero-clean.png" alt="Products staged for a branded sale" className="hero-image" style={styles.heroImage} />
-          <div className="hero-copy" style={styles.heroCopy}>
+          <img
+            src={customHeroUrl ?? "/images/hero-clean.png"}
+            alt="Products staged for a branded sale"
+            className="hero-image"
+            style={{ ...styles.heroImage, opacity: hasCustomHero && !customHeroUrl ? 0 : 1 }}
+          />
+          {customHeroUrl ? <div style={{ position: "absolute", inset: 0, background: "rgba(17,17,17,0.35)" }} /> : null}
+          <div className="hero-copy" style={{ ...styles.heroCopy, zIndex: 2 }}>
             <div style={{ maxWidth: 480 }}>
-              <h1 className="hero-title" style={styles.heroTitle}>
-                Stock in.
-                <br />
-                Sale live.
+              <h1
+                className="hero-title"
+                style={{
+                  ...styles.heroTitle,
+                  ...(heroFont ? { fontFamily: heroFont } : {}),
+                  ...(hasCustomHero ? { color: customHeroUrl ? "#fff" : colorPreset ? colorPreset.text : styles.heroTitle.color } : {}),
+                }}
+              >
+                {campaign?.headline || (
+                  <>
+                    Stock in.
+                    <br />
+                    Sale live.
+                  </>
+                )}
               </h1>
-              <p style={styles.heroSub}>A new AI-powered way to turn your catalogue into a complete branded sale.</p>
+              <p style={{ ...styles.heroSub, ...(hasCustomHero ? { color: customHeroUrl ? "#fff" : colorPreset ? colorPreset.text : styles.heroSub.color, opacity: 0.85 } : {}) }}>
+                {campaign?.shortDescription || "A new AI-powered way to turn your catalogue into a complete branded sale."}
+              </p>
               <a href="#products-grid" className="hero-shop-cta" style={styles.heroCta}>
                 Shop the sale
               </a>

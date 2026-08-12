@@ -2,6 +2,7 @@ import { Router } from "express";
 import { asyncHandler } from "../lib/asyncHandler.js";
 import { resolveOptionalUser } from "../middleware/auth.js";
 import { requireBrand } from "../middleware/tenantRouter.js";
+import { getOrCreateCurrentCampaign } from "../store/campaigns.js";
 import { getMembership } from "../store/memberships.js";
 import { listProductsForBrand } from "../store/products.js";
 
@@ -32,6 +33,14 @@ export function storefrontRouter(): Router {
     asyncHandler(async (req, res) => {
       const previewing = req.brand!.status !== "active" && (await isPreviewAuthorized(req, req.brand!.id));
       res.json({ brand: req.brand, previewing });
+    }),
+  );
+  /** Launch Studio's "Store" tab (headline/hero image/colour/font) — the storefront's own hero was, until now, hardcoded platform copy that never read any of this; this is what makes those fields actually show up for real customers. */
+  router.get(
+    "/api/storefront/campaign",
+    requireBrand,
+    asyncHandler(async (req, res) => {
+      res.json({ campaign: await getOrCreateCurrentCampaign(req.brand!.tenantId, req.brand!.id) });
     }),
   );
   router.get(

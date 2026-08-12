@@ -137,6 +137,12 @@ export class ApiClient {
     return products;
   }
 
+  /** Launch Studio's "Store" tab hero fields (headline, image, colour, font) — this is what actually renders them on the real storefront. */
+  async getCurrentStorefrontCampaign(): Promise<Campaign> {
+    const { campaign } = await this.request<{ campaign: Campaign }>("/api/storefront/campaign");
+    return campaign;
+  }
+
   resolveAssetUrl(relativeUrl: string): string {
     return `${this.config.baseUrl}${relativeUrl}`;
   }
@@ -326,6 +332,19 @@ export class ApiClient {
   async updateCampaign(id: string, patch: Partial<Omit<Campaign, "id" | "tenantId" | "brandId" | "createdAt">>): Promise<Campaign> {
     const { campaign } = await this.request<{ campaign: Campaign }>(`/api/campaigns/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
     return campaign;
+  }
+
+  /** Store tab's hero image — a real upload, replacing the old raw-URL text field. Raw fetch, not this.request(): see addProductImage's comment on FormData. */
+  async uploadHeroImage(brandId: string, file: File): Promise<string> {
+    const token = await this.config.getAuthToken?.();
+    const form = new FormData();
+    form.append("file", file);
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`${this.config.baseUrl}/api/brands/${brandId}/hero-image`, { method: "POST", body: form, headers });
+    if (!res.ok) throw new ApiError(res.status, await res.text());
+    const { url } = (await res.json()) as { url: string };
+    return url;
   }
 
   async updateBrandPolicies(brandId: string, patch: Partial<{ returnPolicy: string; shippingPolicy: string }>): Promise<Brand> {

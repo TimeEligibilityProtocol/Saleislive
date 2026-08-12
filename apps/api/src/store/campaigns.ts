@@ -24,6 +24,8 @@ function toDomainCampaign(row: PrismaCampaign): Campaign {
     heroDesktopUrl: row.heroDesktopUrl,
     heroMobileUrl: row.heroMobileUrl,
     themePreset: row.themePreset as Campaign["themePreset"],
+    heroColorPreset: row.heroColorPreset as Campaign["heroColorPreset"],
+    heroFontPreset: row.heroFontPreset,
     createdAt: row.createdAt.toISOString(),
   };
 }

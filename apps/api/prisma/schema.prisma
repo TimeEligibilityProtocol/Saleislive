@@ -327,6 +327,8 @@ model Campaign {
   heroDesktopUrl   String?
   heroMobileUrl    String?
   themePreset      String
+  heroColorPreset  String?
+  heroFontPreset   String?
 
   createdAt DateTime @default(now())
 

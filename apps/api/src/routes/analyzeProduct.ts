@@ -4,6 +4,9 @@ import multer from "multer";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
 
+/** Ola's fixed department taxonomy (2026-08-12) — every AI category suggestion must land in exactly one of these, not a free-text subcategory, so the catalogue stays organized the same way regardless of who described the product. Mirrored in admin/src/App.tsx's CATEGORY_OPTIONS for the manual dropdown. */
+export const PRODUCT_CATEGORY_OPTIONS = ["Men", "Women", "Kids", "Home", "Jewellery", "Beauty"] as const;
+
 const RECORD_PRODUCT_DETAILS_TOOL = {
   name: "record_product_details",
   description: "Record what you can see about the product in the photo, for a retail catalogue listing.",
@@ -15,7 +18,12 @@ const RECORD_PRODUCT_DETAILS_TOOL = {
         type: "string",
         description: "Best guess at the fabric/material, e.g. 'Leather', 'Cotton blend'. Say 'Unknown' if genuinely not visible — never guess confidently on a fact the merchant needs to verify.",
       },
-      category: { type: "string", description: "A short product category, e.g. 'Dresses', 'Shoes', 'Bags'." },
+      category: {
+        type: "string",
+        enum: PRODUCT_CATEGORY_OPTIONS as unknown as string[],
+        description:
+          "Which department this product belongs in. Pick the one who it's for/where it's used, not the item type — e.g. a men's leather belt is 'Men' (not 'Accessories'), a scented candle is 'Home', a necklace is 'Jewellery', a face cream is 'Beauty'. If a product could plausibly fit more than one (e.g. unisex), pick the department the styling most clearly reads as.",
+      },
       description: {
         type: "string",
         description: "A 1-2 sentence retail product description in a polished, on-brand tone suitable for a fashion/lifestyle storefront. Describe the item itself, not the photo.",

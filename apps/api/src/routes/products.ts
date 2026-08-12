@@ -292,7 +292,8 @@ export function adminProductsRouter(anthropicClient: Anthropic | null): Router {
       const options = {
         offsetX: clampFraction(offsetX, 0.5, 0.05, 0.95),
         offsetY: clampFraction(offsetY, 0.5, 0.05, 0.95),
-        scale: clampFraction(scale, 0.72, 0.15, 0.95),
+        // Upper bound is intentionally generous (not capped at "fits inside the frame") — Ola wants to be able to zoom a product past the canvas on purpose for a detail shot, matching the admin preview's own clamp.
+        scale: clampFraction(scale, 0.72, 0.15, 3),
         customBackgroundUrl,
       };
       const composited = await compositeOntoBackground(asset.buffer, preset ?? "white", options);

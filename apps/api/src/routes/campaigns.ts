@@ -1,10 +1,14 @@
-import { CampaignAccess, CampaignStatus, ThemePresetId } from "@saleis-live/domain";
+import { CampaignAccess, CampaignStatus, HeroColorPresetId, ThemePresetId } from "@saleis-live/domain";
 import { Router } from "express";
+import multer from "multer";
 import { asyncHandler } from "../lib/asyncHandler.js";
+import { saveUploadedAsset } from "../lib/assetStorage.js";
 import { requireAuth } from "../middleware/auth.js";
 import { logAudit } from "../store/auditLog.js";
 import { getCampaignById, getOrCreateCurrentCampaign, updateCampaign } from "../store/campaigns.js";
 import { getBrandById, publishBrand, updateBrandPolicies } from "../store/tenants.js";
+
+const heroUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 /**
  * Screen 06 (Launch Studio) — Sale + Store + Policies tabs. Payments and
@@ -41,6 +45,8 @@ export function campaignsRouter(): Router {
         heroDesktopUrl: string | null;
         heroMobileUrl: string | null;
         themePreset: ThemePresetId;
+        heroColorPreset: HeroColorPresetId | null;
+        heroFontPreset: string | null;
       }>;
       const before = await getCampaignById(req.params.id);
       const updated = await updateCampaign(req.params.id, body);
@@ -54,6 +60,21 @@ export function campaignsRouter(): Router {
         await logAudit({ tenantId: updated.tenantId, brandId: updated.brandId, userId: req.user!.id, action: "campaign.published", entityType: "campaign", entityId: updated.id, metadata: { name: updated.name, slug: updated.slug } });
       }
       res.json({ campaign: updated });
+    }),
+  );
+
+  /** Store tab's hero image — a real upload (multipart), same pattern as product photos/backgrounds, replacing the old raw-URL text field nobody could actually use without hosting the image somewhere else first. */
+  router.post(
+    "/api/brands/:brandId/hero-image",
+    requireAuth,
+    heroUpload.single("file"),
+    asyncHandler(async (req, res) => {
+      const brand = await getBrandById(req.params.brandId);
+      if (!brand) return res.status(400).json({ error: "unknown_brand" });
+      if (!req.file) return res.status(400).json({ error: "missing_file" });
+      const extension = (req.file.originalname.split(".").pop() || "jpg").toLowerCase();
+      const url = await saveUploadedAsset(req.file.buffer, extension, "hero");
+      res.status(201).json({ url });
     }),
   );
 
