@@ -32,6 +32,8 @@ export interface Brand {
   /** Verification is required before a slug matching a recognizable brand name goes live — see blueprint §3. */
   slugVerified: boolean;
   customDomain: string | null;
+  /** Shown in the storefront header in place of the "Your brand goes here" placeholder — set from Launch Studio's "Store design" tab. Null means the brand hasn't uploaded one yet. */
+  logoUrl: string | null;
   /** Store-wide policy text shown on the storefront (screen 06's "Policies" tab) — plain text, no template engine. */
   returnPolicy: string | null;
   shippingPolicy: string | null;

@@ -27,6 +27,7 @@ function toDomainBrand(row: PrismaBrand): Brand {
     secondaryLanguage: row.secondaryLanguage,
     slugVerified: row.slugVerified,
     customDomain: row.customDomain,
+    logoUrl: row.logoUrl,
     returnPolicy: row.returnPolicy,
     shippingPolicy: row.shippingPolicy,
     paymentIntegration: row.paymentIntegration as HttpIntegrationConfig | null,
@@ -81,7 +82,7 @@ export async function isSlugAvailable(slug: string): Promise<boolean> {
 }
 
 export async function createBrand(
-  input: Omit<Brand, "id" | "createdAt" | "status" | "slugVerified" | "customDomain" | "returnPolicy" | "shippingPolicy" | "paymentIntegration" | "deliveryIntegration">,
+  input: Omit<Brand, "id" | "createdAt" | "status" | "slugVerified" | "customDomain" | "logoUrl" | "returnPolicy" | "shippingPolicy" | "paymentIntegration" | "deliveryIntegration">,
 ): Promise<Brand> {
   const row = await prisma.brand.create({
     data: {
@@ -128,6 +129,15 @@ export async function updateBrandProfile(id: string, patch: { name: string; coun
 export async function updateBrandPolicies(id: string, patch: Partial<{ returnPolicy: string; shippingPolicy: string }>): Promise<Brand | undefined> {
   try {
     const row = await prisma.brand.update({ where: { id }, data: patch });
+    return toDomainBrand(row);
+  } catch {
+    return undefined;
+  }
+}
+
+export async function setBrandLogo(id: string, logoUrl: string): Promise<Brand | undefined> {
+  try {
+    const row = await prisma.brand.update({ where: { id }, data: { logoUrl } });
     return toDomainBrand(row);
   } catch {
     return undefined;

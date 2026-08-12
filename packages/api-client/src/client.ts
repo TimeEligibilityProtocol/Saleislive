@@ -334,6 +334,19 @@ export class ApiClient {
     return campaign;
   }
 
+  /** Store design's brand logo — shown on the real storefront header. Raw fetch, not this.request(): see addProductImage's comment on FormData. */
+  async uploadBrandLogo(brandId: string, file: File): Promise<Brand> {
+    const token = await this.config.getAuthToken?.();
+    const form = new FormData();
+    form.append("file", file);
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`${this.config.baseUrl}/api/brands/${brandId}/logo`, { method: "POST", body: form, headers });
+    if (!res.ok) throw new ApiError(res.status, await res.text());
+    const { brand } = (await res.json()) as { brand: Brand };
+    return brand;
+  }
+
   /** Store tab's hero image — a real upload, replacing the old raw-URL text field. Raw fetch, not this.request(): see addProductImage's comment on FormData. */
   async uploadHeroImage(brandId: string, file: File): Promise<string> {
     const token = await this.config.getAuthToken?.();

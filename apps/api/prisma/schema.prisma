@@ -48,6 +48,7 @@ model Brand {
   secondaryLanguage String?
   slugVerified      Boolean     @default(false)
   customDomain      String?
+  logoUrl           String?
   returnPolicy      String?
   shippingPolicy    String?
   /// HttpIntegrationConfig — packages/domain/src/adapters.ts

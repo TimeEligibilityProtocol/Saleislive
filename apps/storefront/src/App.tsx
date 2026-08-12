@@ -167,12 +167,18 @@ export function App() {
           <span className="storefront-logo" style={{ display: "inline-flex" }}>
             <Logo height={55} />
           </span>
-          <span className="storefront-brand-placeholder-full" style={styles.brandPlaceholder}>
-            Your brand goes here
-          </span>
-          <span className="storefront-brand-placeholder-short" style={styles.brandPlaceholder}>
-            Your brand
-          </span>
+          {brand.logoUrl ? (
+            <img src={apiClient.resolveAssetUrl(brand.logoUrl)} alt={brand.name} style={{ height: 32, width: "auto", objectFit: "contain" }} />
+          ) : (
+            <>
+              <span className="storefront-brand-placeholder-full" style={styles.brandPlaceholder}>
+                Your brand goes here
+              </span>
+              <span className="storefront-brand-placeholder-short" style={styles.brandPlaceholder}>
+                Your brand
+              </span>
+            </>
+          )}
         </a>
         <a href="#/bag" style={{ ...styles.bagLink, flexShrink: 0 }}>
           Bag ({cartCount})
@@ -249,9 +255,14 @@ function HomeView({ brand, campaign, products, onAddToBag }: { brand: Brand; cam
                   </>
                 )}
               </h1>
-              <p style={{ ...styles.heroSub, ...(hasCustomHero ? { color: customHeroUrl ? "#fff" : colorPreset ? colorPreset.text : styles.heroSub.color, opacity: 0.85 } : {}) }}>
-                {campaign?.shortDescription || "A new AI-powered way to turn your catalogue into a complete branded sale."}
-              </p>
+              {/* Short description is optional (Ola, 2026-08-12) — a merchant who deliberately left it blank shouldn't see the platform's own demo copy fill in instead; that fallback only applies when nothing about the hero has been customized at all. */}
+              {hasCustomHero ? (
+                campaign?.shortDescription ? (
+                  <p style={{ ...styles.heroSub, color: customHeroUrl ? "#fff" : colorPreset ? colorPreset.text : styles.heroSub.color, opacity: 0.85 }}>{campaign.shortDescription}</p>
+                ) : null
+              ) : (
+                <p style={styles.heroSub}>A new AI-powered way to turn your catalogue into a complete branded sale.</p>
+              )}
               <a href="#products-grid" className="hero-shop-cta" style={styles.heroCta}>
                 Shop the sale
               </a>

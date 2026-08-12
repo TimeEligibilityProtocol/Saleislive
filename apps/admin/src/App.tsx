@@ -2757,8 +2757,15 @@ function ImportHistorySection({ brandId }: { brandId: string }) {
   );
 }
 
-type LaunchTab = "sale" | "store" | "payments" | "delivery" | "policies";
-const LAUNCH_TABS: LaunchTab[] = ["sale", "store", "payments", "delivery", "policies"];
+// Was 5 flat tabs (Sale/Store/Payments/Delivery/Policies) with one shared
+// Save button that silently wrote both Sale-info and Store-design fields
+// together no matter which tab was open — confusing, since it looked like
+// two separate steps but wasn't (Ola, 2026-08-12). Payments/Delivery/
+// Policies are all "things you connect before going fully live", not
+// storefront content, so they're one combined tab now.
+type LaunchTab = "sale" | "store" | "connect";
+const LAUNCH_TABS: LaunchTab[] = ["sale", "store", "connect"];
+const LAUNCH_TAB_LABELS: Record<LaunchTab, string> = { sale: "Sale info", store: "Store design", connect: "Connect & policies" };
 
 const CAMPAIGN_ACCESS_OPTIONS: { key: CampaignAccess; label: string }[] = [
   { key: "public", label: "Public" },
@@ -2807,6 +2814,8 @@ function LaunchStudioPage() {
   const [uploadingHero, setUploadingHero] = useState<"desktop" | "mobile" | null>(null);
   const heroDesktopInputRef = useRef<HTMLInputElement>(null);
   const heroMobileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   const [returnPolicy, setReturnPolicy] = useState("");
   const [shippingPolicy, setShippingPolicy] = useState("");
@@ -2855,7 +2864,11 @@ function LaunchStudioPage() {
     });
   };
 
-  const onSaveSaleAndStore = async () => {
+  // Two distinct publish actions, not one shared save behind both tabs —
+  // Sale info (who can access, when it runs, which products) and Store
+  // design (what visitors actually see) are genuinely separate decisions,
+  // and sharing a single Save silently rewrote whichever tab wasn't open.
+  const onPublishSaleInfo = async () => {
     if (!campaign) return;
     setSaving(true);
     setError(null);
@@ -2868,6 +2881,23 @@ function LaunchStudioPage() {
         startsAt: startsAt ? new Date(startsAt).toISOString() : campaign.startsAt,
         endsAt: endsAt ? new Date(endsAt).toISOString() : null,
         productIds: [...productIds],
+      });
+      setCampaign(updated);
+      setSaved(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const onPublishStoreDesign = async () => {
+    if (!campaign) return;
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const updated = await apiClient.updateCampaign(campaign.id, {
         headline,
         shortDescription,
         heroDesktopUrl: heroDesktopUrl || null,
@@ -2900,6 +2930,23 @@ function LaunchStudioPage() {
     }
   };
 
+  // Unlike hero image/colour/font, the logo commits immediately on upload
+  // rather than waiting for "Publish" — same as Product Studio's photo
+  // tools, and it lives on Brand (not Campaign) so there's nothing else on
+  // this tab's Publish action that could plausibly bundle it in.
+  const onLogoFilePicked = async (file: File | null) => {
+    if (!file) return;
+    setUploadingLogo(true);
+    setError(null);
+    try {
+      setBrand(await apiClient.uploadBrandLogo(brandId, file));
+    } catch {
+      setError("Couldn't upload that logo.");
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
   const onSavePolicies = async () => {
     setSaving(true);
     setError(null);
@@ -2922,7 +2969,7 @@ function LaunchStudioPage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
           <h1 style={styles.h1}>Set up your sale</h1>
-          <p style={styles.sub}>Configure sale, storefront, payment and delivery in one launch workspace.</p>
+          <p style={styles.sub}>Sale details, how your store looks, and connecting payments/delivery — nothing here is visible to customers until you Go live.</p>
         </div>
         <a href="#/preview-publish" style={styles.previewLink}>
           Preview &amp; publish →
@@ -2942,7 +2989,7 @@ function LaunchStudioPage() {
               setError(null);
             }}
           >
-            {t[0].toUpperCase() + t.slice(1)}
+            {LAUNCH_TAB_LABELS[t]}
           </button>
         ))}
       </div>
@@ -3014,10 +3061,10 @@ function LaunchStudioPage() {
           )}
 
           {error ? <p style={styles.error}>{error}</p> : null}
-          {saved ? <p style={{ ...styles.sub, color: colors.success, fontWeight: 600, marginTop: 12, marginBottom: 0 }}>Saved.</p> : null}
+          {saved ? <p style={{ ...styles.sub, color: colors.success, fontWeight: 600, marginTop: 12, marginBottom: 0 }}>Published.</p> : null}
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
-            <button style={{ ...styles.button, ...styles.buttonAuto, opacity: saving ? 0.4 : 1 }} disabled={saving} onClick={onSaveSaleAndStore}>
-              {saving ? "Saving…" : "Save"}
+            <button style={{ ...styles.button, ...styles.buttonAuto, opacity: saving ? 0.4 : 1 }} disabled={saving} onClick={onPublishSaleInfo}>
+              {saving ? "Publishing…" : "Publish"}
             </button>
           </div>
         </div>
@@ -3026,10 +3073,50 @@ function LaunchStudioPage() {
       {tab === "store" ? (
         <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
           <div style={{ ...styles.sectionCard, flex: 1, minWidth: 320 }}>
-            <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 16 }}>Store</h2>
-            <label style={styles.label}>Headline</label>
+            <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 16 }}>Store design</h2>
+
+            <label style={styles.label}>Logo</label>
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                e.target.value = "";
+                void onLogoFilePicked(file);
+              }}
+            />
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 8,
+                  border: `1px dashed ${colors.border}`,
+                  background: brand?.logoUrl ? `url(${apiClient.resolveAssetUrl(brand.logoUrl)}) center/contain no-repeat` : colors.background,
+                  flexShrink: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {!brand?.logoUrl ? <span style={{ fontSize: 9, color: colors.muted }}>No logo</span> : null}
+              </div>
+              <button
+                type="button"
+                disabled={uploadingLogo}
+                onClick={() => logoInputRef.current?.click()}
+                style={{ ...styles.button, ...styles.buttonAuto, fontSize: 12, padding: "8px 14px", opacity: uploadingLogo ? 0.5 : 1 }}
+              >
+                {uploadingLogo ? "Uploading…" : brand?.logoUrl ? "Replace logo" : "Upload logo"}
+              </button>
+            </div>
+            <p style={{ fontSize: 11, color: colors.muted, marginTop: 6 }}>Shown on your storefront's header. Best results: a transparent PNG, roughly 400 × 160px.</p>
+
+            <label style={{ ...styles.label, marginTop: 16 }}>Headline</label>
             <input style={styles.input} value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="e.g. The private sale is live." />
-            <label style={styles.label}>Short description</label>
+            <label style={styles.label}>Short description (optional)</label>
             <input style={styles.input} value={shortDescription} onChange={(e) => setShortDescription(e.target.value)} placeholder="e.g. Selected pieces. Limited time." />
 
             <label style={{ ...styles.label, marginTop: 16 }}>Hero image</label>
@@ -3107,7 +3194,7 @@ function LaunchStudioPage() {
               Best results: desktop 1920 × 1080px, mobile 1080 × 1350px, JPG or PNG. Optional — without one, the colour below fills the hero instead.
             </p>
 
-            <label style={{ ...styles.label, marginTop: 16 }}>Hero colour</label>
+            <label style={{ ...styles.label, marginTop: 16 }}>Background colour (used if you don't upload a hero photo)</label>
             <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
               {HERO_COLOR_OPTIONS.map(([key, preset]) => (
                 <button
@@ -3168,10 +3255,10 @@ function LaunchStudioPage() {
             </div>
 
             {error ? <p style={styles.error}>{error}</p> : null}
-            {saved ? <p style={{ ...styles.sub, color: colors.success, fontWeight: 600, marginTop: 12, marginBottom: 0 }}>Saved.</p> : null}
+            {saved ? <p style={{ ...styles.sub, color: colors.success, fontWeight: 600, marginTop: 12, marginBottom: 0 }}>Published.</p> : null}
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
-              <button style={{ ...styles.button, ...styles.buttonAuto, opacity: saving ? 0.4 : 1 }} disabled={saving} onClick={onSaveSaleAndStore}>
-                {saving ? "Saving…" : "Save"}
+              <button style={{ ...styles.button, ...styles.buttonAuto, opacity: saving ? 0.4 : 1 }} disabled={saving} onClick={onPublishStoreDesign}>
+                {saving ? "Publishing…" : "Publish"}
               </button>
             </div>
           </div>
@@ -3210,33 +3297,33 @@ function LaunchStudioPage() {
         </div>
       ) : null}
 
-      {tab === "payments" ? <IntegrationPanel kind="payment" brandId={brandId} integration={brand?.paymentIntegration ?? null} onUpdated={setBrand} /> : null}
-
-      {tab === "delivery" ? <IntegrationPanel kind="delivery" brandId={brandId} integration={brand?.deliveryIntegration ?? null} onUpdated={setBrand} /> : null}
-
-      {tab === "policies" ? (
-        <div style={{ ...styles.sectionCard, maxWidth: 600 }}>
-          <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 16 }}>Policies</h2>
-          <label style={styles.label}>Return policy</label>
-          <textarea
-            style={{ ...styles.input, minHeight: 80, fontFamily: "inherit", resize: "vertical" }}
-            value={returnPolicy}
-            onChange={(e) => setReturnPolicy(e.target.value)}
-            placeholder="e.g. Returns accepted within 14 days…"
-          />
-          <label style={{ ...styles.label, marginTop: 16 }}>Shipping policy</label>
-          <textarea
-            style={{ ...styles.input, minHeight: 80, fontFamily: "inherit", resize: "vertical" }}
-            value={shippingPolicy}
-            onChange={(e) => setShippingPolicy(e.target.value)}
-            placeholder="e.g. Delivery within 3-5 business days…"
-          />
-          {error ? <p style={styles.error}>{error}</p> : null}
-          {saved ? <p style={{ ...styles.sub, color: colors.success, fontWeight: 600, marginTop: 12, marginBottom: 0 }}>Saved.</p> : null}
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
-            <button style={{ ...styles.button, ...styles.buttonAuto, opacity: saving ? 0.4 : 1 }} disabled={saving} onClick={onSavePolicies}>
-              {saving ? "Saving…" : "Save"}
-            </button>
+      {tab === "connect" ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          <IntegrationPanel kind="payment" brandId={brandId} integration={brand?.paymentIntegration ?? null} onUpdated={setBrand} />
+          <IntegrationPanel kind="delivery" brandId={brandId} integration={brand?.deliveryIntegration ?? null} onUpdated={setBrand} />
+          <div style={{ ...styles.sectionCard, maxWidth: 600 }}>
+            <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 16 }}>Policies</h2>
+            <label style={styles.label}>Return policy</label>
+            <textarea
+              style={{ ...styles.input, minHeight: 80, fontFamily: "inherit", resize: "vertical" }}
+              value={returnPolicy}
+              onChange={(e) => setReturnPolicy(e.target.value)}
+              placeholder="e.g. Returns accepted within 14 days…"
+            />
+            <label style={{ ...styles.label, marginTop: 16 }}>Shipping policy</label>
+            <textarea
+              style={{ ...styles.input, minHeight: 80, fontFamily: "inherit", resize: "vertical" }}
+              value={shippingPolicy}
+              onChange={(e) => setShippingPolicy(e.target.value)}
+              placeholder="e.g. Delivery within 3-5 business days…"
+            />
+            {error ? <p style={styles.error}>{error}</p> : null}
+            {saved ? <p style={{ ...styles.sub, color: colors.success, fontWeight: 600, marginTop: 12, marginBottom: 0 }}>Published.</p> : null}
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
+              <button style={{ ...styles.button, ...styles.buttonAuto, opacity: saving ? 0.4 : 1 }} disabled={saving} onClick={onSavePolicies}>
+                {saving ? "Publishing…" : "Publish"}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
@@ -3469,7 +3556,8 @@ function PreviewPublishPage() {
   const selectedProducts = products.filter((p) => campaign.productIds.includes(p.id));
   const readyProducts = selectedProducts.filter(isCatalogueReady);
   const catalogueReady = selectedProducts.length > 0 && readyProducts.length === selectedProducts.length;
-  const storeReady = !!campaign.headline && !!campaign.shortDescription;
+  // Short description is optional (Ola, 2026-08-12: "not everyone will want it") — only the headline actually gates readiness.
+  const storeReady = !!campaign.headline;
   const policiesReady = !!brand.returnPolicy && !!brand.shippingPolicy;
   const canPublish = catalogueReady && storeReady && policiesReady;
 
@@ -3493,32 +3581,36 @@ function PreviewPublishPage() {
       ready: catalogueReady,
       note: selectedProducts.length === 0 ? "No products selected" : `${readyProducts.length}/${selectedProducts.length} ready`,
     },
-    { label: "Store copy", ready: storeReady, note: storeReady ? "Ready" : "Missing headline or description" },
+    { label: "Store copy", ready: storeReady, note: storeReady ? "Ready" : "Missing headline" },
     { label: "Policies", ready: policiesReady, note: policiesReady ? "Ready" : "Missing return or shipping policy" },
   ];
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div>
-          <h1 style={styles.h1}>Go live</h1>
-          <p style={styles.sub}>Final check before the sale goes live. Until then, your store is only visible to you.</p>
-        </div>
-        <a href={resolveStorefrontPreviewUrl(brand.slug, window.localStorage.getItem(AUTH_TOKEN_KEY))} target="_blank" rel="noreferrer" style={styles.previewLink}>
-          Preview your store →
-        </a>
+      <div>
+        <h1 style={styles.h1}>Go live</h1>
+        <p style={styles.sub}>Final check before the sale goes live. Until then, your store is only visible to you.</p>
       </div>
       <hr style={styles.divider} />
 
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div style={{ ...styles.sectionCard, flex: 1, minWidth: 320 }}>
-          <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 16 }}>Storefront preview</h2>
-          <div style={{ background: colors.background, borderRadius: 12, padding: 28, textAlign: "center" }}>
-            <p style={{ fontFamily: typography.fontFamily.display, fontSize: 26, margin: "0 0 12px", color: colors.ink }}>{campaign.headline || "Your headline here"}</p>
-            <p style={{ fontSize: 13, color: colors.muted, margin: "0 0 16px" }}>{campaign.shortDescription || "Your short description here"}</p>
-            <span style={{ ...styles.pill, background: colors.navy, color: colors.white, padding: "8px 20px" }}>Shop now</span>
-          </div>
+          <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 16 }}>See your actual storefront</h2>
+          <p style={{ ...styles.sub, marginBottom: 16 }}>
+            Not public yet — this link only works for you, signed in. It's the real store: your products, headline, colours and everything else you've set up so far.
+          </p>
+          <a
+            href={resolveStorefrontPreviewUrl(brand.slug, window.localStorage.getItem(AUTH_TOKEN_KEY))}
+            target="_blank"
+            rel="noreferrer"
+            style={{ ...styles.button, ...styles.buttonAuto, display: "inline-block", textDecoration: "none", textAlign: "center" }}
+          >
+            Open your store →
+          </a>
           <p style={{ fontSize: 12, color: colors.muted, marginTop: 12 }}>
+            Adapts automatically to phone screens — open the same link on your phone, or resize this browser window, to check the mobile layout.
+          </p>
+          <p style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>
             {selectedProducts.length} product{selectedProducts.length === 1 ? "" : "s"} in this sale.
           </p>
         </div>

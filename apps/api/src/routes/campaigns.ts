@@ -6,7 +6,7 @@ import { saveUploadedAsset } from "../lib/assetStorage.js";
 import { requireAuth } from "../middleware/auth.js";
 import { logAudit } from "../store/auditLog.js";
 import { getCampaignById, getOrCreateCurrentCampaign, updateCampaign } from "../store/campaigns.js";
-import { getBrandById, publishBrand, updateBrandPolicies } from "../store/tenants.js";
+import { getBrandById, publishBrand, setBrandLogo, updateBrandPolicies } from "../store/tenants.js";
 
 const heroUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -75,6 +75,23 @@ export function campaignsRouter(): Router {
       const extension = (req.file.originalname.split(".").pop() || "jpg").toLowerCase();
       const url = await saveUploadedAsset(req.file.buffer, extension, "hero");
       res.status(201).json({ url });
+    }),
+  );
+
+  /** Store design's brand logo — shown on the real storefront header in place of the "Your brand goes here" placeholder. */
+  router.post(
+    "/api/brands/:brandId/logo",
+    requireAuth,
+    heroUpload.single("file"),
+    asyncHandler(async (req, res) => {
+      const brand = await getBrandById(req.params.brandId);
+      if (!brand) return res.status(400).json({ error: "unknown_brand" });
+      if (!req.file) return res.status(400).json({ error: "missing_file" });
+      const extension = (req.file.originalname.split(".").pop() || "png").toLowerCase();
+      const url = await saveUploadedAsset(req.file.buffer, extension, "logo");
+      const updated = await setBrandLogo(brand.id, url);
+      if (!updated) return res.status(500).json({ error: "update_failed" });
+      res.status(201).json({ brand: updated });
     }),
   );
 
