@@ -330,6 +330,10 @@ model Campaign {
   themePreset      String
   heroColorPreset  String?
   heroFontPreset   String?
+  /// Only set when access = password. Never exposed to any client — see
+  /// store/campaigns.ts's toDomainCampaign, which deliberately omits it,
+  /// same pattern as Credential.passwordHash vs. the User domain type.
+  accessPasswordHash String?
 
   createdAt DateTime @default(now())
 

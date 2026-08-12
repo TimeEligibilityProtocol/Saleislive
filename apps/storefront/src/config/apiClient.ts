@@ -50,9 +50,19 @@ function capturePreviewToken(): void {
 }
 capturePreviewToken();
 
+const UNLOCK_TOKEN_KEY = "saleislive:unlockToken";
+
+/** Set once a visitor types the right password for a "password"-access sale (see unlockStorefrontAccess) — kept for the rest of this tab's session, same lifetime as the preview token. A stale token from a since-changed sale just fails server-side re-verification and re-locks, no special handling needed here. */
+export function storeStorefrontUnlockToken(token: string): void {
+  window.sessionStorage.setItem(UNLOCK_TOKEN_KEY, token);
+}
+
 export const apiClient = new ApiClient({
   baseUrl: resolveApiBaseUrl(),
   brandSlug: resolveBrandSlugOverride(),
+  // A real preview session always wins over an unlock token — the brand
+  // owner previewing their own password-protected sale shouldn't also
+  // need to know its password.
   // eslint-disable-next-line @typescript-eslint/require-await
-  getAuthToken: async () => window.sessionStorage.getItem(PREVIEW_TOKEN_KEY),
+  getAuthToken: async () => window.sessionStorage.getItem(PREVIEW_TOKEN_KEY) ?? window.sessionStorage.getItem(UNLOCK_TOKEN_KEY),
 });

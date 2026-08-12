@@ -127,9 +127,24 @@ export class ApiClient {
     return brand;
   }
 
-  /** `previewing` is true only when this request carries a valid session for a member of this exact brand — see apps/api/src/routes/storefront.ts's isPreviewAuthorized. Lets the storefront show a "coming soon" page to real visitors while still letting the brand owner see their own unpublished store. */
-  async getCurrentStorefrontBrand(): Promise<{ brand: Brand; previewing: boolean }> {
-    return this.request<{ brand: Brand; previewing: boolean }>("/api/storefront/me");
+  /**
+   * `previewing` is true only when this request carries a valid session for
+   * a member of this exact brand — see apps/api/src/routes/storefront.ts's
+   * isPreviewAuthorized. Lets the storefront show a "coming soon" page to
+   * real visitors while still letting the brand owner see their own
+   * unpublished store. `locked` is true when the current sale is
+   * password-protected and this visitor hasn't unlocked it yet (see
+   * unlockStorefrontAccess) — the storefront should show a password gate
+   * instead of calling listStorefrontProducts/getCurrentStorefrontCampaign,
+   * both of which 401 while locked.
+   */
+  async getCurrentStorefrontBrand(): Promise<{ brand: Brand; previewing: boolean; access: Campaign["access"]; locked: boolean }> {
+    return this.request<{ brand: Brand; previewing: boolean; access: Campaign["access"]; locked: boolean }>("/api/storefront/me");
+  }
+
+  /** The password for a "password"-access sale, checked against the hash set via updateCampaign's accessPassword field. On success, the returned token unlocks listStorefrontProducts/getCurrentStorefrontCampaign for ~30 days — the caller is responsible for storing it and threading it back through getAuthToken. */
+  async unlockStorefrontAccess(password: string): Promise<{ token: string }> {
+    return this.request<{ token: string }>("/api/storefront/unlock", { method: "POST", body: JSON.stringify({ password }) });
   }
 
   async listStorefrontProducts(): Promise<Product[]> {
@@ -329,7 +344,8 @@ export class ApiClient {
     return campaign;
   }
 
-  async updateCampaign(id: string, patch: Partial<Omit<Campaign, "id" | "tenantId" | "brandId" | "createdAt">>): Promise<Campaign> {
+  /** `accessPassword` is write-only (set/change the shared password for `access: "password"`) — never present on a read, so never pass it back from a Campaign you just fetched. */
+  async updateCampaign(id: string, patch: Partial<Omit<Campaign, "id" | "tenantId" | "brandId" | "createdAt">> & { accessPassword?: string }): Promise<Campaign> {
     const { campaign } = await this.request<{ campaign: Campaign }>(`/api/campaigns/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
     return campaign;
   }

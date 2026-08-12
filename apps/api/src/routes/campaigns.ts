@@ -5,7 +5,7 @@ import { asyncHandler } from "../lib/asyncHandler.js";
 import { saveUploadedAsset } from "../lib/assetStorage.js";
 import { requireAuth } from "../middleware/auth.js";
 import { logAudit } from "../store/auditLog.js";
-import { getCampaignById, getOrCreateCurrentCampaign, updateCampaign } from "../store/campaigns.js";
+import { getCampaignById, getOrCreateCurrentCampaign, setCampaignAccessPassword, updateCampaign } from "../store/campaigns.js";
 import { getBrandById, publishBrand, setBrandLogo, updateBrandPolicies } from "../store/tenants.js";
 
 const heroUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -47,10 +47,20 @@ export function campaignsRouter(): Router {
         themePreset: ThemePresetId;
         heroColorPreset: HeroColorPresetId | null;
         heroFontPreset: string | null;
+        /// Plaintext, write-only — never round-tripped back on reads (see
+        /// store/campaigns.ts's toDomainCampaign, which never selects the
+        /// hash). Handled separately from the rest of the patch below since
+        /// it needs hashing, not a direct column assignment.
+        accessPassword: string;
       }>;
+      const { accessPassword, ...patch } = body;
       const before = await getCampaignById(req.params.id);
-      const updated = await updateCampaign(req.params.id, body);
+      const updated = await updateCampaign(req.params.id, patch);
       if (!updated) return res.status(404).json({ error: "not_found" });
+      if (accessPassword) {
+        await setCampaignAccessPassword(updated.id, accessPassword);
+        updated.hasAccessPassword = true; // updateCampaign's snapshot predates this write
+      }
       if (body.status === "live" && before?.status !== "live") {
         // The moment a merchant's very first sale actually goes live is also
         // the moment their storefront should stop being preview-only and

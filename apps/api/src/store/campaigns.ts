@@ -1,9 +1,11 @@
 import { Campaign } from "@saleis-live/domain";
+import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
 import { prisma } from "../lib/prisma.js";
 import { Campaign as PrismaCampaign, Prisma } from "../generated/prisma/client.js";
 
 const toJson = (v: unknown) => v as Prisma.InputJsonValue;
+const BCRYPT_ROUNDS = 12;
 
 /** Persisted in Postgres via Prisma. */
 
@@ -26,6 +28,7 @@ function toDomainCampaign(row: PrismaCampaign): Campaign {
     themePreset: row.themePreset as Campaign["themePreset"],
     heroColorPreset: row.heroColorPreset as Campaign["heroColorPreset"],
     heroFontPreset: row.heroFontPreset,
+    hasAccessPassword: !!row.accessPasswordHash,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -82,4 +85,17 @@ export async function updateCampaign(id: string, patch: Partial<Omit<Campaign, "
   } catch {
     return undefined;
   }
+}
+
+/** Sets/changes the shared password for a "password"-access campaign. Passing null clears it (access reverts to needing no password to unlock, though the UI should also flip `access` away from "password" when doing this). */
+export async function setCampaignAccessPassword(id: string, password: string | null): Promise<void> {
+  const accessPasswordHash = password ? await bcrypt.hash(password, BCRYPT_ROUNDS) : null;
+  await prisma.campaign.update({ where: { id }, data: { accessPasswordHash } });
+}
+
+/** True only for a campaign that both requires a password and has that exact password. A password-access campaign with no hash set yet (Ola turned on "Password" but hasn't set one) never unlocks — fails closed, not open. */
+export async function verifyCampaignAccessPassword(id: string, password: string): Promise<boolean> {
+  const row = await prisma.campaign.findUnique({ where: { id }, select: { accessPasswordHash: true } });
+  if (!row?.accessPasswordHash) return false;
+  return bcrypt.compare(password, row.accessPasswordHash);
 }

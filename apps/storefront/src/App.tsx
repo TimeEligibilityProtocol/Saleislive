@@ -1,8 +1,9 @@
 import { colors, typography } from "@saleis-live/ui";
-import { Brand, Campaign, DeliveryMethod, HERO_COLOR_PRESETS, Money, Order, Product } from "@saleis-live/domain";
-import { SyntheticEvent, useEffect, useState } from "react";
+import { Brand, Campaign, CampaignAccess, DeliveryMethod, HERO_COLOR_PRESETS, Money, Order, Product } from "@saleis-live/domain";
+import { ApiError } from "@saleis-live/api-client";
+import { SyntheticEvent, useCallback, useEffect, useState } from "react";
 import { Logo } from "./components/Logo";
-import { apiClient } from "./config/apiClient";
+import { apiClient, storeStorefrontUnlockToken } from "./config/apiClient";
 
 // Flat demo delivery fee — not a real courier rate lookup (no adapter is
 // connected, see Launch Studio's honest "Payments/Delivery: Not connected").
@@ -42,13 +43,42 @@ function useHashRoute(): string {
   return hash;
 }
 
-type LoadState = "loading" | "not_found" | "ready";
+type LoadState = "loading" | "not_found" | "locked" | "ready";
 type CheckoutInfo = { name: string; phone: string; location: string; deliveryMethod: DeliveryMethod };
+
+/**
+ * Google's own crawler runs JavaScript before deciding what to index, so a
+ * client-injected robots meta tag genuinely works for search de-indexing —
+ * unlike Open Graph link-preview cards (WhatsApp/Slack/LinkedIn/iMessage),
+ * whose crawlers only ever read the static, pre-JS HTML document and need
+ * server-side templating instead (tracked separately, Share Card phase 1).
+ * "public" gets no tag at all (indexable, the existing default); everything
+ * else — private/unlisted, invite (no allowlist built yet, so treated the
+ * same as private for now), and password — asks not to be indexed, since
+ * none of them are meant to be discoverable, only reachable by direct link.
+ */
+function useNoindexForAccess(access: CampaignAccess | null): void {
+  useEffect(() => {
+    const existing = document.querySelector('meta[name="robots"]');
+    if (access && access !== "public") {
+      const tag = existing ?? document.createElement("meta");
+      tag.setAttribute("name", "robots");
+      tag.setAttribute("content", "noindex, nofollow");
+      if (!existing) document.head.appendChild(tag);
+    } else if (existing) {
+      existing.remove();
+    }
+    return () => {
+      document.querySelector('meta[name="robots"]')?.remove();
+    };
+  }, [access]);
+}
 
 export function App() {
   const [state, setState] = useState<LoadState>("loading");
   const [brand, setBrand] = useState<Brand | null>(null);
   const [campaign, setCampaign] = useState<Campaign | null>(null);
+  const [access, setAccess] = useState<CampaignAccess | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<Record<string, number>>({});
@@ -56,12 +86,18 @@ export function App() {
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
   const hash = useHashRoute();
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setState("loading");
     apiClient
       .getCurrentStorefrontBrand()
-      .then(({ brand: b, previewing: p }) => {
+      .then(({ brand: b, previewing: p, access: a, locked }) => {
         setBrand(b);
         setPreviewing(p);
+        setAccess(a);
+        if (locked) {
+          setState("locked");
+          return null;
+        }
         return Promise.all([apiClient.listStorefrontProducts(), apiClient.getCurrentStorefrontCampaign().catch(() => null)]);
       })
       .then((result) => {
@@ -71,13 +107,27 @@ export function App() {
         setCampaign(c);
         setState("ready");
       })
-      .catch(() => {
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 401) {
+          setState("locked");
+          return;
+        }
         setState("not_found");
       });
   }, []);
 
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useNoindexForAccess(access);
+
   if (state === "loading") {
     return <div style={styles.centeredPage}>Loading…</div>;
+  }
+
+  if (state === "locked" && brand) {
+    return <PasswordGateView brand={brand} onUnlocked={load} />;
   }
 
   if (state === "not_found" || !brand) {
@@ -193,6 +243,56 @@ export function App() {
 
 function NotFound() {
   return <p style={{ padding: 32, fontSize: 14 }}>That item isn't available anymore.</p>;
+}
+
+/** access: "password" gate — the API already refused products/campaign with a 401, this is just the UI asking for what it needs. onUnlocked re-runs the whole load sequence rather than trying to patch state locally, so it stays correct if anything else about the sale changed since the page opened. */
+function PasswordGateView({ brand, onUnlocked }: { brand: Brand; onUnlocked: () => void }) {
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  const submit = async () => {
+    if (!password.trim()) return;
+    setChecking(true);
+    setError(null);
+    try {
+      const { token } = await apiClient.unlockStorefrontAccess(password);
+      storeStorefrontUnlockToken(token);
+      onUnlocked();
+    } catch {
+      setError("That's not the right password.");
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  return (
+    <div style={styles.centeredPage}>
+      <div style={{ textAlign: "center", width: "100%", maxWidth: 320 }}>
+        {brand.logoUrl ? (
+          <img src={apiClient.resolveAssetUrl(brand.logoUrl)} alt={brand.name} style={{ height: 40, width: "auto", objectFit: "contain", marginBottom: 16 }} />
+        ) : (
+          <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>{brand.name}</p>
+        )}
+        <p style={{ fontSize: 14, color: "#8A8578", marginBottom: 16 }}>This sale is password-protected.</p>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void submit();
+          }}
+          placeholder="Password"
+          style={{ ...styles.formInput, textAlign: "center" }}
+          autoFocus
+        />
+        {error ? <p style={{ color: "#B3261E", fontSize: 12, marginTop: 8 }}>{error}</p> : null}
+        <button type="button" style={{ ...styles.buyButton, width: "100%", padding: "14px 16px", fontSize: 14, marginTop: 16, opacity: checking ? 0.6 : 1 }} disabled={checking} onClick={() => void submit()}>
+          {checking ? "Checking…" : "Unlock"}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function HomeView({ brand, campaign, products, onAddToBag }: { brand: Brand; campaign: Campaign | null; products: Product[]; onAddToBag: (id: string) => void }) {

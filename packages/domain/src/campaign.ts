@@ -40,5 +40,7 @@ export interface Campaign {
   /** Null means "use the platform default" (ivory bg / Instrument Serif) — these only apply to this sale's own hero, not the whole brand. */
   heroColorPreset: HeroColorPresetId | null;
   heroFontPreset: string | null;
+  /** Whether a password is currently set for `access: "password"` — never the password/hash itself, just enough for the admin UI to show "Password set" vs "No password yet" without round-tripping anything secret. */
+  hasAccessPassword: boolean;
   createdAt: string;
 }

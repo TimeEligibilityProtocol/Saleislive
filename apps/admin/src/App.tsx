@@ -2838,11 +2838,11 @@ type LaunchTab = "sale" | "store";
 const LAUNCH_TABS: LaunchTab[] = ["sale", "store"];
 const LAUNCH_TAB_LABELS: Record<LaunchTab, string> = { sale: "Sale info", store: "Store design" };
 
-const CAMPAIGN_ACCESS_OPTIONS: { key: CampaignAccess; label: string }[] = [
-  { key: "public", label: "Public" },
-  { key: "private", label: "Private" },
-  { key: "invite", label: "Invite only" },
-  { key: "password", label: "Password" },
+const CAMPAIGN_ACCESS_OPTIONS: { key: CampaignAccess; label: string; description: string }[] = [
+  { key: "public", label: "Public", description: "Anyone can find and view this sale." },
+  { key: "private", label: "Private / Unlisted", description: "Anyone with the link can view it, no password — just hidden from search and not listed anywhere. Best for sharing a Share Card straight to WhatsApp." },
+  { key: "password", label: "Password", description: "Anyone with the link needs the shared password below to get in." },
+  { key: "invite", label: "Invite only", description: "Coming later (a real allowlist of invited people). For now this behaves the same as Private / Unlisted — link required, no password." },
 ];
 
 const THEME_PRESET_OPTIONS: { key: ThemePresetId; label: string }[] = [
@@ -2872,6 +2872,10 @@ function LaunchStudioPage() {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [access, setAccess] = useState<CampaignAccess>("public");
+  const [hasAccessPassword, setHasAccessPassword] = useState(false);
+  const [accessPasswordInput, setAccessPasswordInput] = useState("");
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [passwordSaved, setPasswordSaved] = useState(false);
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
 
@@ -2901,6 +2905,7 @@ function LaunchStudioPage() {
         setName(c.name);
         setSlug(c.slug);
         setAccess(c.access);
+        setHasAccessPassword(c.hasAccessPassword);
         setStartsAt(c.startsAt.slice(0, 16));
         setEndsAt(c.endsAt ? c.endsAt.slice(0, 16) : "");
         setHeadline(c.headline);
@@ -2954,6 +2959,29 @@ function LaunchStudioPage() {
       setError(err instanceof Error ? err.message : "Couldn't save.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Separate from onPublishSaleInfo on purpose: the password field is
+  // almost always empty (it's write-only, never read back), so bundling it
+  // into the main Publish button would either silently overwrite a real
+  // password with blank on every unrelated save, or need extra "only send
+  // if non-empty" logic that's easy to get wrong. A dedicated action makes
+  // "set/change the password" its own explicit, unambiguous step.
+  const onSetAccessPassword = async () => {
+    if (!campaign || !accessPasswordInput.trim()) return;
+    setSavingPassword(true);
+    setError(null);
+    setPasswordSaved(false);
+    try {
+      await apiClient.updateCampaign(campaign.id, { accessPassword: accessPasswordInput.trim() });
+      setHasAccessPassword(true);
+      setAccessPasswordInput("");
+      setPasswordSaved(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't set password.");
+    } finally {
+      setSavingPassword(false);
     }
   };
 
@@ -3065,6 +3093,37 @@ function LaunchStudioPage() {
               </button>
             ))}
           </div>
+          <p style={{ fontSize: 12, color: colors.muted, margin: "8px 0 0" }}>{CAMPAIGN_ACCESS_OPTIONS.find((a) => a.key === access)?.description}</p>
+
+          {access === "password" ? (
+            <div style={{ marginTop: 12, padding: 12, border: `1px solid ${colors.border}`, borderRadius: 8, background: colors.background }}>
+              <label style={styles.label}>{hasAccessPassword ? "Change password" : "Set password"}</label>
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <input
+                  style={{ ...styles.input, flex: 1 }}
+                  type="text"
+                  value={accessPasswordInput}
+                  onChange={(e) => {
+                    setAccessPasswordInput(e.target.value);
+                    setPasswordSaved(false);
+                  }}
+                  placeholder={hasAccessPassword ? "New password" : "Choose a password"}
+                />
+                <button
+                  type="button"
+                  style={{ ...styles.button, ...styles.buttonAuto, opacity: !accessPasswordInput.trim() || savingPassword ? 0.4 : 1 }}
+                  disabled={!accessPasswordInput.trim() || savingPassword}
+                  onClick={() => void onSetAccessPassword()}
+                >
+                  {savingPassword ? "Saving…" : "Set"}
+                </button>
+              </div>
+              <p style={{ fontSize: 11, color: hasAccessPassword ? colors.success : colors.muted, margin: "6px 0 0" }}>
+                {passwordSaved ? "Password updated." : hasAccessPassword ? "A password is set — share it with whoever you send this sale to." : "No password set yet — the sale won't unlock for anyone until you set one."}
+              </p>
+            </div>
+          ) : null}
+
           <div style={{ display: "flex", gap: 16, marginTop: 16 }}>
             <div style={{ flex: 1 }}>
               <label style={styles.label}>Starts</label>
