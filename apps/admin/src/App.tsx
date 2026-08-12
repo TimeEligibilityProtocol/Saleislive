@@ -480,13 +480,45 @@ function SetupProgressBar() {
   const [brandId] = useState(() => window.localStorage.getItem(LAST_BRAND_ID_KEY) ?? "b_demo");
   const { steps, reload } = useSetupSteps(brandId);
   const [busy, setBusy] = useState(false);
+  const [teamSize, setTeamSize] = useState<number | null>(null);
+  const autoApprovingRef = useRef(false);
 
-  if (!steps) return null;
-  const currentIndex = steps.findIndex((s) => s.status !== "approved");
-  if (currentIndex === -1) return null;
-  const current = steps[currentIndex];
+  useEffect(() => {
+    let cancelled = false;
+    apiClient
+      .listTeam(brandId)
+      .then((team) => {
+        if (!cancelled) setTeamSize(team.length);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [brandId]);
+
   const role = auth.memberships.find((m) => m.brandId === brandId)?.role ?? null;
   const canApprove = role === "brand_admin" || role === "group_owner";
+  const currentIndex = steps ? steps.findIndex((s) => s.status !== "approved") : -1;
+  const current = currentIndex >= 0 ? steps![currentIndex] : null;
+  // A solo brand has no one else who could ever approve a step they submitted — the
+  // gate is pointless friction (Ola, 2026-08-12: got confused by an Approve/Reject
+  // bar with no other team member around to explain it). Approve it silently instead.
+  const isSolo = teamSize !== null && teamSize <= 1;
+
+  useEffect(() => {
+    if (isSolo && canApprove && current?.status === "submitted" && !autoApprovingRef.current) {
+      autoApprovingRef.current = true;
+      apiClient
+        .approveSetupStep(brandId, current.stepKey)
+        .catch(() => {})
+        .finally(() => {
+          autoApprovingRef.current = false;
+          reload();
+        });
+    }
+  }, [isSolo, canApprove, current?.status, current?.stepKey, brandId, reload]);
+
+  if (!steps || !current) return null;
 
   const act = async (fn: () => Promise<SetupStepView>) => {
     setBusy(true);
@@ -523,11 +555,11 @@ function SetupProgressBar() {
         <a href={SETUP_STEP_ROUTES[current.stepKey]} style={{ color: colors.navy, fontWeight: 600 }}>
           {SETUP_STEP_LABELS[current.stepKey]}
         </a>
-        {current.status === "submitted" ? <span style={{ color: colors.warning }}> · waiting for approval</span> : null}
+        {current.status === "submitted" && !isSolo ? <span style={{ color: colors.warning }}> · waiting for approval</span> : null}
         {current.status === "rejected" && current.note ? <span style={{ color: colors.error }}> · rejected: {current.note}</span> : null}
       </div>
       <div style={styles.setupBarActions}>
-        {current.status === "submitted" && canApprove ? (
+        {current.status === "submitted" && canApprove && !isSolo ? (
           <>
             <button type="button" disabled={busy} style={styles.setupBtnPrimary} onClick={() => void act(() => apiClient.approveSetupStep(brandId, current.stepKey))}>
               Approve
