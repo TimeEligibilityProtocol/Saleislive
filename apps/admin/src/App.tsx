@@ -48,6 +48,7 @@ const NAV_ITEMS = [
   { label: "Add your stock", route: "#/add-stock" },
   { label: "Review your products with AI", route: "#/catalogue-center" },
   { label: "Set up your sale", route: "#/launch-studio" },
+  { label: "Payments & delivery", route: "#/payments-delivery" },
   { label: "Go live", route: "#/preview-publish" },
   { label: "Orders", route: "#/orders" },
   { label: "Dashboard", route: "#/dashboard" },
@@ -63,12 +64,12 @@ type NavLabel = (typeof NAV_ITEMS)[number]["label"];
  * enforced yet (see the read_only gap noted where this is used).
  */
 const ROLE_NAV_ACCESS: Record<Role, NavLabel[]> = {
-  group_owner: ["New brand", "Team", "Add your stock", "Review your products with AI", "Set up your sale", "Go live", "Orders", "Dashboard", "Store"],
-  brand_admin: ["New brand", "Team", "Add your stock", "Review your products with AI", "Set up your sale", "Go live", "Orders", "Dashboard", "Store"],
-  merchandiser: ["Add your stock", "Review your products with AI", "Set up your sale", "Go live"],
+  group_owner: ["New brand", "Team", "Add your stock", "Review your products with AI", "Set up your sale", "Payments & delivery", "Go live", "Orders", "Dashboard", "Store"],
+  brand_admin: ["New brand", "Team", "Add your stock", "Review your products with AI", "Set up your sale", "Payments & delivery", "Go live", "Orders", "Dashboard", "Store"],
+  merchandiser: ["Add your stock", "Review your products with AI", "Set up your sale", "Payments & delivery", "Go live"],
   order_manager: ["Orders"],
   analyst: ["Dashboard"],
-  read_only: ["New brand", "Team", "Add your stock", "Review your products with AI", "Set up your sale", "Go live", "Orders", "Dashboard", "Store"],
+  read_only: ["New brand", "Team", "Add your stock", "Review your products with AI", "Set up your sale", "Payments & delivery", "Go live", "Orders", "Dashboard", "Store"],
 };
 
 /** Where each wizard step's real work happens — used both to link the setup bar's step label and to redirect someone who jumps ahead to a step that isn't unlocked yet. */
@@ -326,6 +327,11 @@ function resolveRoute(hash: string): { active: NavLabel; stepKey: SetupStepKey |
   }
   if (hash === "#/catalogue-center") return { active: "Review your products with AI", stepKey: "ai_catalogue_review", page: <CatalogueCenterPage /> };
   if (hash === "#/launch-studio") return { active: "Set up your sale", stepKey: "launch_setup", page: <LaunchStudioPage /> };
+  // Same wizard step as Launch Studio (launch_setup) — a separate nav
+  // destination visually, not a separate approval gate, per Ola's ask
+  // (2026-08-12) to pull Payments/Delivery/Policies out of Launch
+  // Studio's tabs into their own sidebar screen before Go live.
+  if (hash === "#/payments-delivery") return { active: "Payments & delivery", stepKey: "launch_setup", page: <PaymentsDeliveryPage /> };
   if (hash === "#/preview-publish") return { active: "Go live", stepKey: "preview_publish", page: <PreviewPublishPage /> };
   if (hash === "#/orders") return { active: "Orders", stepKey: null, page: <OrdersPage /> };
   if (hash.startsWith("#/orders/")) {
@@ -1861,6 +1867,14 @@ function ProductStudioPage({ productId }: { productId: string }) {
   // click can silently seem to do nothing. This is the only signal that it
   // didn't: a plain "add a photo" success line would look the same either way.
   const [photoToolNotice, setPhotoToolNotice] = useState<string | null>(null);
+  // The photo Photo tools reads from and writes new results onto — deliberately
+  // NOT "whichever photo is currently main". Clicking a gallery thumbnail to
+  // preview a result used to silently retarget Apply background at whatever
+  // you'd just looked at, so re-applying with a different preset composited
+  // an already-composited photo onto itself ("photo inside a photo" — real
+  // report, 2026-08-12). Only Remove background (a fresh cutout) and this
+  // panel's own thumbnail strip change it now.
+  const [photoToolsSourceUrl, setPhotoToolsSourceUrl] = useState<string | null>(null);
 
   useEffect(() => {
     apiClient
@@ -1887,6 +1901,7 @@ function ProductStudioPage({ productId }: { productId: string }) {
       .then((p) => {
         if (cancelled) return;
         setProduct(p);
+        setPhotoToolsSourceUrl((p.images.find((i) => i.isMain) ?? p.images[0])?.url ?? null);
         setName(p.name.value ?? "");
         setDescription(p.description.value ?? "");
         setCategory(p.category.value ?? "");
@@ -1969,21 +1984,17 @@ function ProductStudioPage({ productId }: { productId: string }) {
     }
   };
 
-  // Acts on whichever photo is currently main — click a thumbnail below to make a different one main first.
-  const targetPhotoUrl = () => product?.images.find((i) => i.isMain)?.url ?? product?.images[0]?.url ?? null;
-
   const onRemoveBackground = async () => {
-    if (!product) return;
-    const url = targetPhotoUrl();
-    if (!url) return;
+    if (!product || !photoToolsSourceUrl) return;
     setRemovingBg(true);
     setPhotoError(null);
     setPhotoToolNotice(null);
     try {
-      const updated = await apiClient.removeImageBackground(brandId, productId, url);
+      const updated = await apiClient.removeImageBackground(brandId, productId, photoToolsSourceUrl);
       const cutout = updated.images[updated.images.length - 1];
       const withCutoutMain = await apiClient.setMainProductImage(brandId, productId, cutout.url);
       setProduct(withCutoutMain);
+      setPhotoToolsSourceUrl(cutout.url);
       resetPosition();
       setPhotoToolNotice("Background removed — this cutout is now the main photo (shown on a checkered pattern above so the transparency is visible). Pick a background below, then drag it into place.");
     } catch (err) {
@@ -2014,14 +2025,15 @@ function ProductStudioPage({ productId }: { productId: string }) {
   };
 
   const onApplyBackground = async () => {
-    if (!product) return;
-    const url = targetPhotoUrl();
-    if (!url) return;
+    if (!product || !photoToolsSourceUrl) return;
     setApplyingBg(true);
     setPhotoError(null);
     try {
-      setProduct(await apiClient.applyBackgroundPreset(brandId, productId, url, customBgUrl ? null : preset, { offsetX, offsetY, scale, customBackgroundUrl: customBgUrl ?? undefined }));
-      setPhotoToolNotice("Background applied — added as a new photo in the gallery below.");
+      // Deliberately doesn't touch photoToolsSourceUrl or product-main — stays
+      // pointed at the same cutout so trying several different backgrounds in a
+      // row keeps compositing from the clean source, never from a previous result.
+      setProduct(await apiClient.applyBackgroundPreset(brandId, productId, photoToolsSourceUrl, customBgUrl ? null : preset, { offsetX, offsetY, scale, customBackgroundUrl: customBgUrl ?? undefined }));
+      setPhotoToolNotice("Background applied — added as a new photo in the gallery below. Pick another background to try again on the same cutout.");
     } catch {
       setPhotoError("Couldn't apply that background.");
     } finally {
@@ -2204,12 +2216,39 @@ function ProductStudioPage({ productId }: { productId: string }) {
           {photoError ? <p style={{ ...styles.error, marginTop: 8 }}>{photoError}</p> : null}
 
           <hr style={{ ...styles.divider, margin: "16px 0" }} />
-          <p style={{ fontSize: 12, fontWeight: 600, margin: "0 0 8px" }}>Photo tools — acts on the main photo above</p>
+          <p style={{ fontSize: 12, fontWeight: 600, margin: "0 0 8px" }}>Photo tools</p>
+          {product.images.length > 1 ? (
+            <>
+              <p style={{ fontSize: 11, color: colors.muted, margin: "0 0 6px" }}>Working on:</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+                {product.images.map((img) => (
+                  <button
+                    key={img.url}
+                    type="button"
+                    onClick={() => setPhotoToolsSourceUrl(img.url)}
+                    title={img.alt}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      padding: 0,
+                      borderRadius: 6,
+                      border: photoToolsSourceUrl === img.url ? `2px solid ${colors.navy}` : `1px solid ${colors.border}`,
+                      cursor: "pointer",
+                      overflow: "hidden",
+                      ...CHECKERBOARD_BG,
+                    }}
+                  >
+                    <img src={resolveImg(img.url)} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : null}
           <button
             type="button"
-            disabled={removingBg || !mainImage}
+            disabled={removingBg || !photoToolsSourceUrl}
             onClick={() => void onRemoveBackground()}
-            style={{ ...styles.button, ...styles.buttonAuto, width: "100%", background: colors.white, color: colors.ink, border: `1px solid ${colors.border}`, opacity: removingBg || !mainImage ? 0.5 : 1 }}
+            style={{ ...styles.button, ...styles.buttonAuto, width: "100%", background: colors.white, color: colors.ink, border: `1px solid ${colors.border}`, opacity: removingBg || !photoToolsSourceUrl ? 0.5 : 1 }}
           >
             {removingBg ? "Removing background…" : "Remove background"}
           </button>
@@ -2280,10 +2319,10 @@ function ProductStudioPage({ productId }: { productId: string }) {
             />
           </div>
 
-          {mainImage ? (
+          {photoToolsSourceUrl ? (
             <div style={{ marginTop: 10 }}>
               <BackgroundPositioner
-                cutoutUrl={resolveImg(mainImage.url)}
+                cutoutUrl={resolveImg(photoToolsSourceUrl)}
                 background={
                   customBgUrl
                     ? { kind: "image", url: apiClient.resolveAssetUrl(customBgUrl) }
@@ -2313,15 +2352,15 @@ function ProductStudioPage({ productId }: { productId: string }) {
 
           <button
             type="button"
-            disabled={applyingBg || !mainImage || (presetsMeta.length === 0 && !customBgUrl)}
+            disabled={applyingBg || !photoToolsSourceUrl || (presetsMeta.length === 0 && !customBgUrl)}
             onClick={() => void onApplyBackground()}
-            style={{ ...styles.button, ...styles.buttonAuto, width: "100%", marginTop: 10, opacity: applyingBg || !mainImage ? 0.5 : 1 }}
+            style={{ ...styles.button, ...styles.buttonAuto, width: "100%", marginTop: 10, opacity: applyingBg || !photoToolsSourceUrl ? 0.5 : 1 }}
           >
             {applyingBg ? "Applying…" : "Apply background"}
           </button>
           {photoToolNotice ? <p style={{ fontSize: 11, color: colors.navy, marginTop: 8 }}>{photoToolNotice}</p> : null}
           <p style={{ fontSize: 11, color: colors.muted, marginTop: 8 }}>
-            "Remove background" makes the cutout the main photo above. "Apply background" adds the result as a new photo in the gallery rather than replacing the cutout.
+            "Apply background" adds a new photo to the gallery rather than replacing anything — try as many backgrounds as you like on the same "Working on" photo above, they won't overwrite each other.
           </p>
         </div>
 
@@ -2763,9 +2802,9 @@ function ImportHistorySection({ brandId }: { brandId: string }) {
 // two separate steps but wasn't (Ola, 2026-08-12). Payments/Delivery/
 // Policies are all "things you connect before going fully live", not
 // storefront content, so they're one combined tab now.
-type LaunchTab = "sale" | "store" | "connect";
-const LAUNCH_TABS: LaunchTab[] = ["sale", "store", "connect"];
-const LAUNCH_TAB_LABELS: Record<LaunchTab, string> = { sale: "Sale info", store: "Store design", connect: "Connect & policies" };
+type LaunchTab = "sale" | "store";
+const LAUNCH_TABS: LaunchTab[] = ["sale", "store"];
+const LAUNCH_TAB_LABELS: Record<LaunchTab, string> = { sale: "Sale info", store: "Store design" };
 
 const CAMPAIGN_ACCESS_OPTIONS: { key: CampaignAccess; label: string }[] = [
   { key: "public", label: "Public" },
@@ -2817,9 +2856,6 @@ function LaunchStudioPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
-  const [returnPolicy, setReturnPolicy] = useState("");
-  const [shippingPolicy, setShippingPolicy] = useState("");
-
   const [products, setProducts] = useState<Product[]>([]);
   const [productIds, setProductIds] = useState<Set<string>>(new Set());
 
@@ -2842,8 +2878,6 @@ function LaunchStudioPage() {
         setThemePreset(c.themePreset);
         setHeroColorPreset(c.heroColorPreset);
         setHeroFontPreset(c.heroFontPreset);
-        setReturnPolicy(b.returnPolicy ?? "");
-        setShippingPolicy(b.shippingPolicy ?? "");
         setProducts(p);
         setProductIds(new Set(c.productIds));
       })
@@ -2944,21 +2978,6 @@ function LaunchStudioPage() {
       setError("Couldn't upload that logo.");
     } finally {
       setUploadingLogo(false);
-    }
-  };
-
-  const onSavePolicies = async () => {
-    setSaving(true);
-    setError(null);
-    setSaved(false);
-    try {
-      const updated = await apiClient.updateBrandPolicies(brandId, { returnPolicy, shippingPolicy });
-      setBrand(updated);
-      setSaved(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't save.");
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -3297,36 +3316,90 @@ function LaunchStudioPage() {
         </div>
       ) : null}
 
-      {tab === "connect" ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          <IntegrationPanel kind="payment" brandId={brandId} integration={brand?.paymentIntegration ?? null} onUpdated={setBrand} />
-          <IntegrationPanel kind="delivery" brandId={brandId} integration={brand?.deliveryIntegration ?? null} onUpdated={setBrand} />
-          <div style={{ ...styles.sectionCard, maxWidth: 600 }}>
-            <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 16 }}>Policies</h2>
-            <label style={styles.label}>Return policy</label>
-            <textarea
-              style={{ ...styles.input, minHeight: 80, fontFamily: "inherit", resize: "vertical" }}
-              value={returnPolicy}
-              onChange={(e) => setReturnPolicy(e.target.value)}
-              placeholder="e.g. Returns accepted within 14 days…"
-            />
-            <label style={{ ...styles.label, marginTop: 16 }}>Shipping policy</label>
-            <textarea
-              style={{ ...styles.input, minHeight: 80, fontFamily: "inherit", resize: "vertical" }}
-              value={shippingPolicy}
-              onChange={(e) => setShippingPolicy(e.target.value)}
-              placeholder="e.g. Delivery within 3-5 business days…"
-            />
-            {error ? <p style={styles.error}>{error}</p> : null}
-            {saved ? <p style={{ ...styles.sub, color: colors.success, fontWeight: 600, marginTop: 12, marginBottom: 0 }}>Published.</p> : null}
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
-              <button style={{ ...styles.button, ...styles.buttonAuto, opacity: saving ? 0.4 : 1 }} disabled={saving} onClick={onSavePolicies}>
-                {saving ? "Publishing…" : "Publish"}
-              </button>
-            </div>
+      <WizardNextButton stepKey="launch_setup" />
+    </div>
+  );
+}
+
+/** Split out of Launch Studio (2026-08-12, Ola: "payment i delivery chciałam żeby było zupełnie nowa zakładka") — Payments/Delivery/Policies live entirely on Brand, not Campaign, so this loads independently of Sale info/Store design. Same wizard step (launch_setup) as Launch Studio, just a separate sidebar destination. */
+function PaymentsDeliveryPage() {
+  const [brandId] = useState(() => window.localStorage.getItem(LAST_BRAND_ID_KEY) ?? "b_demo");
+  const [brand, setBrand] = useState<Brand | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [returnPolicy, setReturnPolicy] = useState("");
+  const [shippingPolicy, setShippingPolicy] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    apiClient
+      .getBrand(brandId)
+      .then((b) => {
+        if (cancelled) return;
+        setBrand(b);
+        setReturnPolicy(b.returnPolicy ?? "");
+        setShippingPolicy(b.shippingPolicy ?? "");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [brandId]);
+
+  const onSavePolicies = async () => {
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const updated = await apiClient.updateBrandPolicies(brandId, { returnPolicy, shippingPolicy });
+      setBrand(updated);
+      setSaved(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <p style={styles.sub}>Loading…</p>;
+
+  return (
+    <div>
+      <h1 style={styles.h1}>Payments & delivery</h1>
+      <p style={styles.sub}>Connect your own processor and courier, and set the policies customers will see at checkout.</p>
+      <hr style={styles.divider} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+        <IntegrationPanel kind="payment" brandId={brandId} integration={brand?.paymentIntegration ?? null} onUpdated={setBrand} />
+        <IntegrationPanel kind="delivery" brandId={brandId} integration={brand?.deliveryIntegration ?? null} onUpdated={setBrand} />
+        <div style={{ ...styles.sectionCard, maxWidth: 600 }}>
+          <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 16 }}>Policies</h2>
+          <label style={styles.label}>Return policy</label>
+          <textarea
+            style={{ ...styles.input, minHeight: 80, fontFamily: "inherit", resize: "vertical" }}
+            value={returnPolicy}
+            onChange={(e) => setReturnPolicy(e.target.value)}
+            placeholder="e.g. Returns accepted within 14 days…"
+          />
+          <label style={{ ...styles.label, marginTop: 16 }}>Shipping policy</label>
+          <textarea
+            style={{ ...styles.input, minHeight: 80, fontFamily: "inherit", resize: "vertical" }}
+            value={shippingPolicy}
+            onChange={(e) => setShippingPolicy(e.target.value)}
+            placeholder="e.g. Delivery within 3-5 business days…"
+          />
+          {error ? <p style={styles.error}>{error}</p> : null}
+          {saved ? <p style={{ ...styles.sub, color: colors.success, fontWeight: 600, marginTop: 12, marginBottom: 0 }}>Published.</p> : null}
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
+            <button style={{ ...styles.button, ...styles.buttonAuto, opacity: saving ? 0.4 : 1 }} disabled={saving} onClick={() => void onSavePolicies()}>
+              {saving ? "Publishing…" : "Publish"}
+            </button>
           </div>
         </div>
-      ) : null}
+      </div>
       <WizardNextButton stepKey="launch_setup" />
     </div>
   );
