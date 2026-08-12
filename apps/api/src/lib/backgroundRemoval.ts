@@ -104,8 +104,10 @@ export async function compositeOntoBackground(cutoutPng: Buffer, presetKey: stri
     .resize({ width: Math.round(canvasSize * scale), height: Math.round(canvasSize * scale), fit: "inside", withoutEnlargement: false })
     .toBuffer();
   const resizedMeta = await sharp(resized).metadata();
-  const left = Math.round(canvasSize * offsetX - (resizedMeta.width ?? 0) / 2);
-  const top = Math.round(canvasSize * offsetY - (resizedMeta.height ?? 0) / 2);
+  const resizedWidth = resizedMeta.width ?? 0;
+  const resizedHeight = resizedMeta.height ?? 0;
+  const left = Math.round(canvasSize * offsetX - resizedWidth / 2);
+  const top = Math.round(canvasSize * offsetY - resizedHeight / 2);
 
   const customAsset = customBackgroundUrl ? await readLocalAsset(customBackgroundUrl) : null;
   const imageFile = BACKGROUND_IMAGE_PRESETS[presetKey];
@@ -115,8 +117,25 @@ export async function compositeOntoBackground(cutoutPng: Buffer, presetKey: stri
       ? sharp(path.join(BACKGROUND_IMAGE_DIR, imageFile)).resize({ width: canvasSize, height: canvasSize, fit: "cover" })
       : sharp({ create: { width: canvasSize, height: canvasSize, channels: 4, background: { ...(BACKGROUND_PRESETS[presetKey] ?? BACKGROUND_PRESETS.white), alpha: 1 } } });
 
-  return base
-    .composite([{ input: resized, left, top }])
-    .png()
-    .toBuffer();
+  // sharp's composite() throws ("Image to composite must have same dimensions
+  // or smaller") the moment the overlay pokes past the base canvas on any
+  // side — which a scale above ~0.74, or just a large-enough scale dragged
+  // near an edge, does immediately (real incident, 2026-08-12: "Couldn't
+  // apply that background"). Zooming a product in past the frame is a
+  // real, intended feature (see BackgroundPositioner's comment), so the
+  // fix is to crop the overlay down to whatever's actually visible inside
+  // the canvas — not to cap the scale.
+  const srcLeft = Math.max(0, -left);
+  const srcTop = Math.max(0, -top);
+  const destLeft = Math.max(0, left);
+  const destTop = Math.max(0, top);
+  const visibleWidth = Math.min(resizedWidth - srcLeft, canvasSize - destLeft);
+  const visibleHeight = Math.min(resizedHeight - srcTop, canvasSize - destTop);
+
+  const composited =
+    visibleWidth > 0 && visibleHeight > 0
+      ? base.composite([{ input: await sharp(resized).extract({ left: srcLeft, top: srcTop, width: visibleWidth, height: visibleHeight }).toBuffer(), left: destLeft, top: destTop }])
+      : base; // Dragged/zoomed the product fully out of frame — an empty background is the honest result, not a crash.
+
+  return composited.png().toBuffer();
 }
