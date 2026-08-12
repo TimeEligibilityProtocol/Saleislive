@@ -3605,6 +3605,8 @@ function PreviewPublishPage() {
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState<"live" | "scheduled" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const resolveImg = (url: string) => (url.startsWith("http") ? url : apiClient.resolveAssetUrl(url));
 
   useEffect(() => {
     let cancelled = false;
@@ -3658,6 +3660,21 @@ function PreviewPublishPage() {
     { label: "Policies", ready: policiesReady, note: policiesReady ? "Ready" : "Missing return or shipping policy" },
   ];
 
+  const onRemoveFromSale = async (p: Product) => {
+    if (!campaign) return;
+    if (!window.confirm(`Remove "${p.name.value || "this product"}" from the sale? This can't be undone from here — you'd need to add it back.`)) return;
+    setRemovingId(p.id);
+    setError(null);
+    try {
+      const updated = await apiClient.updateCampaign(campaign.id, { productIds: campaign.productIds.filter((id) => id !== p.id) });
+      setCampaign(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't remove that product.");
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
   return (
     <div>
       <div>
@@ -3665,6 +3682,69 @@ function PreviewPublishPage() {
         <p style={styles.sub}>Final check before the sale goes live. Until then, your store is only visible to you.</p>
       </div>
       <hr style={styles.divider} />
+
+      <div style={{ ...styles.sectionCard, marginBottom: 24 }}>
+        <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 4 }}>Your sale, at a glance</h2>
+        <p style={{ ...styles.sub, marginBottom: 16 }}>Click a product to fix it. Use the × to drop it from this sale.</p>
+        {selectedProducts.length === 0 ? (
+          <p style={styles.sub}>No products in this sale yet.</p>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
+            {selectedProducts.map((p) => {
+              const mainImage = p.images.find((i) => i.isMain) ?? p.images[0];
+              const badge = productStatusBadge(p);
+              const issues = describeProductIssues(p);
+              return (
+                <div
+                  key={p.id}
+                  style={{ position: "relative", border: `1px solid ${colors.border}`, borderRadius: 8, overflow: "hidden", cursor: "pointer", background: colors.white, opacity: removingId === p.id ? 0.5 : 1 }}
+                  onClick={() => {
+                    window.location.hash = `#/products/${p.id}`;
+                  }}
+                >
+                  <button
+                    type="button"
+                    aria-label="Remove from sale"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoveFromSale(p);
+                    }}
+                    disabled={!!removingId}
+                    style={{
+                      position: "absolute",
+                      top: 4,
+                      right: 4,
+                      width: 22,
+                      height: 22,
+                      borderRadius: "50%",
+                      border: "none",
+                      background: "rgba(0,0,0,0.55)",
+                      color: colors.white,
+                      fontSize: 13,
+                      lineHeight: "22px",
+                      textAlign: "center",
+                      padding: 0,
+                      cursor: "pointer",
+                      zIndex: 1,
+                    }}
+                  >
+                    ×
+                  </button>
+                  <div style={{ width: "100%", aspectRatio: "1 / 1", background: colors.background, ...CHECKERBOARD_BG }}>
+                    {mainImage ? <img src={resolveImg(mainImage.url)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : null}
+                  </div>
+                  <div style={{ padding: 8 }}>
+                    <p style={{ fontSize: 12, fontWeight: 600, margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name.value || "Untitled product"}</p>
+                    <p style={{ fontSize: 12, color: colors.muted, margin: "0 0 6px" }}>{formatChange(p.price)}</p>
+                    <span style={{ display: "inline-block", fontSize: 10, fontWeight: 700, color: badge.color, background: badge.bg, borderRadius: 4, padding: "2px 6px" }}>{badge.label}</span>
+                    {issues.length > 0 ? <p style={{ fontSize: 10, color: colors.error, margin: "4px 0 0" }}>{issues.join(" · ")}</p> : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div style={{ ...styles.sectionCard, flex: 1, minWidth: 320 }}>
