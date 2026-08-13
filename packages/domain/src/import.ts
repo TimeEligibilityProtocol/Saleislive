@@ -174,7 +174,10 @@ export function buildProductFromImportRow(opts: {
   const priceMinor = parseAmountMinor(row.price);
   const stock = parseStock(row.stock);
   const price: Money = priceMinor !== null ? { amountMinor: priceMinor, currency: row.currency ?? defaultCurrency } : existing?.price ?? { amountMinor: 0, currency: defaultCurrency };
-  const images: ProductImage[] = row.imageUrl && !existing?.images.some((i) => i.url === row.imageUrl) ? [...(existing?.images ?? []), { url: row.imageUrl, alt: row.name ?? row.sku, isMain: (existing?.images.length ?? 0) === 0 }] : existing?.images ?? [];
+  const images: ProductImage[] =
+    row.imageUrl && !existing?.images.some((i) => i.url === row.imageUrl)
+      ? [...(existing?.images ?? []), { url: row.imageUrl, alt: row.name ?? row.sku, isMain: (existing?.images.length ?? 0) === 0, finish: "original" }]
+      : existing?.images ?? [];
 
   return {
     id,

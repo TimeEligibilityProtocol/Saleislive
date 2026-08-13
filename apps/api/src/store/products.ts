@@ -16,6 +16,14 @@ const toJson = (v: unknown) => v as Prisma.InputJsonValue;
  * honesty rule (price === salePrice, no fake discount).
  */
 
+/** Rows saved before ProductImage.finish existed have no such field in their stored JSON — inferred here from the same URL prefix saveUploadedAsset always writes (cutout-/branded-/anything else), so old data self-heals on read instead of needing a migration script. */
+function normalizeImage(image: ProductImage & { finish?: ProductImage["finish"] }): ProductImage {
+  if (image.finish) return image as ProductImage;
+  const filename = image.url.split("/").pop() ?? "";
+  const finish: ProductImage["finish"] = filename.startsWith("cutout-") ? "cutout" : filename.startsWith("branded-") ? "branded" : "original";
+  return { ...image, finish };
+}
+
 function toDomainProduct(row: PrismaProduct): Product {
   return {
     id: row.id,
@@ -30,7 +38,7 @@ function toDomainProduct(row: PrismaProduct): Product {
     size: row.size as unknown as AiAssistedField<string>,
     material: row.material as unknown as AiAssistedField<string>,
     dimensions: row.dimensions as unknown as AiAssistedField<string>,
-    images: row.images as unknown as ProductImage[],
+    images: (row.images as unknown as ProductImage[]).map(normalizeImage),
     price: { amountMinor: row.priceAmountMinor, currency: row.priceCurrency },
     salePrice: { amountMinor: row.salePriceAmountMinor, currency: row.salePriceCurrency },
     stock: row.stock,
@@ -67,7 +75,7 @@ export async function ensureSeedData(): Promise<void> {
     size: approvedField(size),
     material: approvedField(material),
     dimensions: emptyField<string>(),
-    images: [{ url: imageUrl, alt: name, isMain: true }] satisfies ProductImage[],
+    images: [{ url: imageUrl, alt: name, isMain: true, finish: "original" }] satisfies ProductImage[],
     priceAmountMinor: priceMinor,
     priceCurrency: "AED",
     salePriceAmountMinor: priceMinor,

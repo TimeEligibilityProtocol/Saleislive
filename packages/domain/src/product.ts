@@ -86,11 +86,22 @@ export function editField<T>(current: AiAssistedField<T>, newValue: T, opts: { u
 
 export type ProductStatus = "draft" | "active" | "archived";
 
+/**
+ * Where a photo is in the Background Studio pipeline. "cutout" is a
+ * background-removed image that's never been placed on anything — a
+ * floating product on a transparent/checkerboard canvas, not something a
+ * customer should ever see. Only "original" (never touched) and "branded"
+ * (composited onto a real background) count as finished; isCatalogueReady
+ * blocks a product whose main photo is still a bare cutout.
+ */
+export type PhotoFinish = "original" | "cutout" | "branded";
+
 /** A single product image — url is server-relative; alt/isMain drive gallery + listing-card selection. */
 export interface ProductImage {
   url: string;
   alt: string;
   isMain: boolean;
+  finish: PhotoFinish;
 }
 
 export interface Product {
@@ -128,5 +139,14 @@ export interface Product {
  * product to have filled in.
  */
 export function isCatalogueReady(product: Product): boolean {
-  return product.images.length > 0 && product.name.value != null && product.price.amountMinor > 0 && !!product.category.value && !!product.color.value && !!product.material.value;
+  const mainImage = product.images.find((i) => i.isMain) ?? product.images[0];
+  return (
+    product.images.length > 0 &&
+    mainImage?.finish !== "cutout" &&
+    product.name.value != null &&
+    product.price.amountMinor > 0 &&
+    !!product.category.value &&
+    !!product.color.value &&
+    !!product.material.value
+  );
 }

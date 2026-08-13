@@ -247,7 +247,7 @@ export function adminProductsRouter(anthropicClient: Anthropic | null): Router {
       try {
         const cutout = await removeImageBackground(asset.buffer, asset.mimetype);
         const cutoutUrl = await saveUploadedAsset(cutout, "png", "cutout");
-        const image = { url: cutoutUrl, alt: `${source.alt} (background removed)`, isMain: false };
+        const image = { url: cutoutUrl, alt: `${source.alt} (background removed)`, isMain: false, finish: "cutout" as const };
         const updated = { ...existing, images: [...existing.images, image], updatedAt: new Date().toISOString() };
         await upsertProduct(updated);
         res.status(201).json({ product: updated });
@@ -299,7 +299,7 @@ export function adminProductsRouter(anthropicClient: Anthropic | null): Router {
       const composited = await compositeOntoBackground(asset.buffer, preset ?? "white", options);
       const compositedUrl = await saveUploadedAsset(composited, "png", "branded");
       const label = customBackgroundUrl ? "custom background" : `${preset} background`;
-      const image = { url: compositedUrl, alt: `${source.alt} (${label})`, isMain: false };
+      const image = { url: compositedUrl, alt: `${source.alt} (${label})`, isMain: false, finish: "branded" as const };
       const updated = { ...existing, images: [...existing.images, image], updatedAt: new Date().toISOString() };
       await upsertProduct(updated);
       res.status(201).json({ product: updated });
@@ -337,7 +337,7 @@ export function adminProductsRouter(anthropicClient: Anthropic | null): Router {
 
       const extension = (req.file.originalname.split(".").pop() || "jpg").toLowerCase();
       const url = await saveUploadedAsset(req.file.buffer, extension, "product");
-      const image = { url, alt: existing.name.value ?? existing.sku, isMain: existing.images.length === 0 };
+      const image = { url, alt: existing.name.value ?? existing.sku, isMain: existing.images.length === 0, finish: "original" as const };
       const now = new Date().toISOString();
       let updated = { ...existing, images: [...existing.images, image], updatedAt: now };
       // Only runs the vision call when this photo just became the main one and the product has no description yet — see autoAnalyzeIfNeeded's doc comment.

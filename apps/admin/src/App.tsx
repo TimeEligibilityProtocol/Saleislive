@@ -2763,7 +2763,9 @@ function productStatusBadge(p: Product): { label: string; color: string; bg: str
 /** What's actually missing on this product — plain field checks, not a simulated AI conversation. */
 function describeProductIssues(p: Product): string[] {
   const issues: string[] = [];
+  const mainImage = p.images.find((i) => i.isMain) ?? p.images[0];
   if (p.images.length === 0) issues.push("Missing photo");
+  else if (mainImage?.finish === "cutout") issues.push("Background not finished — apply a background or pick a different main photo");
   if (!p.name.value) issues.push("Missing name");
   if (!p.category.value) issues.push("Missing category");
   if (!p.color.value) issues.push("Missing colour");
@@ -3166,7 +3168,7 @@ function LaunchStudioPage() {
   // Sale info (who can access, when it runs, which products) and Store
   // design (what visitors actually see) are genuinely separate decisions,
   // and sharing a single Save silently rewrote whichever tab wasn't open.
-  const onPublishSaleInfo = async () => {
+  const onSaveSaleInfo = async () => {
     if (!campaign) return;
     setSaving(true);
     setError(null);
@@ -3189,7 +3191,7 @@ function LaunchStudioPage() {
     }
   };
 
-  // Separate from onPublishSaleInfo on purpose: the password field is
+  // Separate from onSaveSaleInfo on purpose: the password field is
   // almost always empty (it's write-only, never read back), so bundling it
   // into the main Publish button would either silently overwrite a real
   // password with blank on every unrelated save, or need extra "only send
@@ -3212,7 +3214,7 @@ function LaunchStudioPage() {
     }
   };
 
-  const onPublishStoreDesign = async () => {
+  const onSaveStoreDesign = async () => {
     if (!campaign) return;
     setSaving(true);
     setError(null);
@@ -3252,9 +3254,9 @@ function LaunchStudioPage() {
   };
 
   // Unlike hero image/colour/font, the logo commits immediately on upload
-  // rather than waiting for "Publish" — same as Product Studio's photo
+  // rather than waiting for "Save" — same as Product Studio's photo
   // tools, and it lives on Brand (not Campaign) so there's nothing else on
-  // this tab's Publish action that could plausibly bundle it in.
+  // this tab's Save action that could plausibly bundle it in.
   const onLogoFilePicked = async (file: File | null) => {
     if (!file) return;
     setUploadingLogo(true);
@@ -3398,10 +3400,10 @@ function LaunchStudioPage() {
           )}
 
           {error ? <p style={styles.error}>{error}</p> : null}
-          {saved ? <p style={{ ...styles.sub, color: colors.success, fontWeight: 600, marginTop: 12, marginBottom: 0 }}>Published.</p> : null}
+          {saved ? <p style={{ ...styles.sub, color: colors.success, fontWeight: 600, marginTop: 12, marginBottom: 0 }}>Saved.</p> : null}
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
-            <button style={{ ...styles.button, ...styles.buttonAuto, opacity: saving ? 0.4 : 1 }} disabled={saving} onClick={onPublishSaleInfo}>
-              {saving ? "Publishing…" : "Publish"}
+            <button style={{ ...styles.button, ...styles.buttonAuto, opacity: saving ? 0.4 : 1 }} disabled={saving} onClick={onSaveSaleInfo}>
+              {saving ? "Saving…" : "Save"}
             </button>
           </div>
         </div>
@@ -3592,10 +3594,10 @@ function LaunchStudioPage() {
             </div>
 
             {error ? <p style={styles.error}>{error}</p> : null}
-            {saved ? <p style={{ ...styles.sub, color: colors.success, fontWeight: 600, marginTop: 12, marginBottom: 0 }}>Published.</p> : null}
+            {saved ? <p style={{ ...styles.sub, color: colors.success, fontWeight: 600, marginTop: 12, marginBottom: 0 }}>Saved.</p> : null}
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
-              <button style={{ ...styles.button, ...styles.buttonAuto, opacity: saving ? 0.4 : 1 }} disabled={saving} onClick={onPublishStoreDesign}>
-                {saving ? "Publishing…" : "Publish"}
+              <button style={{ ...styles.button, ...styles.buttonAuto, opacity: saving ? 0.4 : 1 }} disabled={saving} onClick={onSaveStoreDesign}>
+                {saving ? "Saving…" : "Save"}
               </button>
             </div>
           </div>
@@ -3710,10 +3712,10 @@ function PaymentsDeliveryPage() {
             placeholder="e.g. Delivery within 3-5 business days…"
           />
           {error ? <p style={styles.error}>{error}</p> : null}
-          {saved ? <p style={{ ...styles.sub, color: colors.success, fontWeight: 600, marginTop: 12, marginBottom: 0 }}>Published.</p> : null}
+          {saved ? <p style={{ ...styles.sub, color: colors.success, fontWeight: 600, marginTop: 12, marginBottom: 0 }}>Saved.</p> : null}
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
             <button style={{ ...styles.button, ...styles.buttonAuto, opacity: saving ? 0.4 : 1 }} disabled={saving} onClick={() => void onSavePolicies()}>
-              {saving ? "Publishing…" : "Publish"}
+              {saving ? "Saving…" : "Save"}
             </button>
           </div>
         </div>
@@ -3954,6 +3956,14 @@ function PreviewPublishPage() {
   const policiesReady = !!brand.returnPolicy && !!brand.shippingPolicy;
   const canPublish = catalogueReady && storeReady && policiesReady;
 
+  // Where "Needs attention" should send you — the single most useful next
+  // fix, not an exhaustive list, so clicking it is always one direct hop
+  // to something you can actually act on. Same priority order as the
+  // checklist below: catalogue first, then store copy, then policies.
+  const firstUnreadyProduct = selectedProducts.find((p) => !isCatalogueReady(p));
+  const needsAttentionTarget: string | null =
+    selectedProducts.length === 0 ? "#/launch-studio" : firstUnreadyProduct ? `#/products/${firstUnreadyProduct.id}` : !storeReady ? "#/launch-studio" : !policiesReady ? "#/payments-delivery" : null;
+
   const onPublish = async (status: "live" | "scheduled") => {
     if (!campaign) return;
     setPublishing(status);
@@ -4103,20 +4113,28 @@ function PreviewPublishPage() {
             <span style={{ fontSize: 12, fontWeight: 700, color: colors.muted }}>Not connected</span>
           </div>
 
-          {!canPublish ? <p style={{ fontSize: 11, color: colors.error, marginTop: 12 }}>Fix the items above before publishing.</p> : null}
           <p style={{ fontSize: 11, color: colors.muted, marginTop: 12 }}>Publishing makes the storefront visible without checkout until a payment processor is connected.</p>
           {error ? <p style={styles.error}>{error}</p> : null}
 
           {campaign.status === "live" ? (
             <p style={{ ...styles.sub, color: colors.success, fontWeight: 700, marginTop: 16, marginBottom: 0 }}>This sale is live.</p>
+          ) : !canPublish ? (
+            <button
+              style={{ ...styles.button, background: colors.white, color: colors.ink, border: `1px solid ${colors.border}` }}
+              onClick={() => {
+                if (needsAttentionTarget) window.location.hash = needsAttentionTarget;
+              }}
+            >
+              Needs attention →
+            </button>
           ) : (
             <>
-              <button style={{ ...styles.button, opacity: !canPublish || !!publishing ? 0.4 : 1 }} disabled={!canPublish || !!publishing} onClick={() => onPublish("live")}>
+              <button style={{ ...styles.button, opacity: publishing ? 0.4 : 1 }} disabled={!!publishing} onClick={() => onPublish("live")}>
                 {publishing === "live" ? "Publishing…" : "Publish now"}
               </button>
               <button
-                style={{ ...styles.button, background: colors.white, color: colors.ink, border: `1px solid ${colors.border}`, opacity: !canPublish || !!publishing ? 0.4 : 1 }}
-                disabled={!canPublish || !!publishing}
+                style={{ ...styles.button, background: colors.white, color: colors.ink, border: `1px solid ${colors.border}`, opacity: publishing ? 0.4 : 1 }}
+                disabled={!!publishing}
                 onClick={() => onPublish("scheduled")}
               >
                 {publishing === "scheduled" ? "Scheduling…" : "Schedule"}
