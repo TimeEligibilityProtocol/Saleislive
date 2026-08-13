@@ -44,10 +44,16 @@ export function checkoutRouter(): Router {
       if (!body.items?.length) return res.status(400).json({ error: "empty_bag" });
       if (!body.customerName?.trim()) return res.status(400).json({ error: "missing_customer_name" });
 
+      const campaign = await getOrCreateCurrentCampaign(brand.tenantId, brand.id);
+
       const lines: OrderLine[] = [];
       for (const item of body.items) {
         const product = await getProductById(item.productId);
         if (!product || product.brandId !== brand.id) return res.status(400).json({ error: "unknown_product" });
+        // A product taken out of the sale (Go live's board) shouldn't stay
+        // buyable just because it's still sitting in someone's bag from
+        // before it was removed.
+        if (!campaign.productIds.includes(product.id)) return res.status(400).json({ error: "not_in_sale" });
         const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
         if (product.stock < quantity) return res.status(409).json({ error: "insufficient_stock", productId: product.id });
         lines.push({ productId: product.id, sku: product.sku, quantity, unitPrice: product.salePrice });
@@ -63,8 +69,6 @@ export function checkoutRouter(): Router {
       const itemsTotal = lines.reduce((sum, l) => sum + l.unitPrice.amountMinor * l.quantity, 0);
       const total = itemsTotal + (deliveryMethod === "courier" ? COURIER_FEE_MINOR : 0);
       const currency = lines[0].unitPrice.currency;
-
-      const campaign = await getOrCreateCurrentCampaign(brand.tenantId, brand.id);
 
       const order = await createOrder({
         tenantId: brand.tenantId,

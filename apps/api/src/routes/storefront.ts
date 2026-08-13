@@ -116,7 +116,14 @@ export function storefrontRouter(): Router {
         res.status(401).json({ error: "password_required" });
         return;
       }
-      res.json({ products: await listProductsForBrand(req.brand!.id) });
+      // Every active product for the brand is NOT the same thing as "what's
+      // in this sale" — a merchant removing a product from the sale (Go
+      // live's board) only ever edited campaign.productIds, never the
+      // product's own status, so real customers kept seeing it here
+      // regardless. The sale's product list is the actual source of truth
+      // for what the public storefront shows.
+      const products = (await listProductsForBrand(req.brand!.id)).filter((p) => campaign.productIds.includes(p.id));
+      res.json({ products });
     }),
   );
   return router;
