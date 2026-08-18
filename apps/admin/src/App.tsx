@@ -2239,7 +2239,13 @@ function ProductStudioPage({ productId }: { productId: string }) {
     try {
       setProduct(await apiClient.removeProductImage(brandId, productId, url));
     } catch (err) {
-      setPhotoError(err instanceof ApiError && err.status === 409 ? "Can't remove the only photo — add another one first." : "Couldn't remove that photo.");
+      if (err instanceof ApiError && err.status === 409 && err.message.includes("last_original")) {
+        setPhotoError("Can't remove this — it's your only original photo. Keep it so you can always try a different background later.");
+      } else if (err instanceof ApiError && err.status === 409) {
+        setPhotoError("Can't remove the only photo — add another one first.");
+      } else {
+        setPhotoError("Couldn't remove that photo.");
+      }
     }
   };
 
@@ -2257,7 +2263,13 @@ function ProductStudioPage({ productId }: { productId: string }) {
       resetPosition();
       setPhotoToolNotice("Background removed — this cutout is now the main photo (shown on a checkered pattern above so the transparency is visible). Pick a background below, then drag it into place.");
     } catch (err) {
-      setPhotoError(err instanceof ApiError && err.status === 422 ? "Couldn't find a clear product in that photo — try a different one." : "Background removal failed.");
+      if (err instanceof ApiError && err.status === 422) {
+        setPhotoError("Couldn't find a clear product in that photo — try a different one.");
+      } else if (err instanceof ApiError && err.message.includes("not_original")) {
+        setPhotoError("Select the original photo above first — background removal only works on an untouched photo, not one that's already been processed.");
+      } else {
+        setPhotoError("Background removal failed.");
+      }
     } finally {
       setRemovingBg(false);
     }
@@ -2305,6 +2317,9 @@ function ProductStudioPage({ productId }: { productId: string }) {
 
   const mainImage = product.images.find((i) => i.isMain) ?? product.images[0];
   const resolveImg = (url: string) => (url.startsWith("http") ? url : apiClient.resolveAssetUrl(url));
+  const photoToolsSourceImage = product.images.find((i) => i.url === photoToolsSourceUrl);
+  const photoToolsSourceIsOriginal = photoToolsSourceImage?.finish === "original";
+  const hasAnyOriginal = product.images.some((i) => i.finish === "original");
 
   const onSuggestWithAI = async () => {
     if (!mainImage) return;
@@ -2485,8 +2500,9 @@ function ProductStudioPage({ productId }: { productId: string }) {
                     key={img.url}
                     type="button"
                     onClick={() => setPhotoToolsSourceUrl(img.url)}
-                    title={img.alt}
+                    title={img.finish === "original" ? `${img.alt} (original — background can be changed)` : `${img.alt} (already processed)`}
                     style={{
+                      position: "relative",
                       width: 36,
                       height: 36,
                       padding: 0,
@@ -2498,6 +2514,9 @@ function ProductStudioPage({ productId }: { productId: string }) {
                     }}
                   >
                     <img src={resolveImg(img.url)} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                    {img.finish === "original" ? (
+                      <span style={{ position: "absolute", bottom: 1, right: 1, width: 8, height: 8, borderRadius: "50%", background: colors.success, border: `1px solid ${colors.white}` }} />
+                    ) : null}
                   </button>
                 ))}
               </div>
@@ -2505,12 +2524,19 @@ function ProductStudioPage({ productId }: { productId: string }) {
           ) : null}
           <button
             type="button"
-            disabled={removingBg || !photoToolsSourceUrl}
+            disabled={removingBg || !photoToolsSourceUrl || !photoToolsSourceIsOriginal}
             onClick={() => void onRemoveBackground()}
-            style={{ ...styles.button, ...styles.buttonAuto, width: "100%", background: colors.white, color: colors.ink, border: `1px solid ${colors.border}`, opacity: removingBg || !photoToolsSourceUrl ? 0.5 : 1 }}
+            style={{ ...styles.button, ...styles.buttonAuto, width: "100%", background: colors.white, color: colors.ink, border: `1px solid ${colors.border}`, opacity: removingBg || !photoToolsSourceUrl || !photoToolsSourceIsOriginal ? 0.5 : 1 }}
           >
             {removingBg ? "Removing background…" : "Remove background"}
           </button>
+          {!hasAnyOriginal ? (
+            <p style={{ fontSize: 11, color: colors.error, marginTop: 6 }}>No original photo left on this product — add a new photo above to be able to change its background.</p>
+          ) : photoToolsSourceUrl && !photoToolsSourceIsOriginal ? (
+            <p style={{ fontSize: 11, color: colors.muted, marginTop: 6 }}>
+              Select the <span style={{ color: colors.success, fontWeight: 700 }}>green-dot</span> original photo above to change its background — not a photo that's already been processed.
+            </p>
+          ) : null}
 
           <p style={{ fontSize: 11, fontWeight: 600, color: colors.muted, margin: "12px 0 6px" }}>Choose a background</p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>

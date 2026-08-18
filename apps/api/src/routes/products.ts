@@ -240,6 +240,13 @@ export function adminProductsRouter(anthropicClient: Anthropic | null): Router {
       const { url } = req.body as { url?: string };
       const source = existing.images.find((i) => i.url === url);
       if (!source) return res.status(400).json({ error: "unknown_image" });
+      // Re-segmenting an already-processed photo (its own background already
+      // swapped out, or already a bare cutout) is a much harder target for
+      // the model than a clean original — real failures traced back to this
+      // 2026-08-18. Once a product has lost its original (an old product,
+      // pre-dating this check), there's nothing left to restart from — the
+      // fix there is a fresh upload, not retrying on a processed photo.
+      if (source.finish !== "original") return res.status(400).json({ error: "not_original" });
 
       const asset = await readLocalAsset(source.url);
       if (!asset) return res.status(422).json({ error: "image_unavailable" });
@@ -393,7 +400,17 @@ export function adminProductsRouter(anthropicClient: Anthropic | null): Router {
     }),
   );
 
-  /** Removing a photo — the last one can't be removed if the product needs at least one to publish (isProductReadyToPublish), so this just refuses rather than leaving a product silently unpublishable without saying why. */
+  /**
+   * Removing a photo — the last one can't be removed if the product needs
+   * at least one to publish (isProductReadyToPublish), so this just
+   * refuses rather than leaving a product silently unpublishable without
+   * saying why. Same reasoning extended 2026-08-18 to originals
+   * specifically: losing the last untouched photo (a plain upload, or one
+   * from Excel import — both tagged finish "original") leaves nothing to
+   * restart a background change from, forcing every future attempt to
+   * re-segment an already-processed photo (see remove-background's guard
+   * above) — refused even when branded/cutout copies still exist.
+   */
   router.delete(
     "/api/brands/:brandId/products/:id/images",
     requireAuth,
@@ -405,6 +422,9 @@ export function adminProductsRouter(anthropicClient: Anthropic | null): Router {
       const { url } = req.body as { url?: string };
       if (!url) return res.status(400).json({ error: "missing_url" });
       if (existing.images.length <= 1) return res.status(409).json({ error: "last_image" });
+      const target = existing.images.find((i) => i.url === url);
+      const originalCount = existing.images.filter((i) => i.finish === "original").length;
+      if (target?.finish === "original" && originalCount <= 1) return res.status(409).json({ error: "last_original" });
 
       const removingMain = existing.images.find((i) => i.url === url)?.isMain;
       const remaining = existing.images.filter((i) => i.url !== url);
