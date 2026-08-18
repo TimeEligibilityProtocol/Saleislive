@@ -248,7 +248,7 @@ export function adminProductsRouter(anthropicClient: Anthropic | null): Router {
         const cutout = await removeImageBackground(asset.buffer, asset.mimetype);
         const cutoutUrl = await saveUploadedAsset(cutout, "png", "cutout");
         const image = { url: cutoutUrl, alt: `${source.alt} (background removed)`, isMain: false, finish: "cutout" as const };
-        const updated = { ...existing, images: [...existing.images, image], updatedAt: new Date().toISOString() };
+        const updated = withImages(existing, [...existing.images, image]);
         await upsertProduct(updated);
         res.status(201).json({ product: updated });
       } catch (err) {
@@ -263,6 +263,23 @@ export function adminProductsRouter(anthropicClient: Anthropic | null): Router {
   function clampFraction(value: unknown, fallback: number, min: number, max: number): number {
     const n = typeof value === "number" && Number.isFinite(value) ? value : fallback;
     return Math.min(max, Math.max(min, n));
+  }
+
+  /**
+   * Every route that changes `images` (remove/apply background, add/remove a
+   * photo, set main) must re-derive `status` here too, not just the general
+   * PATCH /products/:id route — otherwise a product can sit "active"/"Live"
+   * with a broken or unfinished main photo indefinitely, only getting
+   * caught the next time something unrelated happens to trigger a resave.
+   * Real bug found 2026-08-18: applying a background left the raw
+   * transparent cutout as the main photo (never advanced to the finished
+   * result) with status still "active" — Ola saw this as "I applied a
+   * background, it saved, but the store still shows the broken photo."
+   */
+  function withImages(existing: Product, images: Product["images"]): Product {
+    const withNewImages = { ...existing, images, updatedAt: new Date().toISOString() };
+    const nextStatus = existing.status === "archived" ? "archived" : isCatalogueReady(withNewImages) ? "active" : "draft";
+    return { ...withNewImages, status: nextStatus };
   }
 
   /** "Branded background" — composites an already-removed cutout onto a flat brand-colour backdrop, one of the real photographed scene backgrounds, or a merchant-uploaded custom background (see POST .../backgrounds below), at a caller-chosen position/scale. */
@@ -299,8 +316,15 @@ export function adminProductsRouter(anthropicClient: Anthropic | null): Router {
       const composited = await compositeOntoBackground(asset.buffer, preset ?? "white", options);
       const compositedUrl = await saveUploadedAsset(composited, "png", "branded");
       const label = customBackgroundUrl ? "custom background" : `${preset} background`;
-      const image = { url: compositedUrl, alt: `${source.alt} (${label})`, isMain: false, finish: "branded" as const };
-      const updated = { ...existing, images: [...existing.images, image], updatedAt: new Date().toISOString() };
+      // The finished result becomes the main photo — a successful Apply
+      // used to leave the raw transparent cutout as main, so the storefront
+      // (and the "is this product ready" check) never actually saw the new
+      // background. "Working on" (photoToolsSourceUrl, client-side) is
+      // untouched by this, so trying another background still composites
+      // from the same clean cutout, not from this result.
+      const image = { url: compositedUrl, alt: `${source.alt} (${label})`, isMain: true, finish: "branded" as const };
+      const images = [...existing.images.map((i) => ({ ...i, isMain: false })), image];
+      const updated = withImages(existing, images);
       await upsertProduct(updated);
       res.status(201).json({ product: updated });
     }),
@@ -342,6 +366,9 @@ export function adminProductsRouter(anthropicClient: Anthropic | null): Router {
       let updated = { ...existing, images: [...existing.images, image], updatedAt: now };
       // Only runs the vision call when this photo just became the main one and the product has no description yet — see autoAnalyzeIfNeeded's doc comment.
       updated = await autoAnalyzeIfNeeded(anthropicClient, updated, now);
+      // Recomputed after autoAnalyzeIfNeeded, not before — AI-filled fields
+      // (category/color/material) can be what makes the product ready.
+      updated = { ...updated, status: existing.status === "archived" ? "archived" : isCatalogueReady(updated) ? "active" : "draft" };
       await upsertProduct(updated);
       res.status(201).json({ product: updated });
     }),
@@ -360,7 +387,7 @@ export function adminProductsRouter(anthropicClient: Anthropic | null): Router {
       if (!url || !existing.images.some((i) => i.url === url)) return res.status(400).json({ error: "unknown_image" });
 
       const images = existing.images.map((i) => ({ ...i, isMain: i.url === url }));
-      const updated = { ...existing, images, updatedAt: new Date().toISOString() };
+      const updated = withImages(existing, images);
       await upsertProduct(updated);
       res.json({ product: updated });
     }),
@@ -382,7 +409,7 @@ export function adminProductsRouter(anthropicClient: Anthropic | null): Router {
       const removingMain = existing.images.find((i) => i.url === url)?.isMain;
       const remaining = existing.images.filter((i) => i.url !== url);
       const images = removingMain && remaining.length > 0 ? remaining.map((i, idx) => ({ ...i, isMain: idx === 0 })) : remaining;
-      const updated = { ...existing, images, updatedAt: new Date().toISOString() };
+      const updated = withImages(existing, images);
       await upsertProduct(updated);
       res.json({ product: updated });
     }),
