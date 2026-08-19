@@ -3328,6 +3328,8 @@ function LaunchStudioPage() {
   const [heroButtonColor, setHeroButtonColor] = useState<string | null>(null);
   const [buyButtonColor, setBuyButtonColor] = useState<string | null>(null);
   const [productAreaBackgroundColor, setProductAreaBackgroundColor] = useState<string | null>(null);
+  const [headerBackgroundColor, setHeaderBackgroundColor] = useState<string | null>(null);
+  const [bodyTextColor, setBodyTextColor] = useState<string | null>(null);
   const [heroFontPreset, setHeroFontPreset] = useState<string | null>(null);
   const [heroTitleSize, setHeroTitleSize] = useState<HeroTitleSizeId | null>(null);
   const [showHeroCta, setShowHeroCta] = useState(true);
@@ -3372,6 +3374,8 @@ function LaunchStudioPage() {
         setHeroButtonColor(c.heroButtonColor);
         setBuyButtonColor(c.buyButtonColor);
         setProductAreaBackgroundColor(c.productAreaBackgroundColor);
+        setHeaderBackgroundColor(c.headerBackgroundColor);
+        setBodyTextColor(c.bodyTextColor);
         setHeroFontPreset(c.heroFontPreset);
         setHeroTitleSize(c.heroTitleSize);
         setShowHeroCta(c.showHeroCta !== false);
@@ -3466,6 +3470,8 @@ function LaunchStudioPage() {
         heroButtonColor,
         buyButtonColor,
         productAreaBackgroundColor,
+        headerBackgroundColor,
+        bodyTextColor,
         heroFontPreset,
         heroTitleSize,
         showHeroCta,
@@ -3923,13 +3929,15 @@ function LaunchStudioPage() {
 
             <hr style={{ border: "none", borderTop: `1px solid ${colors.line}`, margin: "20px 0 16px" }} />
             <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", color: colors.muted, margin: "0 0 4px" }}>Buttons &amp; background</p>
-            <p style={{ fontSize: 11, color: colors.muted, margin: "0 0 10px" }}>Set independently — the hero button, the "Add to bag" buttons, and the background behind your products can each be their own colour.</p>
+            <p style={{ fontSize: 11, color: colors.muted, margin: "0 0 10px" }}>Set independently — the hero button, the "Add to bag" buttons, the header bar, body text, and the background behind your products can each be their own colour.</p>
 
             {(
               [
                 { label: "Hero button colour", value: heroButtonColor, set: setHeroButtonColor, fallback: "#173B8F" },
                 { label: "Add to bag button colour", value: buyButtonColor, set: setBuyButtonColor, fallback: "#173B8F" },
                 { label: "Store background colour", value: productAreaBackgroundColor, set: setProductAreaBackgroundColor, fallback: "#F5F2EB" },
+                { label: "Header bar colour", value: headerBackgroundColor, set: setHeaderBackgroundColor, fallback: "#FFFFFF" },
+                { label: "Body text colour (product names, prices, descriptions)", value: bodyTextColor, set: setBodyTextColor, fallback: "#111111" },
               ] as const
             ).map((row) => (
               <div key={row.label} style={{ marginTop: 10 }}>

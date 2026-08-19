@@ -33,6 +33,8 @@ function toDomainCampaign(row: PrismaCampaign): Campaign {
     heroButtonColor: row.heroButtonColor,
     buyButtonColor: row.buyButtonColor,
     productAreaBackgroundColor: row.productAreaBackgroundColor,
+    headerBackgroundColor: row.headerBackgroundColor,
+    bodyTextColor: row.bodyTextColor,
     showHeroCta: row.showHeroCta,
     heroImageOffsetX: row.heroImageOffsetX,
     heroImageOffsetY: row.heroImageOffsetY,

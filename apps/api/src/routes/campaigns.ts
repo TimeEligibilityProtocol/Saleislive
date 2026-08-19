@@ -52,6 +52,8 @@ export function campaignsRouter(): Router {
         heroButtonColor: string | null;
         buyButtonColor: string | null;
         productAreaBackgroundColor: string | null;
+        headerBackgroundColor: string | null;
+        bodyTextColor: string | null;
         showHeroCta: boolean | null;
         heroImageOffsetX: number | null;
         heroImageOffsetY: number | null;

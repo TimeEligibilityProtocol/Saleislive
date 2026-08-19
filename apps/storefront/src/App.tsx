@@ -241,12 +241,29 @@ export function App() {
   const buyButtonBackground = campaign?.buyButtonColor || colors.navy;
   const buyButtonText = campaign?.buyButtonColor ? contrastTextColor(campaign.buyButtonColor) : colors.white;
 
-  // Set once, page-wide (not just behind the product grid) — a colour
-  // picked here must look the same on every route (bag, product detail,
-  // checkout), never just the home grid. Ola, 2026-08-19: "musi się
+  // Set once, page-wide (not just behind the product grid, and not just
+  // background) — a colour picked here must look the same on every route
+  // (bag, product detail, checkout), never just the home grid. Both
+  // properties are inherited CSS properties, so leaving them here and
+  // never re-declaring them lower down is what keeps the card and the
+  // detail page in sync automatically. Ola, 2026-08-19: "musi się
   // zmieniać wszędzie w sklepie... żeby nie było takiej sytuacji że inny
-  // jest w koszyku, inny jak klikamy na produkt".
-  const pageStyle = { ...styles.page, ...(campaign?.productAreaBackgroundColor ? { background: campaign.productAreaBackgroundColor } : {}) };
+  // jest w koszyku, inny jak klikamy na produkt" / "jak się kliknie na
+  // produkt to musi być ten sam kolor opisu później".
+  const pageStyle = {
+    ...styles.page,
+    ...(campaign?.productAreaBackgroundColor ? { background: campaign.productAreaBackgroundColor } : {}),
+    ...(campaign?.bodyTextColor ? { color: campaign.bodyTextColor } : {}),
+  };
+  const headerStyle = { ...styles.header, ...(campaign?.headerBackgroundColor ? { background: campaign.headerBackgroundColor } : {}) };
+  // The "Bag" link and brand placeholder both have their own fixed colours
+  // (navy / muted grey) tuned for the header's default white — a dark
+  // header colour would otherwise sit right on top of the exact
+  // invisible-text bug class fixed elsewhere this session. The saleis.live
+  // logo mark itself is NOT recoloured here — it's a fixed brand asset
+  // (see Logo.tsx's own comment), same as any platform keeping its own
+  // mark's colour regardless of a merchant's chosen theme.
+  const headerTextColor = campaign?.headerBackgroundColor ? contrastTextColor(campaign.headerBackgroundColor) : undefined;
 
   return (
     <StoreThemeContext.Provider value={{ buyButtonBackground, buyButtonText }}>
@@ -264,7 +281,7 @@ export function App() {
           PREVIEW — this store is not public yet. Only you can see this.
         </div>
       ) : null}
-      <header style={styles.header}>
+      <header style={headerStyle}>
         <a href="#/" style={{ ...styles.brandLockup, minWidth: 0 }}>
           {brand.showPlatformLogo !== false ? (
             <span className="storefront-logo" style={{ display: "inline-flex" }}>
@@ -275,16 +292,16 @@ export function App() {
             <img src={apiClient.resolveAssetUrl(brand.logoUrl)} alt={brand.name} style={{ height: LOGO_SIZE_PX[brand.logoSize ?? "medium"], width: "auto", objectFit: "contain" }} />
           ) : (
             <>
-              <span className="storefront-brand-placeholder-full" style={styles.brandPlaceholder}>
+              <span className="storefront-brand-placeholder-full" style={{ ...styles.brandPlaceholder, ...(headerTextColor ? { color: headerTextColor } : {}) }}>
                 Your brand goes here
               </span>
-              <span className="storefront-brand-placeholder-short" style={styles.brandPlaceholder}>
+              <span className="storefront-brand-placeholder-short" style={{ ...styles.brandPlaceholder, ...(headerTextColor ? { color: headerTextColor } : {}) }}>
                 Your brand
               </span>
             </>
           )}
         </a>
-        <a href="#/bag" style={{ ...styles.bagLink, flexShrink: 0 }}>
+        <a href="#/bag" style={{ ...styles.bagLink, flexShrink: 0, ...(headerTextColor ? { color: headerTextColor } : {}) }}>
           Bag ({cartCount})
         </a>
       </header>

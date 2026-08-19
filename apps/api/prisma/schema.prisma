@@ -338,6 +338,8 @@ model Campaign {
   heroButtonColor             String?
   buyButtonColor               String?
   productAreaBackgroundColor  String?
+  headerBackgroundColor       String?
+  bodyTextColor                String?
   showHeroCta      Boolean?
   /// Position/scale of the hero photo within the hero canvas (drag-to-move,
   /// drag-the-dot-to-resize, same mechanism as product photo positioning).

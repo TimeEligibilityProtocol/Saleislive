@@ -114,8 +114,22 @@ export interface Campaign {
   heroButtonColor: string | null;
   /** Free hex colour for every "Add to bag" / primary action button across the storefront (product card, product detail, checkout, confirmation) — one shared colour, since they're all the same button role. Null = platform default navy. Text colour auto-derives via contrastTextColor. */
   buyButtonColor: string | null;
-  /** Free hex colour for the page area behind the product grid (category pills through the product cards) — independent of the hero background. Null = platform default ivory. */
+  /** Free hex colour for the page area behind the product grid (category pills through the product cards) — independent of the hero background. Null = platform default ivory. Set once at the page root (App.tsx), so it's identical on every route — home, product detail, bag, checkout — never just the home grid. Ola, 2026-08-19: "musi się zmieniać wszędzie w sklepie... żeby nie było takiej sytuacji że inny jest w koszyku, inny jak klikamy na produkt". */
   productAreaBackgroundColor: string | null;
+  /** Free hex colour for the header bar (behind the logo/bag link) — independent of the hero and product-area colours. Null = platform default white. Ola, 2026-08-19: "kolor tego paska na którym jest logo tez musi być zmienialny". */
+  headerBackgroundColor: string | null;
+  /**
+   * Free hex colour for ordinary body text site-wide — product names/
+   * prices on the grid, the same product's title/price/detail labels on
+   * its own page, bag line items. Set once at the page root (same
+   * mechanism as productAreaBackgroundColor) so it can never drift
+   * between the card and the detail view — Ola, 2026-08-19: "jak się
+   * kliknie na produkt to musi być ten sam kolor opisu później". Null =
+   * platform default near-black. Secondary/muted labels (SKU, policy
+   * text) intentionally keep their own muted tone regardless — this only
+   * covers primary body text.
+   */
+  bodyTextColor: string | null;
   /** Null/true = show the platform's own "Shop the sale" CTA over the hero. False = hide it — a merchant whose uploaded hero photo already has its own call-to-action baked in doesn't want a second, redundant one on top. */
   showHeroCta: boolean | null;
   /**
