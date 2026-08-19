@@ -3520,7 +3520,10 @@ function LaunchStudioPage() {
               </>
             ) : null}
 
-            <label style={{ ...styles.label, marginTop: 16 }}>Headline</label>
+            <hr style={{ border: "none", borderTop: `1px solid ${colors.line}`, margin: "20px 0 16px" }} />
+            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", color: colors.muted, margin: "0 0 4px" }}>Headline &amp; copy</p>
+
+            <label style={{ ...styles.label, marginTop: 8 }}>Headline</label>
             <input style={styles.input} value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="e.g. The private sale is live." />
             <label style={{ ...styles.label, marginTop: 4 }}>Headline size</label>
             <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
@@ -3538,7 +3541,62 @@ function LaunchStudioPage() {
             <label style={{ ...styles.label, marginTop: 10 }}>Short description (optional)</label>
             <input style={styles.input} value={shortDescription} onChange={(e) => setShortDescription(e.target.value)} placeholder="e.g. Selected pieces. Limited time." />
 
-            <label style={{ ...styles.label, marginTop: 16 }}>Hero image</label>
+            <hr style={{ border: "none", borderTop: `1px solid ${colors.line}`, margin: "20px 0 16px" }} />
+            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", color: colors.muted, margin: "0 0 4px" }}>Hero visual</p>
+
+            <label style={styles.label}>Background colour</label>
+            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              {HERO_COLOR_OPTIONS.map(([key, preset]) => (
+                <button
+                  key={key}
+                  type="button"
+                  title={preset.label}
+                  onClick={() => setHeroColorPreset(key)}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 999,
+                    border: heroColorPreset === key ? `2px solid ${colors.navy}` : `1px solid ${colors.border}`,
+                    background: preset.background,
+                    cursor: "pointer",
+                  }}
+                />
+              ))}
+            </div>
+
+            <label style={{ ...styles.label, marginTop: 16 }}>Layout</label>
+            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              {THEME_PRESET_OPTIONS.map((t) => (
+                <button key={t.key} type="button" style={{ ...styles.pillButton, ...(themePreset === t.key ? styles.pillButtonActive : {}) }} onClick={() => setThemePreset(t.key)}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            <label style={{ ...styles.label, marginTop: 16 }}>Hero font</label>
+            {HERO_FONT_GROUPS.map((g) => (
+              <div key={g.group} style={{ marginTop: 6 }}>
+                <p style={{ fontSize: 10, fontWeight: 700, color: colors.muted, textTransform: "uppercase", margin: "0 0 4px" }}>{g.group}</p>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {g.fonts.map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setHeroFontPreset(f)}
+                      style={{
+                        ...styles.pillButton,
+                        ...((heroFontPreset ?? DEFAULT_HERO_FONT) === f ? styles.pillButtonActive : {}),
+                        fontFamily: f,
+                      }}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            <label style={{ ...styles.label, marginTop: 16 }}>Hero image (optional — overrides the colour above when set)</label>
             <input
               ref={heroDesktopInputRef}
               type="file"
@@ -3609,61 +3667,7 @@ function LaunchStudioPage() {
                 </button>
               </div>
             </div>
-            <p style={{ fontSize: 11, color: colors.muted, marginTop: 6 }}>
-              Best results: desktop 1920 × 1080px, mobile 1080 × 1350px, JPG or PNG. Optional — without one, the colour below fills the hero instead.
-            </p>
-
-            <label style={{ ...styles.label, marginTop: 16 }}>Background colour (used if you don't upload a hero photo)</label>
-            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-              {HERO_COLOR_OPTIONS.map(([key, preset]) => (
-                <button
-                  key={key}
-                  type="button"
-                  title={preset.label}
-                  onClick={() => setHeroColorPreset(key)}
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 999,
-                    border: heroColorPreset === key ? `2px solid ${colors.navy}` : `1px solid ${colors.border}`,
-                    background: preset.background,
-                    cursor: "pointer",
-                  }}
-                />
-              ))}
-            </div>
-
-            <label style={{ ...styles.label, marginTop: 16 }}>Hero font</label>
-            {HERO_FONT_GROUPS.map((g) => (
-              <div key={g.group} style={{ marginTop: 6 }}>
-                <p style={{ fontSize: 10, fontWeight: 700, color: colors.muted, textTransform: "uppercase", margin: "0 0 4px" }}>{g.group}</p>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {g.fonts.map((f) => (
-                    <button
-                      key={f}
-                      type="button"
-                      onClick={() => setHeroFontPreset(f)}
-                      style={{
-                        ...styles.pillButton,
-                        ...((heroFontPreset ?? DEFAULT_HERO_FONT) === f ? styles.pillButtonActive : {}),
-                        fontFamily: f,
-                      }}
-                    >
-                      {f}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-
-            <label style={{ ...styles.label, marginTop: 16 }}>Layout</label>
-            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-              {THEME_PRESET_OPTIONS.map((t) => (
-                <button key={t.key} type="button" style={{ ...styles.pillButton, ...(themePreset === t.key ? styles.pillButtonActive : {}) }} onClick={() => setThemePreset(t.key)}>
-                  {t.label}
-                </button>
-              ))}
-            </div>
+            <p style={{ fontSize: 11, color: colors.muted, marginTop: 6 }}>Best results: desktop 1920 × 1080px, mobile 1080 × 1350px, JPG or PNG.</p>
 
             <div style={{ ...styles.reassuranceCard, marginTop: 20 }}>
               <h2 style={styles.reassuranceTitle}>Design your hero (Canva / Figma)</h2>
