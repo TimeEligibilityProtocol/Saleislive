@@ -3298,6 +3298,50 @@ function useGoogleFontLoader(family: string | null | undefined): void {
 }
 const HERO_COLOR_OPTIONS = Object.entries(HERO_COLOR_PRESETS) as [HeroColorPresetId, (typeof HERO_COLOR_PRESETS)[HeroColorPresetId]][];
 
+/**
+ * One "colour, or Default" field — the single repeated building block for
+ * every colour control in Store design (background, button, font colour,
+ * everywhere). Same swatch/hex/Reset pattern used consistently instead of
+ * every section inventing its own — Ola, 2026-08-19: "zróbmy je spójne,
+ * teraz jest wszystko rozsiane".
+ */
+function ColorPickerRow({ label, value, onChange, fallback }: { label: string; value: string | null; onChange: (v: string | null) => void; fallback: string }) {
+  return (
+    <div>
+      <label style={styles.label}>{label}</label>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
+        <input
+          type="color"
+          value={value ?? fallback}
+          onChange={(e) => onChange(e.target.value)}
+          style={{ width: 36, height: 36, padding: 0, border: value ? `2px solid ${colors.navy}` : `1px solid ${colors.border}`, borderRadius: 999, cursor: "pointer", background: "none" }}
+        />
+        <span style={{ fontSize: 12, color: colors.muted }}>{value ? value : "Default"}</span>
+        {value ? (
+          <button type="button" onClick={() => onChange(null)} style={{ ...styles.pillButton, padding: "6px 10px", fontSize: 11 }}>
+            Reset
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/** Lays two (or more) fields out as one row, side by side — Ola, 2026-08-19: "nie pod sobą ale ... w linijkach". */
+function FieldRow({ children }: { children: React.ReactNode }) {
+  return <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginTop: 12 }}>{Array.isArray(children) ? children.map((c, i) => <div key={i} style={{ flex: 1, minWidth: 160 }}>{c}</div>) : <div style={{ flex: 1, minWidth: 160 }}>{children}</div>}</div>;
+}
+
+/** One named block of Store design (Header / Hero / Store) — a heading plus a consistent divider, so the panel reads as clearly separated sections instead of one long undifferentiated list. */
+function StoreDesignSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginTop: 28 }}>
+      <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: colors.ink, margin: "0 0 12px", paddingBottom: 8, borderBottom: `2px solid ${colors.ink}` }}>{title}</p>
+      {children}
+    </div>
+  );
+}
+
 function LaunchStudioPage() {
   const [brandId] = useState(() => window.localStorage.getItem(LAST_BRAND_ID_KEY) ?? "b_demo");
   const [tab, setTab] = useState<LaunchTab>("sale");
@@ -3325,8 +3369,11 @@ function LaunchStudioPage() {
   const [themePreset, setThemePreset] = useState<ThemePresetId>("editorial");
   const [heroColorPreset, setHeroColorPreset] = useState<HeroColorPresetId | null>(null);
   const [heroCustomColor, setHeroCustomColor] = useState<string | null>(null);
+  const [heroTextColor, setHeroTextColor] = useState<string | null>(null);
   const [heroButtonColor, setHeroButtonColor] = useState<string | null>(null);
+  const [heroButtonTextColor, setHeroButtonTextColor] = useState<string | null>(null);
   const [buyButtonColor, setBuyButtonColor] = useState<string | null>(null);
+  const [buyButtonTextColor, setBuyButtonTextColor] = useState<string | null>(null);
   const [productAreaBackgroundColor, setProductAreaBackgroundColor] = useState<string | null>(null);
   const [headerBackgroundColor, setHeaderBackgroundColor] = useState<string | null>(null);
   const [bodyTextColor, setBodyTextColor] = useState<string | null>(null);
@@ -3371,8 +3418,11 @@ function LaunchStudioPage() {
         setThemePreset(c.themePreset);
         setHeroColorPreset(c.heroColorPreset);
         setHeroCustomColor(c.heroCustomColor);
+        setHeroTextColor(c.heroTextColor);
         setHeroButtonColor(c.heroButtonColor);
+        setHeroButtonTextColor(c.heroButtonTextColor);
         setBuyButtonColor(c.buyButtonColor);
+        setBuyButtonTextColor(c.buyButtonTextColor);
         setProductAreaBackgroundColor(c.productAreaBackgroundColor);
         setHeaderBackgroundColor(c.headerBackgroundColor);
         setBodyTextColor(c.bodyTextColor);
@@ -3467,8 +3517,11 @@ function LaunchStudioPage() {
         themePreset,
         heroColorPreset,
         heroCustomColor,
+        heroTextColor,
         heroButtonColor,
+        heroButtonTextColor,
         buyButtonColor,
+        buyButtonTextColor,
         productAreaBackgroundColor,
         headerBackgroundColor,
         bodyTextColor,
@@ -3709,336 +3762,335 @@ function LaunchStudioPage() {
       {tab === "store" ? (
         <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
           <div style={{ ...styles.sectionCard, flex: 1, minWidth: 320 }}>
-            <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 16 }}>Store design</h2>
+            <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 4 }}>Store design</h2>
+            <p style={{ fontSize: 11, color: colors.muted, margin: 0 }}>Header, hero, and store — organised the same way top to bottom: what it says, then how it looks.</p>
 
-            <label style={styles.label}>Logo</label>
-            <input
-              ref={logoInputRef}
-              type="file"
-              accept="image/*"
-              style={{ display: "none" }}
-              onChange={(e) => {
-                const file = e.target.files?.[0] ?? null;
-                e.target.value = "";
-                void onLogoFilePicked(file);
-              }}
-            />
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div
-                style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: 8,
-                  border: `1px dashed ${colors.border}`,
-                  background: brand?.logoUrl ? `url(${apiClient.resolveAssetUrl(brand.logoUrl)}) center/contain no-repeat` : colors.background,
-                  flexShrink: 0,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
+            <StoreDesignSection title="Header">
+              <label style={styles.label}>Logo</label>
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  e.target.value = "";
+                  void onLogoFilePicked(file);
                 }}
-              >
-                {!brand?.logoUrl ? <span style={{ fontSize: 9, color: colors.muted }}>No logo</span> : null}
-              </div>
-              <button
-                type="button"
-                disabled={uploadingLogo}
-                onClick={() => logoInputRef.current?.click()}
-                style={{ ...styles.button, ...styles.buttonAuto, fontSize: 12, padding: "8px 14px", opacity: uploadingLogo ? 0.5 : 1 }}
-              >
-                {uploadingLogo ? "Uploading…" : brand?.logoUrl ? "Replace logo" : "Upload logo"}
-              </button>
-              {brand?.logoUrl ? (
+              />
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 8,
+                    border: `1px dashed ${colors.border}`,
+                    background: brand?.logoUrl ? `url(${apiClient.resolveAssetUrl(brand.logoUrl)}) center/contain no-repeat` : colors.background,
+                    flexShrink: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {!brand?.logoUrl ? <span style={{ fontSize: 9, color: colors.muted }}>No logo</span> : null}
+                </div>
                 <button
                   type="button"
                   disabled={uploadingLogo}
-                  onClick={() => void onRemoveLogo()}
-                  style={{ ...styles.button, background: colors.white, color: colors.error, border: `1px solid ${colors.border}`, fontSize: 12, padding: "8px 14px", opacity: uploadingLogo ? 0.5 : 1 }}
+                  onClick={() => logoInputRef.current?.click()}
+                  style={{ ...styles.button, ...styles.buttonAuto, fontSize: 12, padding: "8px 14px", opacity: uploadingLogo ? 0.5 : 1 }}
                 >
-                  Remove logo
+                  {uploadingLogo ? "Uploading…" : brand?.logoUrl ? "Replace logo" : "Upload logo"}
                 </button>
+                {brand?.logoUrl ? (
+                  <button
+                    type="button"
+                    disabled={uploadingLogo}
+                    onClick={() => void onRemoveLogo()}
+                    style={{ ...styles.button, background: colors.white, color: colors.error, border: `1px solid ${colors.border}`, fontSize: 12, padding: "8px 14px", opacity: uploadingLogo ? 0.5 : 1 }}
+                  >
+                    Remove logo
+                  </button>
+                ) : null}
+              </div>
+              <p style={{ fontSize: 11, color: colors.muted, marginTop: 6 }}>Shown on your storefront's header. Best results: a transparent PNG, roughly 400 × 160px.</p>
+              {brand?.logoUrl ? (
+                <>
+                  <label style={{ ...styles.label, marginTop: 10 }}>Logo size</label>
+                  <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                    {(["small", "medium", "large"] as const).map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        disabled={savingLogoSize}
+                        onClick={() => void onLogoSizePicked(s)}
+                        style={{ ...styles.pillButton, padding: "8px 14px", fontSize: 12, ...((brand.logoSize ?? "medium") === s ? styles.pillButtonActive : {}) }}
+                      >
+                        {s === "small" ? "Small" : s === "medium" ? "Medium" : "Large"}
+                      </button>
+                    ))}
+                  </div>
+                </>
               ) : null}
-            </div>
-            <p style={{ fontSize: 11, color: colors.muted, marginTop: 6 }}>Shown on your storefront's header. Best results: a transparent PNG, roughly 400 × 160px.</p>
-            {brand?.logoUrl ? (
-              <>
-                <label style={{ ...styles.label, marginTop: 10 }}>Logo size</label>
-                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                  {(["small", "medium", "large"] as const).map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      disabled={savingLogoSize}
-                      onClick={() => void onLogoSizePicked(s)}
-                      style={{ ...styles.pillButton, padding: "8px 14px", fontSize: 12, ...((brand.logoSize ?? "medium") === s ? styles.pillButtonActive : {}) }}
-                    >
-                      {s === "small" ? "Small" : s === "medium" ? "Medium" : "Large"}
-                    </button>
-                  ))}
-                </div>
-              </>
-            ) : null}
 
-            <label
-              style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, cursor: savingShowPlatformLogo ? "default" : "pointer" }}
-              onClick={(e) => {
-                e.preventDefault();
-                if (savingShowPlatformLogo) return;
-                void onToggleShowPlatformLogo(brand?.showPlatformLogo === false);
-              }}
-            >
-              <span style={{ ...styles.checkbox, ...(brand?.showPlatformLogo !== false ? styles.checkboxChecked : {}) }}>{brand?.showPlatformLogo !== false ? "✓" : ""}</span>
-              <span style={{ fontSize: 12 }}>Show the saleis.live logo in your storefront header</span>
-            </label>
-            <p style={{ fontSize: 11, color: colors.muted, margin: "4px 0 0" }}>
-              Off or on, a small "Powered by saleis.live" note always stays in the footer.
-            </p>
+              <label
+                style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, cursor: savingShowPlatformLogo ? "default" : "pointer" }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (savingShowPlatformLogo) return;
+                  void onToggleShowPlatformLogo(brand?.showPlatformLogo === false);
+                }}
+              >
+                <span style={{ ...styles.checkbox, ...(brand?.showPlatformLogo !== false ? styles.checkboxChecked : {}) }}>{brand?.showPlatformLogo !== false ? "✓" : ""}</span>
+                <span style={{ fontSize: 12 }}>Show the saleis.live logo in your storefront header</span>
+              </label>
+              <p style={{ fontSize: 11, color: colors.muted, margin: "4px 0 0" }}>
+                Off or on, a small "Powered by saleis.live" note always stays in the footer.
+              </p>
 
-            <hr style={{ border: "none", borderTop: `1px solid ${colors.line}`, margin: "20px 0 16px" }} />
-            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", color: colors.muted, margin: "0 0 4px" }}>Headline &amp; copy</p>
+              <div style={{ marginTop: 14, maxWidth: 220 }}>
+                <ColorPickerRow label="Header bar colour" value={headerBackgroundColor} onChange={setHeaderBackgroundColor} fallback="#FFFFFF" />
+              </div>
+            </StoreDesignSection>
 
-            <label style={{ ...styles.label, marginTop: 8 }}>Headline</label>
-            <input style={styles.input} value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="e.g. The private sale is live." />
-            <label style={{ ...styles.label, marginTop: 4 }}>Headline size</label>
-            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-              {(["small", "medium", "large"] as const).map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setHeroTitleSize(s)}
-                  style={{ ...styles.pillButton, padding: "8px 14px", fontSize: 12, ...((heroTitleSize ?? "medium") === s ? styles.pillButtonActive : {}) }}
-                >
-                  {s === "small" ? "Small" : s === "medium" ? "Medium" : "Large"}
-                </button>
-              ))}
-            </div>
-            <label style={{ ...styles.label, marginTop: 10 }}>Short description (optional)</label>
-            <input style={styles.input} value={shortDescription} onChange={(e) => setShortDescription(e.target.value)} placeholder="e.g. Selected pieces. Limited time." />
+            <StoreDesignSection title="Hero">
+              <label style={styles.label}>Headline</label>
+              <input style={styles.input} value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="e.g. The private sale is live." />
+              <label style={{ ...styles.label, marginTop: 10 }}>Short description (optional)</label>
+              <input style={styles.input} value={shortDescription} onChange={(e) => setShortDescription(e.target.value)} placeholder="e.g. Selected pieces. Limited time." />
+              <label style={{ ...styles.label, marginTop: 10 }}>Headline size</label>
+              <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                {(["small", "medium", "large"] as const).map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setHeroTitleSize(s)}
+                    style={{ ...styles.pillButton, padding: "8px 14px", fontSize: 12, ...((heroTitleSize ?? "medium") === s ? styles.pillButtonActive : {}) }}
+                  >
+                    {s === "small" ? "Small" : s === "medium" ? "Medium" : "Large"}
+                  </button>
+                ))}
+              </div>
 
-            <hr style={{ border: "none", borderTop: `1px solid ${colors.line}`, margin: "20px 0 16px" }} />
-            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", color: colors.muted, margin: "0 0 4px" }}>Hero visual</p>
+              <label style={{ ...styles.label, marginTop: 16 }}>Layout</label>
+              <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                {THEME_PRESET_OPTIONS.map((t) => (
+                  <button key={t.key} type="button" style={{ ...styles.pillButton, ...(themePreset === t.key ? styles.pillButtonActive : {}) }} onClick={() => setThemePreset(t.key)}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
 
-            <label style={styles.label}>Background colour</label>
-            <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center" }}>
-              {HERO_COLOR_OPTIONS.map(([key, preset]) => (
-                <button
-                  key={key}
-                  type="button"
-                  title={preset.label}
-                  onClick={() => {
-                    setHeroColorPreset(key);
-                    setHeroCustomColor(null);
+              <label style={{ ...styles.label, marginTop: 16 }}>Background colour</label>
+              <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center" }}>
+                {HERO_COLOR_OPTIONS.map(([key, preset]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    title={preset.label}
+                    onClick={() => {
+                      setHeroColorPreset(key);
+                      setHeroCustomColor(null);
+                    }}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 999,
+                      border: heroColorPreset === key && !heroCustomColor ? `2px solid ${colors.navy}` : `1px solid ${colors.border}`,
+                      background: preset.background,
+                      cursor: "pointer",
+                    }}
+                  />
+                ))}
+                <span style={{ width: 1, height: 24, background: colors.border, margin: "0 4px" }} />
+                <input
+                  type="color"
+                  title="Custom colour"
+                  value={heroCustomColor ?? "#F5F2EB"}
+                  onChange={(e) => {
+                    setHeroCustomColor(e.target.value);
+                    setHeroColorPreset(null);
                   }}
                   style={{
                     width: 36,
                     height: 36,
+                    padding: 0,
+                    border: heroCustomColor ? `2px solid ${colors.navy}` : `1px solid ${colors.border}`,
                     borderRadius: 999,
-                    border: heroColorPreset === key && !heroCustomColor ? `2px solid ${colors.navy}` : `1px solid ${colors.border}`,
-                    background: preset.background,
                     cursor: "pointer",
+                    background: "none",
                   }}
                 />
-              ))}
-              <span style={{ width: 1, height: 24, background: colors.border, margin: "0 4px" }} />
-              <input
-                type="color"
-                title="Custom colour"
-                value={heroCustomColor ?? "#F5F2EB"}
-                onChange={(e) => {
-                  setHeroCustomColor(e.target.value);
-                  setHeroColorPreset(null);
-                }}
-                style={{
-                  width: 36,
-                  height: 36,
-                  padding: 0,
-                  border: heroCustomColor ? `2px solid ${colors.navy}` : `1px solid ${colors.border}`,
-                  borderRadius: 999,
-                  cursor: "pointer",
-                  background: "none",
-                }}
-              />
-              {heroColorPreset || heroCustomColor ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setHeroColorPreset(null);
-                    setHeroCustomColor(null);
-                  }}
-                  style={{ ...styles.pillButton, padding: "6px 10px", fontSize: 11 }}
-                >
-                  Reset to default
-                </button>
-              ) : null}
-            </div>
-            <p style={{ fontSize: 11, color: colors.muted, margin: "4px 0 0" }}>
-              {heroCustomColor ? `Custom colour ${heroCustomColor}` : heroColorPreset ? HERO_COLOR_PRESETS[heroColorPreset].label : "Default hero colour — no override set."}
-            </p>
-
-            <label style={{ ...styles.label, marginTop: 16 }}>Layout</label>
-            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-              {THEME_PRESET_OPTIONS.map((t) => (
-                <button key={t.key} type="button" style={{ ...styles.pillButton, ...(themePreset === t.key ? styles.pillButtonActive : {}) }} onClick={() => setThemePreset(t.key)}>
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            <label style={{ ...styles.label, marginTop: 16 }}>Hero font</label>
-            {HERO_FONT_GROUPS.map((g) => (
-              <div key={g.group} style={{ marginTop: 6 }}>
-                <p style={{ fontSize: 10, fontWeight: 700, color: colors.muted, textTransform: "uppercase", margin: "0 0 4px" }}>{g.group}</p>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {g.fonts.map((f) => (
-                    <button
-                      key={f}
-                      type="button"
-                      onClick={() => setHeroFontPreset(f)}
-                      style={{
-                        ...styles.pillButton,
-                        ...((heroFontPreset ?? DEFAULT_HERO_FONT) === f ? styles.pillButtonActive : {}),
-                        fontFamily: f,
-                      }}
-                    >
-                      {f}
-                    </button>
-                  ))}
-                </div>
+                {heroColorPreset || heroCustomColor ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHeroColorPreset(null);
+                      setHeroCustomColor(null);
+                    }}
+                    style={{ ...styles.pillButton, padding: "6px 10px", fontSize: 11 }}
+                  >
+                    Reset to default
+                  </button>
+                ) : null}
               </div>
-            ))}
-            <label style={{ ...styles.label, marginTop: 10 }}>Or search Google Fonts</label>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input
-                list="google-font-options"
-                style={{ ...styles.input, flex: 1 }}
-                placeholder="Type a font name, e.g. Cormorant Garamond"
-                defaultValue={heroFontPreset && !(APPROVED_FONTS as readonly string[]).includes(heroFontPreset) ? heroFontPreset : ""}
-                onChange={(e) => {
-                  const value = e.target.value.trim();
-                  if (GOOGLE_FONT_FAMILIES.includes(value as (typeof GOOGLE_FONT_FAMILIES)[number])) setHeroFontPreset(value);
-                }}
-              />
-              <datalist id="google-font-options">
-                {GOOGLE_FONT_FAMILIES.map((f) => (
-                  <option key={f} value={f} />
-                ))}
-              </datalist>
-            </div>
-            {heroFontPreset && !(APPROVED_FONTS as readonly string[]).includes(heroFontPreset) ? (
-              <p style={{ fontSize: 11, color: colors.muted, margin: "6px 0 0", fontFamily: heroFontPreset }}>Using "{heroFontPreset}" — The quick brown fox jumps.</p>
-            ) : null}
-
-            <hr style={{ border: "none", borderTop: `1px solid ${colors.line}`, margin: "20px 0 16px" }} />
-            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", color: colors.muted, margin: "0 0 4px" }}>Buttons &amp; background</p>
-            <p style={{ fontSize: 11, color: colors.muted, margin: "0 0 10px" }}>Set independently — the hero button, the "Add to bag" buttons, the header bar, body text, and the background behind your products can each be their own colour.</p>
-
-            {(
-              [
-                { label: "Hero button colour", value: heroButtonColor, set: setHeroButtonColor, fallback: "#173B8F" },
-                { label: "Add to bag button colour", value: buyButtonColor, set: setBuyButtonColor, fallback: "#173B8F" },
-                { label: "Store background colour", value: productAreaBackgroundColor, set: setProductAreaBackgroundColor, fallback: "#F5F2EB" },
-                { label: "Header bar colour", value: headerBackgroundColor, set: setHeaderBackgroundColor, fallback: "#FFFFFF" },
-                { label: "Body text colour (product names, prices, descriptions)", value: bodyTextColor, set: setBodyTextColor, fallback: "#111111" },
-              ] as const
-            ).map((row) => (
-              <div key={row.label} style={{ marginTop: 10 }}>
-                <label style={styles.label}>{row.label}</label>
-                <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
-                  <input
-                    type="color"
-                    value={row.value ?? row.fallback}
-                    onChange={(e) => row.set(e.target.value)}
-                    style={{ width: 36, height: 36, padding: 0, border: row.value ? `2px solid ${colors.navy}` : `1px solid ${colors.border}`, borderRadius: 999, cursor: "pointer", background: "none" }}
-                  />
-                  <span style={{ fontSize: 12, color: colors.muted }}>{row.value ? row.value : "Default"}</span>
-                  {row.value ? (
-                    <button type="button" onClick={() => row.set(null)} style={{ ...styles.pillButton, padding: "6px 10px", fontSize: 11 }}>
-                      Reset to default
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-
-            <label style={{ ...styles.label, marginTop: 16 }}>Hero image (optional — overrides the colour above when set)</label>
-            <input
-              ref={heroDesktopInputRef}
-              type="file"
-              accept="image/*"
-              style={{ display: "none" }}
-              onChange={(e) => {
-                const file = e.target.files?.[0] ?? null;
-                e.target.value = "";
-                void onHeroFilePicked("desktop", file);
-              }}
-            />
-            <input
-              ref={heroMobileInputRef}
-              type="file"
-              accept="image/*"
-              style={{ display: "none" }}
-              onChange={(e) => {
-                const file = e.target.files?.[0] ?? null;
-                e.target.value = "";
-                void onHeroFilePicked("mobile", file);
-              }}
-            />
-            <div style={{ display: "flex", gap: 16, marginTop: 4 }}>
-              <div style={{ flex: 1 }}>
-                <div
-                  style={{
-                    aspectRatio: "16/9",
-                    borderRadius: 8,
-                    border: `1px dashed ${colors.border}`,
-                    background: heroDesktopUrl ? `url(${apiClient.resolveAssetUrl(heroDesktopUrl)}) center/cover` : colors.background,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  {!heroDesktopUrl ? <span style={{ fontSize: 11, color: colors.muted }}>No image</span> : null}
-                </div>
-                <button
-                  type="button"
-                  disabled={uploadingHero === "desktop"}
-                  onClick={() => heroDesktopInputRef.current?.click()}
-                  style={{ ...styles.button, ...styles.buttonAuto, width: "100%", marginTop: 6, fontSize: 12, padding: "8px 12px", opacity: uploadingHero === "desktop" ? 0.5 : 1 }}
-                >
-                  {uploadingHero === "desktop" ? "Uploading…" : "Upload desktop hero"}
-                </button>
-              </div>
-              <div style={{ flex: 1 }}>
-                <div
-                  style={{
-                    aspectRatio: "16/9",
-                    borderRadius: 8,
-                    border: `1px dashed ${colors.border}`,
-                    background: heroMobileUrl ? `url(${apiClient.resolveAssetUrl(heroMobileUrl)}) center/cover` : colors.background,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  {!heroMobileUrl ? <span style={{ fontSize: 11, color: colors.muted }}>No image</span> : null}
-                </div>
-                <button
-                  type="button"
-                  disabled={uploadingHero === "mobile"}
-                  onClick={() => heroMobileInputRef.current?.click()}
-                  style={{ ...styles.button, ...styles.buttonAuto, width: "100%", marginTop: 6, fontSize: 12, padding: "8px 12px", opacity: uploadingHero === "mobile" ? 0.5 : 1 }}
-                >
-                  {uploadingHero === "mobile" ? "Uploading…" : "Upload mobile hero"}
-                </button>
-              </div>
-            </div>
-            <p style={{ fontSize: 11, color: colors.muted, marginTop: 6 }}>Best results: desktop 1920 × 1080px, mobile 1080 × 1350px, JPG or PNG.</p>
-
-            <div style={{ ...styles.reassuranceCard, marginTop: 20 }}>
-              <h2 style={styles.reassuranceTitle}>Design your hero (Canva / Figma)</h2>
-              <p style={styles.reassuranceBody}>
-                Not connected yet — designing here and having it land at the right size automatically needs a Canva or Figma developer account with an app registered on their side first (their Connect/API program), which only you can set up since it's tied to your own Canva/Figma account. Once you have that, this is where we'd wire it in. For now: design at{" "}
-                <strong>1920 × 1080px (desktop)</strong> / <strong>1080 × 1350px (mobile)</strong> in whatever tool you like, then upload it above.
+              <p style={{ fontSize: 11, color: colors.muted, margin: "4px 0 0" }}>
+                {heroCustomColor ? `Custom colour ${heroCustomColor}` : heroColorPreset ? HERO_COLOR_PRESETS[heroColorPreset].label : "Default hero colour — no override set."}
               </p>
-            </div>
+
+              <label style={{ ...styles.label, marginTop: 16 }}>Font</label>
+              {HERO_FONT_GROUPS.map((g) => (
+                <div key={g.group} style={{ marginTop: 6 }}>
+                  <p style={{ fontSize: 10, fontWeight: 700, color: colors.muted, textTransform: "uppercase", margin: "0 0 4px" }}>{g.group}</p>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {g.fonts.map((f) => (
+                      <button
+                        key={f}
+                        type="button"
+                        onClick={() => setHeroFontPreset(f)}
+                        style={{
+                          ...styles.pillButton,
+                          ...((heroFontPreset ?? DEFAULT_HERO_FONT) === f ? styles.pillButtonActive : {}),
+                          fontFamily: f,
+                        }}
+                      >
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <label style={{ ...styles.label, marginTop: 10 }}>Or search Google Fonts</label>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input
+                  list="google-font-options"
+                  style={{ ...styles.input, flex: 1 }}
+                  placeholder="Type a font name, e.g. Cormorant Garamond"
+                  defaultValue={heroFontPreset && !(APPROVED_FONTS as readonly string[]).includes(heroFontPreset) ? heroFontPreset : ""}
+                  onChange={(e) => {
+                    const value = e.target.value.trim();
+                    if (GOOGLE_FONT_FAMILIES.includes(value as (typeof GOOGLE_FONT_FAMILIES)[number])) setHeroFontPreset(value);
+                  }}
+                />
+                <datalist id="google-font-options">
+                  {GOOGLE_FONT_FAMILIES.map((f) => (
+                    <option key={f} value={f} />
+                  ))}
+                </datalist>
+              </div>
+              {heroFontPreset && !(APPROVED_FONTS as readonly string[]).includes(heroFontPreset) ? (
+                <p style={{ fontSize: 11, color: colors.muted, margin: "6px 0 0", fontFamily: heroFontPreset }}>Using "{heroFontPreset}" — The quick brown fox jumps.</p>
+              ) : null}
+
+              <FieldRow>
+                <ColorPickerRow label="Font colour" value={heroTextColor} onChange={setHeroTextColor} fallback="#173B8F" />
+              </FieldRow>
+
+              <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 16, cursor: "pointer" }}>
+                <input type="checkbox" checked={showHeroCta} onChange={(e) => setShowHeroCta(e.target.checked)} />
+                <span style={{ fontSize: 12 }}>Show the "Shop the sale" button</span>
+              </label>
+              <p style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>Turn this off if your own hero photo already has a call-to-action baked in.</p>
+
+              {showHeroCta ? (
+                <FieldRow>
+                  <ColorPickerRow label="Button colour" value={heroButtonColor} onChange={setHeroButtonColor} fallback="#173B8F" />
+                  <ColorPickerRow label="Button font colour" value={heroButtonTextColor} onChange={setHeroButtonTextColor} fallback="#FFFFFF" />
+                </FieldRow>
+              ) : null}
+
+              <label style={{ ...styles.label, marginTop: 16 }}>Hero image (optional — overrides the colour above when set)</label>
+              <input
+                ref={heroDesktopInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  e.target.value = "";
+                  void onHeroFilePicked("desktop", file);
+                }}
+              />
+              <input
+                ref={heroMobileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  e.target.value = "";
+                  void onHeroFilePicked("mobile", file);
+                }}
+              />
+              <div style={{ display: "flex", gap: 16, marginTop: 4 }}>
+                <div style={{ flex: 1 }}>
+                  <div
+                    style={{
+                      aspectRatio: "16/9",
+                      borderRadius: 8,
+                      border: `1px dashed ${colors.border}`,
+                      background: heroDesktopUrl ? `url(${apiClient.resolveAssetUrl(heroDesktopUrl)}) center/cover` : colors.background,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {!heroDesktopUrl ? <span style={{ fontSize: 11, color: colors.muted }}>No image</span> : null}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={uploadingHero === "desktop"}
+                    onClick={() => heroDesktopInputRef.current?.click()}
+                    style={{ ...styles.button, ...styles.buttonAuto, width: "100%", marginTop: 6, fontSize: 12, padding: "8px 12px", opacity: uploadingHero === "desktop" ? 0.5 : 1 }}
+                  >
+                    {uploadingHero === "desktop" ? "Uploading…" : "Upload desktop hero"}
+                  </button>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div
+                    style={{
+                      aspectRatio: "16/9",
+                      borderRadius: 8,
+                      border: `1px dashed ${colors.border}`,
+                      background: heroMobileUrl ? `url(${apiClient.resolveAssetUrl(heroMobileUrl)}) center/cover` : colors.background,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {!heroMobileUrl ? <span style={{ fontSize: 11, color: colors.muted }}>No image</span> : null}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={uploadingHero === "mobile"}
+                    onClick={() => heroMobileInputRef.current?.click()}
+                    style={{ ...styles.button, ...styles.buttonAuto, width: "100%", marginTop: 6, fontSize: 12, padding: "8px 12px", opacity: uploadingHero === "mobile" ? 0.5 : 1 }}
+                  >
+                    {uploadingHero === "mobile" ? "Uploading…" : "Upload mobile hero"}
+                  </button>
+                </div>
+              </div>
+              <p style={{ fontSize: 11, color: colors.muted, marginTop: 6 }}>Best results: desktop 1920 × 1080px, mobile 1080 × 1350px, JPG or PNG.</p>
+
+              <div style={{ ...styles.reassuranceCard, marginTop: 20 }}>
+                <h2 style={styles.reassuranceTitle}>Design your hero (Canva / Figma)</h2>
+                <p style={styles.reassuranceBody}>
+                  Not connected yet — designing here and having it land at the right size automatically needs a Canva or Figma developer account with an app registered on their side first (their Connect/API program), which only you can set up since it's tied to your own Canva/Figma account. Once you have that, this is where we'd wire it in. For now: design at{" "}
+                  <strong>1920 × 1080px (desktop)</strong> / <strong>1080 × 1350px (mobile)</strong> in whatever tool you like, then upload it above.
+                </p>
+              </div>
+            </StoreDesignSection>
+
+            <StoreDesignSection title="Store">
+              <FieldRow>
+                <ColorPickerRow label="Background colour" value={productAreaBackgroundColor} onChange={setProductAreaBackgroundColor} fallback="#F5F2EB" />
+                <ColorPickerRow label="Text colour (product names, prices, descriptions)" value={bodyTextColor} onChange={setBodyTextColor} fallback="#111111" />
+              </FieldRow>
+              <FieldRow>
+                <ColorPickerRow label="Add to bag button colour" value={buyButtonColor} onChange={setBuyButtonColor} fallback="#173B8F" />
+                <ColorPickerRow label="Add to bag button font colour" value={buyButtonTextColor} onChange={setBuyButtonTextColor} fallback="#FFFFFF" />
+              </FieldRow>
+            </StoreDesignSection>
 
             {error ? <p style={styles.error}>{error}</p> : null}
             {saved ? <p style={{ ...styles.sub, color: colors.success, fontWeight: 600, marginTop: 12, marginBottom: 0 }}>Saved.</p> : null}
@@ -4065,13 +4117,13 @@ function LaunchStudioPage() {
                 ))}
               </div>
             </div>
-            <p style={{ fontSize: 11, color: colors.muted, marginTop: 0, marginBottom: 10 }}>Drag the photo to move it, drag its dot to resize. Drag the headline block to reposition it.</p>
+            <p style={{ fontSize: 11, color: colors.muted, marginTop: 0, marginBottom: 10 }}>Drag the photo to move it, drag its dot to resize. Drag the headline block to reposition it. Live preview of the Hero section on the left.</p>
             <HeroComposer
               aspectRatio={heroComposerMode === "desktop" ? "1600 / 620" : "1080 / 1290"}
               backgroundColor={heroCustomColor || (heroColorPreset ? HERO_COLOR_PRESETS[heroColorPreset].background : colors.background)}
-              textColor={heroCustomColor ? contrastTextColor(heroCustomColor) : heroColorPreset ? HERO_COLOR_PRESETS[heroColorPreset].text : colors.ink}
+              textColor={heroTextColor || (heroCustomColor ? contrastTextColor(heroCustomColor) : heroColorPreset ? HERO_COLOR_PRESETS[heroColorPreset].text : colors.ink)}
               ctaBackground={heroButtonColor ?? undefined}
-              ctaText={heroButtonColor ? contrastTextColor(heroButtonColor) : undefined}
+              ctaText={heroButtonTextColor || (heroButtonColor ? contrastTextColor(heroButtonColor) : undefined)}
               imageUrl={
                 heroComposerMode === "desktop" ? (heroDesktopUrl ? apiClient.resolveAssetUrl(heroDesktopUrl) : null) : heroMobileUrl ? apiClient.resolveAssetUrl(heroMobileUrl) : null
               }
@@ -4085,11 +4137,6 @@ function LaunchStudioPage() {
               onImageChange={heroComposerMode === "desktop" ? setHeroImagePos : setHeroImagePosMobile}
               onTextChange={heroComposerMode === "desktop" ? setHeroTextPos : setHeroTextPosMobile}
             />
-            <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, cursor: "pointer" }}>
-              <input type="checkbox" checked={showHeroCta} onChange={(e) => setShowHeroCta(e.target.checked)} />
-              <span style={{ fontSize: 12 }}>Show the "Shop the sale" button</span>
-            </label>
-            <p style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>Turn this off if your own hero photo already has a call-to-action baked in.</p>
           </div>
         </div>
       ) : null}

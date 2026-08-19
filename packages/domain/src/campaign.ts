@@ -110,10 +110,16 @@ export interface Campaign {
    * the 4 curated presets.
    */
   heroCustomColor: string | null;
-  /** Free hex colour for the hero's "Shop the sale" button — independent of the hero background colour (Ola: "nie może być jedno"). Null = the existing default (invert the active hero colour, or navy). Text colour auto-derives via contrastTextColor. */
+  /** Explicit override for the hero headline/subtext colour — Ola, 2026-08-19, asked for this as its own field alongside every other "font colour" in the panel. Null = the existing safe default (contrastTextColor against whatever hero background is active). Set deliberately: an override here is NOT contrast-checked against the hero background, so a bad combination is possible if chosen on purpose. */
+  heroTextColor: string | null;
+  /** Free hex colour for the hero's "Shop the sale" button — independent of the hero background colour (Ola: "nie może być jedno"). Null = the existing default (invert the active hero colour, or navy). */
   heroButtonColor: string | null;
-  /** Free hex colour for every "Add to bag" / primary action button across the storefront (product card, product detail, checkout, confirmation) — one shared colour, since they're all the same button role. Null = platform default navy. Text colour auto-derives via contrastTextColor. */
+  /** Explicit override for the hero button's own text colour. Null = contrastTextColor against heroButtonColor (or the hero's own inverted pair when heroButtonColor is also unset). */
+  heroButtonTextColor: string | null;
+  /** Free hex colour for every "Add to bag" / primary action button across the storefront (product card, product detail, checkout, confirmation) — one shared colour, since they're all the same button role. Null = platform default navy. */
   buyButtonColor: string | null;
+  /** Explicit override for the "Add to bag" button's own text colour. Null = contrastTextColor against buyButtonColor, or white against the platform default navy. */
+  buyButtonTextColor: string | null;
   /** Free hex colour for the page area behind the product grid (category pills through the product cards) — independent of the hero background. Null = platform default ivory. Set once at the page root (App.tsx), so it's identical on every route — home, product detail, bag, checkout — never just the home grid. Ola, 2026-08-19: "musi się zmieniać wszędzie w sklepie... żeby nie było takiej sytuacji że inny jest w koszyku, inny jak klikamy na produkt". */
   productAreaBackgroundColor: string | null;
   /** Free hex colour for the header bar (behind the logo/bag link) — independent of the hero and product-area colours. Null = platform default white. Ola, 2026-08-19: "kolor tego paska na którym jest logo tez musi być zmienialny". */

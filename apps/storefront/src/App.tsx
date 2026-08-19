@@ -239,7 +239,9 @@ export function App() {
   }
 
   const buyButtonBackground = campaign?.buyButtonColor || colors.navy;
-  const buyButtonText = campaign?.buyButtonColor ? contrastTextColor(campaign.buyButtonColor) : colors.white;
+  // An explicit buyButtonTextColor override always wins; otherwise the
+  // existing safe auto-contrast fallback.
+  const buyButtonText = campaign?.buyButtonTextColor || (campaign?.buyButtonColor ? contrastTextColor(campaign.buyButtonColor) : colors.white);
 
   // Set once, page-wide (not just behind the product grid, and not just
   // background) — a colour picked here must look the same on every route
@@ -397,25 +399,26 @@ function HomeView({ brand, campaign, products, onAddToBag }: { brand: Brand; cam
   const hasCustomHero = !!(customHeroUrl || heroBg || campaign?.headline);
   const titleSize = HERO_TITLE_SIZE_PX[campaign?.heroTitleSize ?? "medium"];
   const showCta = campaign?.showHeroCta !== false;
-  const heroTextColor: string = customHeroUrl ? "#fff" : campaign?.heroCustomColor ? contrastTextColor(campaign.heroCustomColor) : colorPreset ? colorPreset.text : colors.navy;
+  // An explicit heroTextColor override (Ola, 2026-08-19: wants a manual
+  // "font colour" field, not only the auto-derived one) always wins;
+  // otherwise fall back to the existing safe auto-contrast logic.
+  const heroTextColor: string = campaign?.heroTextColor || (customHeroUrl ? "#fff" : campaign?.heroCustomColor ? contrastTextColor(campaign.heroCustomColor) : colorPreset ? colorPreset.text : colors.navy);
+  const ctaBackground = campaign?.heroButtonColor || (heroBg ? heroTextColor : null);
   const ctaStyle = {
     ...styles.heroCta,
-    ...(campaign?.heroButtonColor
-      ? // An explicit hero-button colour (Ola, 2026-08-19: independent of
-        // the hero background) always wins.
-        { background: campaign.heroButtonColor, color: contrastTextColor(campaign.heroButtonColor) }
-      : heroBg
-        ? // No explicit button colour: use the hero's own text colour as the
-          // button's background, with a FRESH contrast check for the
-          // button's text — not heroBg itself. heroBg can be any arbitrary
-          // hex a merchant picked (not just the 4 hand-curated presets,
-          // where bg/text were already a matched pair), so reusing heroBg
-          // as the button's text colour isn't safe: a mid-grey hero, for
-          // instance, produces near-white heroTextColor + a mid-grey
-          // button text on a near-white button — unreadable. Real bug,
-          // 2026-08-19, caught from a live screenshot with a grey hero.
-          { background: heroTextColor, color: contrastTextColor(heroTextColor) }
-        : {}),
+    ...(ctaBackground
+      ? {
+          background: ctaBackground,
+          // An explicit heroButtonTextColor override always wins. Otherwise
+          // a FRESH contrast check against the button's own background —
+          // never a reused colour from elsewhere (heroBg, heroTextColor),
+          // since those can be any arbitrary hex a merchant picked, not a
+          // hand-curated pair. Real bug, 2026-08-19, caught from a live
+          // screenshot with a grey hero: a mid-grey hero produced a
+          // near-white button with unreadable grey-on-white text.
+          color: campaign?.heroButtonTextColor || contrastTextColor(ctaBackground),
+        }
+      : {}),
   };
   // Drag-positioned layers (Ola, 2026-08-19) — same fraction-of-canvas
   // convention as the admin's HeroComposer and product photo compositing,
@@ -447,7 +450,21 @@ function HomeView({ brand, campaign, products, onAddToBag }: { brand: Brand; cam
           .hero-text-layer { left: ${textPosMobile.x * 100}% !important; top: ${textPosMobile.y * 100}% !important; }
         }
       `}</style>
-      <section style={{ background: !hasCustomHero ? colors.background : heroBg || colors.ink }}>
+      <section
+        style={{
+          background: !hasCustomHero
+            ? colors.background
+            : // A photo needs a dark backdrop behind its own positioned/scaled
+              // space (it's never literally full-bleed), same reasoning as
+              // heroTextColor's forced white text there. But a merchant who
+              // only typed a headline — no photo, no colour — was silently
+              // getting a near-black hero with no way to see why. Real bug,
+              // 2026-08-19, caught from a live screenshot: "coś jest nie tak".
+              customHeroUrl
+              ? heroBg || colors.ink
+              : heroBg || colors.background,
+        }}
+      >
         {!hasCustomHero ? (
           // Untouched hero — the platform's own demo look, byte-identical to
           // before the drag-positioned layout below existed.
