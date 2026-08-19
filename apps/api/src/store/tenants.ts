@@ -29,6 +29,7 @@ function toDomainBrand(row: PrismaBrand): Brand {
     customDomain: row.customDomain,
     logoUrl: row.logoUrl,
     logoSize: row.logoSize as LogoSizeId | null,
+    showPlatformLogo: row.showPlatformLogo,
     returnPolicy: row.returnPolicy,
     shippingPolicy: row.shippingPolicy,
     paymentIntegration: row.paymentIntegration as HttpIntegrationConfig | null,
@@ -89,7 +90,7 @@ export async function isSlugAvailable(slug: string): Promise<boolean> {
 }
 
 export async function createBrand(
-  input: Omit<Brand, "id" | "createdAt" | "status" | "slugVerified" | "customDomain" | "logoUrl" | "logoSize" | "returnPolicy" | "shippingPolicy" | "paymentIntegration" | "deliveryIntegration">,
+  input: Omit<Brand, "id" | "createdAt" | "status" | "slugVerified" | "customDomain" | "logoUrl" | "logoSize" | "showPlatformLogo" | "returnPolicy" | "shippingPolicy" | "paymentIntegration" | "deliveryIntegration">,
 ): Promise<Brand> {
   const row = await prisma.brand.create({
     data: {
@@ -165,6 +166,16 @@ export async function clearBrandLogo(id: string): Promise<Brand | undefined> {
 export async function setBrandLogoSize(id: string, logoSize: LogoSizeId): Promise<Brand | undefined> {
   try {
     const row = await prisma.brand.update({ where: { id }, data: { logoSize } });
+    return toDomainBrand(row);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Store design's "Show saleis.live logo in header" toggle — the footer's "Powered by saleis.live" note is unconditional (see storefront App.tsx), so the platform stays credited either way. */
+export async function setBrandShowPlatformLogo(id: string, showPlatformLogo: boolean): Promise<Brand | undefined> {
+  try {
+    const row = await prisma.brand.update({ where: { id }, data: { showPlatformLogo } });
     return toDomainBrand(row);
   } catch {
     return undefined;

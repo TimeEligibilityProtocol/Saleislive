@@ -6,7 +6,7 @@ import { saveUploadedAsset } from "../lib/assetStorage.js";
 import { requireAuth } from "../middleware/auth.js";
 import { logAudit } from "../store/auditLog.js";
 import { getCampaignById, getOrCreateCurrentCampaign, setCampaignAccessPassword, updateCampaign } from "../store/campaigns.js";
-import { clearBrandLogo, getBrandById, publishBrand, setBrandLogo, setBrandLogoSize, updateBrandPolicies } from "../store/tenants.js";
+import { clearBrandLogo, getBrandById, publishBrand, setBrandLogo, setBrandLogoSize, setBrandShowPlatformLogo, updateBrandPolicies } from "../store/tenants.js";
 
 const heroUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -140,6 +140,21 @@ export function campaignsRouter(): Router {
       const { logoSize } = req.body as { logoSize?: LogoSizeId };
       if (logoSize !== "small" && logoSize !== "medium" && logoSize !== "large") return res.status(400).json({ error: "invalid_size" });
       const updated = await setBrandLogoSize(brand.id, logoSize);
+      if (!updated) return res.status(500).json({ error: "update_failed" });
+      res.json({ brand: updated });
+    }),
+  );
+
+  /** Store design's "Show saleis.live logo in header" toggle. */
+  router.patch(
+    "/api/brands/:brandId/show-platform-logo",
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const brand = await getBrandById(req.params.brandId);
+      if (!brand) return res.status(400).json({ error: "unknown_brand" });
+      const { showPlatformLogo } = req.body as { showPlatformLogo?: boolean };
+      if (typeof showPlatformLogo !== "boolean") return res.status(400).json({ error: "invalid_value" });
+      const updated = await setBrandShowPlatformLogo(brand.id, showPlatformLogo);
       if (!updated) return res.status(500).json({ error: "update_failed" });
       res.json({ brand: updated });
     }),

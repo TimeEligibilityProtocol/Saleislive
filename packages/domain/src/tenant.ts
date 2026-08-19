@@ -40,6 +40,8 @@ export interface Brand {
   logoUrl: string | null;
   /** Null means "medium" (24/32/48px small/medium/large — medium matches the header's original fixed size, so a brand that never touches this sees zero visual change). */
   logoSize: LogoSizeId | null;
+  /** Null/true = storefront header shows the saleis.live wordmark beside the brand's own logo (today's default). False = hide it — a "Powered by saleis.live" note still appears in the footer either way, so the platform stays credited even when a brand goes fully white-label up top. Ola, 2026-08-19: "logo saleis.live - mozliwe do usuniecia z przodu... na dole powinno sie pokazac powered by saleis.live". */
+  showPlatformLogo: boolean | null;
   /** Store-wide policy text shown on the storefront (screen 06's "Policies" tab) — plain text, no template engine. */
   returnPolicy: string | null;
   shippingPolicy: string | null;

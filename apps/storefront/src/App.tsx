@@ -214,9 +214,11 @@ export function App() {
       ) : null}
       <header style={styles.header}>
         <a href="#/" style={{ ...styles.brandLockup, minWidth: 0 }}>
-          <span className="storefront-logo" style={{ display: "inline-flex" }}>
-            <Logo height={55} />
-          </span>
+          {brand.showPlatformLogo !== false ? (
+            <span className="storefront-logo" style={{ display: "inline-flex" }}>
+              <Logo height={55} />
+            </span>
+          ) : null}
           {brand.logoUrl ? (
             <img src={apiClient.resolveAssetUrl(brand.logoUrl)} alt={brand.name} style={{ height: LOGO_SIZE_PX[brand.logoSize ?? "medium"], width: "auto", objectFit: "contain" }} />
           ) : (
@@ -237,6 +239,11 @@ export function App() {
 
       {body}
 
+      <footer style={styles.platformFooter}>
+        <a href="https://saleis.live" target="_blank" rel="noreferrer" style={styles.platformFooterLink}>
+          Powered by saleis.live
+        </a>
+      </footer>
     </div>
   );
 }
@@ -817,6 +824,8 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "3px 10px",
   },
   bagLink: { fontSize: 13, fontWeight: 700, color: colors.navy, textDecoration: "none" },
+  platformFooter: { padding: "20px 32px 28px", textAlign: "center" as const },
+  platformFooterLink: { fontSize: 11, color: colors.muted, textDecoration: "none" },
   backLink: { display: "inline-block", fontSize: 13, fontWeight: 600, color: "#5C574C", textDecoration: "none", margin: "24px 0 0" },
 
   // No background here — the outer <section> (App.tsx's HomeView) is the

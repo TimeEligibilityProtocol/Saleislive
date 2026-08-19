@@ -3292,6 +3292,7 @@ function LaunchStudioPage() {
   const heroMobileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [savingLogoSize, setSavingLogoSize] = useState(false);
+  const [savingShowPlatformLogo, setSavingShowPlatformLogo] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -3486,6 +3487,18 @@ function LaunchStudioPage() {
       setError("Couldn't change the logo size.");
     } finally {
       setSavingLogoSize(false);
+    }
+  };
+
+  const onToggleShowPlatformLogo = async (show: boolean) => {
+    setSavingShowPlatformLogo(true);
+    setError(null);
+    try {
+      setBrand(await apiClient.setBrandShowPlatformLogo(brandId, show));
+    } catch {
+      setError("Couldn't change that setting.");
+    } finally {
+      setSavingShowPlatformLogo(false);
     }
   };
 
@@ -3699,6 +3712,21 @@ function LaunchStudioPage() {
                 </div>
               </>
             ) : null}
+
+            <label
+              style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, cursor: savingShowPlatformLogo ? "default" : "pointer" }}
+              onClick={(e) => {
+                e.preventDefault();
+                if (savingShowPlatformLogo) return;
+                void onToggleShowPlatformLogo(brand?.showPlatformLogo === false);
+              }}
+            >
+              <span style={{ ...styles.checkbox, ...(brand?.showPlatformLogo !== false ? styles.checkboxChecked : {}) }}>{brand?.showPlatformLogo !== false ? "✓" : ""}</span>
+              <span style={{ fontSize: 12 }}>Show the saleis.live logo in your storefront header</span>
+            </label>
+            <p style={{ fontSize: 11, color: colors.muted, margin: "4px 0 0" }}>
+              Off or on, a small "Powered by saleis.live" note always stays in the footer.
+            </p>
 
             <hr style={{ border: "none", borderTop: `1px solid ${colors.line}`, margin: "20px 0 16px" }} />
             <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", color: colors.muted, margin: "0 0 4px" }}>Headline &amp; copy</p>

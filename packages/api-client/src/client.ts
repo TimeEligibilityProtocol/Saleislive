@@ -373,6 +373,11 @@ export class ApiClient {
     return brand;
   }
 
+  async setBrandShowPlatformLogo(brandId: string, showPlatformLogo: boolean): Promise<Brand> {
+    const { brand } = await this.request<{ brand: Brand }>(`/api/brands/${brandId}/show-platform-logo`, { method: "PATCH", body: JSON.stringify({ showPlatformLogo }) });
+    return brand;
+  }
+
   /** Store tab's hero image — a real upload, replacing the old raw-URL text field. Raw fetch, not this.request(): see addProductImage's comment on FormData. */
   async uploadHeroImage(brandId: string, file: File): Promise<string> {
     const token = await this.config.getAuthToken?.();
