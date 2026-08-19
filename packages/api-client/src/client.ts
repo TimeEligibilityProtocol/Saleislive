@@ -363,6 +363,11 @@ export class ApiClient {
     return brand;
   }
 
+  async removeBrandLogo(brandId: string): Promise<Brand> {
+    const { brand } = await this.request<{ brand: Brand }>(`/api/brands/${brandId}/logo`, { method: "DELETE" });
+    return brand;
+  }
+
   async setBrandLogoSize(brandId: string, logoSize: LogoSizeId): Promise<Brand> {
     const { brand } = await this.request<{ brand: Brand }>(`/api/brands/${brandId}/logo-size`, { method: "PATCH", body: JSON.stringify({ logoSize }) });
     return brand;

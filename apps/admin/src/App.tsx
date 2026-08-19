@@ -3304,6 +3304,19 @@ function LaunchStudioPage() {
     }
   };
 
+  const onRemoveLogo = async () => {
+    if (!window.confirm("Remove your logo? Your storefront header will show the plain brand-name placeholder instead.")) return;
+    setUploadingLogo(true);
+    setError(null);
+    try {
+      setBrand(await apiClient.removeBrandLogo(brandId));
+    } catch {
+      setError("Couldn't remove the logo.");
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
   // Same immediate-commit reasoning as the upload above — a size pick is a
   // one-click decision, not something that belongs behind the tab's
   // general Save.
@@ -3499,6 +3512,16 @@ function LaunchStudioPage() {
               >
                 {uploadingLogo ? "Uploading…" : brand?.logoUrl ? "Replace logo" : "Upload logo"}
               </button>
+              {brand?.logoUrl ? (
+                <button
+                  type="button"
+                  disabled={uploadingLogo}
+                  onClick={() => void onRemoveLogo()}
+                  style={{ ...styles.button, background: colors.white, color: colors.error, border: `1px solid ${colors.border}`, fontSize: 12, padding: "8px 14px", opacity: uploadingLogo ? 0.5 : 1 }}
+                >
+                  Remove logo
+                </button>
+              ) : null}
             </div>
             <p style={{ fontSize: 11, color: colors.muted, marginTop: 6 }}>Shown on your storefront's header. Best results: a transparent PNG, roughly 400 × 160px.</p>
             {brand?.logoUrl ? (

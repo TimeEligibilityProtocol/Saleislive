@@ -6,7 +6,7 @@ import { saveUploadedAsset } from "../lib/assetStorage.js";
 import { requireAuth } from "../middleware/auth.js";
 import { logAudit } from "../store/auditLog.js";
 import { getCampaignById, getOrCreateCurrentCampaign, setCampaignAccessPassword, updateCampaign } from "../store/campaigns.js";
-import { getBrandById, publishBrand, setBrandLogo, setBrandLogoSize, updateBrandPolicies } from "../store/tenants.js";
+import { clearBrandLogo, getBrandById, publishBrand, setBrandLogo, setBrandLogoSize, updateBrandPolicies } from "../store/tenants.js";
 
 const heroUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -103,6 +103,19 @@ export function campaignsRouter(): Router {
       const updated = await setBrandLogo(brand.id, url);
       if (!updated) return res.status(500).json({ error: "update_failed" });
       res.status(201).json({ brand: updated });
+    }),
+  );
+
+  /** Store design's "Remove logo" — reverts to the storefront's "Your brand goes here" placeholder. */
+  router.delete(
+    "/api/brands/:brandId/logo",
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const brand = await getBrandById(req.params.brandId);
+      if (!brand) return res.status(400).json({ error: "unknown_brand" });
+      const updated = await clearBrandLogo(brand.id);
+      if (!updated) return res.status(500).json({ error: "update_failed" });
+      res.json({ brand: updated });
     }),
   );
 

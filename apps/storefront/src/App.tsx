@@ -365,7 +365,19 @@ function HomeView({ brand, campaign, products, onAddToBag }: { brand: Brand; cam
               ) : (
                 <p style={styles.heroSub}>A new AI-powered way to turn your catalogue into a complete branded sale.</p>
               )}
-              <a href="#products-grid" className="hero-shop-cta" style={styles.heroCta}>
+              <a
+                href="#products-grid"
+                className="hero-shop-cta"
+                style={{
+                  ...styles.heroCta,
+                  // The button's own navy default sits invisibly on a navy
+                  // hero — real bug, 2026-08-18. Once a colour preset is
+                  // active, invert its own background/text pair for the
+                  // button instead: that pair was already chosen for
+                  // contrast against itself, so it's guaranteed readable.
+                  ...(colorPreset ? { background: colorPreset.text, color: colorPreset.background } : {}),
+                }}
+              >
                 Shop the sale
               </a>
             </div>

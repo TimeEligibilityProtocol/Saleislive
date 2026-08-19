@@ -151,6 +151,16 @@ export async function setBrandLogo(id: string, logoUrl: string): Promise<Brand |
   }
 }
 
+/** Store design's "Remove logo" — Ola, 2026-08-18: there was an Upload/Replace action but no way back to the "Your brand goes here" placeholder once a logo was set. */
+export async function clearBrandLogo(id: string): Promise<Brand | undefined> {
+  try {
+    const row = await prisma.brand.update({ where: { id }, data: { logoUrl: null } });
+    return toDomainBrand(row);
+  } catch {
+    return undefined;
+  }
+}
+
 /** Store design's logo-size picker — Ola, 2026-08-18: the fixed header size read as too small once a real logo was uploaded. */
 export async function setBrandLogoSize(id: string, logoSize: LogoSizeId): Promise<Brand | undefined> {
   try {

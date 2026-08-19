@@ -34,6 +34,27 @@
         font-weight: 400;
         font-display: swap;
       }
+      /* Added 2026-08-18 — Launch Studio's Hero font picker previews each
+         option in its own font, so these need to be loaded here too, not
+         just on the storefront that actually uses the merchant's choice. */
+      @font-face {
+        font-family: "Playfair Display";
+        src: url("/fonts/playfair-display-variable.ttf") format("truetype-variations");
+        font-weight: 400 900;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: "Manrope";
+        src: url("/fonts/manrope-variable.ttf") format("truetype-variations");
+        font-weight: 200 800;
+        font-display: swap;
+      }
+      @font-face {
+        font-family: "Space Grotesk";
+        src: url("/fonts/space-grotesk-variable.ttf") format("truetype-variations");
+        font-weight: 300 700;
+        font-display: swap;
+      }
     </style>
   </head>
   <body>
