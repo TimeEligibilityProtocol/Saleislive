@@ -2224,7 +2224,24 @@ function HeroComposer({
         <p style={{ fontFamily, fontSize: titleSizePx * 0.3, fontWeight: 500, color: textColor, margin: "0 0 6px", lineHeight: 1.05, pointerEvents: "none" }}>{headline || "Your headline"}</p>
         {shortDescription ? <p style={{ fontSize: 12, color: textColor, opacity: 0.85, margin: "0 0 8px", pointerEvents: "none" }}>{shortDescription}</p> : null}
         {showCta ? (
-          <span style={{ display: "inline-block", padding: "6px 12px", borderRadius: 6, background: ctaBackground ?? textColor, color: ctaText ?? backgroundColor, fontSize: 11, fontWeight: 600, pointerEvents: "none" }}>
+          // Default (no explicit ctaBackground/ctaText) mirrors the real
+          // storefront: background = textColor, and the button's OWN text
+          // colour is a fresh contrast check against that, never
+          // `backgroundColor` itself — backgroundColor can be an arbitrary
+          // hex a merchant picked, not a hand-curated pair, so reusing it
+          // as button text isn't guaranteed readable. Real bug, 2026-08-19.
+          <span
+            style={{
+              display: "inline-block",
+              padding: "6px 12px",
+              borderRadius: 6,
+              background: ctaBackground ?? textColor,
+              color: ctaText ?? contrastTextColor(textColor),
+              fontSize: 11,
+              fontWeight: 600,
+              pointerEvents: "none",
+            }}
+          >
             Shop the sale
           </span>
         ) : null}
@@ -3834,12 +3851,22 @@ function LaunchStudioPage() {
                   background: "none",
                 }}
               />
-              {heroCustomColor ? (
-                <button type="button" onClick={() => setHeroCustomColor(null)} style={{ ...styles.pillButton, padding: "6px 10px", fontSize: 11 }}>
-                  Clear custom colour
+              {heroColorPreset || heroCustomColor ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHeroColorPreset(null);
+                    setHeroCustomColor(null);
+                  }}
+                  style={{ ...styles.pillButton, padding: "6px 10px", fontSize: 11 }}
+                >
+                  Reset to default
                 </button>
               ) : null}
             </div>
+            <p style={{ fontSize: 11, color: colors.muted, margin: "4px 0 0" }}>
+              {heroCustomColor ? `Custom colour ${heroCustomColor}` : heroColorPreset ? HERO_COLOR_PRESETS[heroColorPreset].label : "Default hero colour — no override set."}
+            </p>
 
             <label style={{ ...styles.label, marginTop: 16 }}>Layout</label>
             <div style={{ display: "flex", gap: 8, marginTop: 4 }}>

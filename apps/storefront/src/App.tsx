@@ -241,9 +241,16 @@ export function App() {
   const buyButtonBackground = campaign?.buyButtonColor || colors.navy;
   const buyButtonText = campaign?.buyButtonColor ? contrastTextColor(campaign.buyButtonColor) : colors.white;
 
+  // Set once, page-wide (not just behind the product grid) — a colour
+  // picked here must look the same on every route (bag, product detail,
+  // checkout), never just the home grid. Ola, 2026-08-19: "musi się
+  // zmieniać wszędzie w sklepie... żeby nie było takiej sytuacji że inny
+  // jest w koszyku, inny jak klikamy na produkt".
+  const pageStyle = { ...styles.page, ...(campaign?.productAreaBackgroundColor ? { background: campaign.productAreaBackgroundColor } : {}) };
+
   return (
     <StoreThemeContext.Provider value={{ buyButtonBackground, buyButtonText }}>
-    <div style={styles.page}>
+    <div style={pageStyle}>
       <style>{`
         .storefront-brand-placeholder-short { display: none; }
         @media (max-width: 480px) {
@@ -373,7 +380,7 @@ function HomeView({ brand, campaign, products, onAddToBag }: { brand: Brand; cam
   const hasCustomHero = !!(customHeroUrl || heroBg || campaign?.headline);
   const titleSize = HERO_TITLE_SIZE_PX[campaign?.heroTitleSize ?? "medium"];
   const showCta = campaign?.showHeroCta !== false;
-  const heroTextColor = customHeroUrl ? "#fff" : campaign?.heroCustomColor ? contrastTextColor(campaign.heroCustomColor) : colorPreset ? colorPreset.text : styles.heroTitle.color;
+  const heroTextColor: string = customHeroUrl ? "#fff" : campaign?.heroCustomColor ? contrastTextColor(campaign.heroCustomColor) : colorPreset ? colorPreset.text : colors.navy;
   const ctaStyle = {
     ...styles.heroCta,
     ...(campaign?.heroButtonColor
@@ -381,11 +388,16 @@ function HomeView({ brand, campaign, products, onAddToBag }: { brand: Brand; cam
         // the hero background) always wins.
         { background: campaign.heroButtonColor, color: contrastTextColor(campaign.heroButtonColor) }
       : heroBg
-        ? // No explicit button colour: invert the hero's own bg/text pair —
-          // guaranteed contrast, since that pair already contrasts against
-          // itself. The button's navy default otherwise sits invisibly on
-          // a navy hero — real bug, 2026-08-18.
-          { background: heroTextColor, color: heroBg }
+        ? // No explicit button colour: use the hero's own text colour as the
+          // button's background, with a FRESH contrast check for the
+          // button's text — not heroBg itself. heroBg can be any arbitrary
+          // hex a merchant picked (not just the 4 hand-curated presets,
+          // where bg/text were already a matched pair), so reusing heroBg
+          // as the button's text colour isn't safe: a mid-grey hero, for
+          // instance, produces near-white heroTextColor + a mid-grey
+          // button text on a near-white button — unreadable. Real bug,
+          // 2026-08-19, caught from a live screenshot with a grey hero.
+          { background: heroTextColor, color: contrastTextColor(heroTextColor) }
         : {}),
   };
   // Drag-positioned layers (Ola, 2026-08-19) — same fraction-of-canvas
@@ -479,25 +491,23 @@ function HomeView({ brand, campaign, products, onAddToBag }: { brand: Brand; cam
         )}
       </section>
 
-      <div style={{ background: campaign?.productAreaBackgroundColor || undefined }}>
-        <div style={styles.pillRow}>
-          <button type="button" style={{ ...styles.pill, ...(activeCategory === null ? styles.pillActive : {}) }} onClick={() => setActiveCategory(null)}>
-            All
+      <div style={styles.pillRow}>
+        <button type="button" style={{ ...styles.pill, ...(activeCategory === null ? styles.pillActive : {}) }} onClick={() => setActiveCategory(null)}>
+          All
+        </button>
+        {categories.map((c) => (
+          <button key={c} type="button" style={{ ...styles.pill, ...(activeCategory === c ? styles.pillActive : {}) }} onClick={() => setActiveCategory(c)}>
+            {c}
           </button>
-          {categories.map((c) => (
-            <button key={c} type="button" style={{ ...styles.pill, ...(activeCategory === c ? styles.pillActive : {}) }} onClick={() => setActiveCategory(c)}>
-              {c}
-            </button>
-          ))}
-        </div>
-
-        <section id="products-grid" style={styles.grid}>
-          {visible.map((p) => (
-            <ProductCard key={p.id} product={p} onAddToBag={() => onAddToBag(p.id)} />
-          ))}
-        </section>
-        <p style={{ padding: "0 32px 32px", fontSize: 11, color: "#8A8578" }}>Sold and fulfilled by {brand.name}.</p>
+        ))}
       </div>
+
+      <section id="products-grid" style={styles.grid}>
+        {visible.map((p) => (
+          <ProductCard key={p.id} product={p} onAddToBag={() => onAddToBag(p.id)} />
+        ))}
+      </section>
+      <p style={{ padding: "0 32px 32px", fontSize: 11, color: "#8A8578" }}>Sold and fulfilled by {brand.name}.</p>
     </>
   );
 }
