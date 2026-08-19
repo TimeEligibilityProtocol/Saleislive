@@ -48,6 +48,17 @@ export function campaignsRouter(): Router {
         heroColorPreset: HeroColorPresetId | null;
         heroFontPreset: string | null;
         heroTitleSize: HeroTitleSizeId | null;
+        showHeroCta: boolean | null;
+        heroImageOffsetX: number | null;
+        heroImageOffsetY: number | null;
+        heroImageScale: number | null;
+        heroTextOffsetX: number | null;
+        heroTextOffsetY: number | null;
+        heroImageOffsetXMobile: number | null;
+        heroImageOffsetYMobile: number | null;
+        heroImageScaleMobile: number | null;
+        heroTextOffsetXMobile: number | null;
+        heroTextOffsetYMobile: number | null;
         /// Plaintext, write-only — never round-tripped back on reads (see
         /// store/campaigns.ts's toDomainCampaign, which never selects the
         /// hash). Handled separately from the rest of the patch below since

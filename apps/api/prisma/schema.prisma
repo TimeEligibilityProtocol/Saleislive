@@ -332,6 +332,30 @@ model Campaign {
   heroColorPreset  String?
   heroFontPreset   String?
   heroTitleSize    String?
+  showHeroCta      Boolean?
+  /// Position/scale of the hero photo within the hero canvas (drag-to-move,
+  /// drag-the-dot-to-resize, same mechanism as product photo positioning).
+  /// Fractions 0-1 of the canvas, same convention as Product.images'
+  /// composite positioning. Null = centered/default full-bleed, today's
+  /// existing behaviour.
+  heroImageOffsetX Float?
+  heroImageOffsetY Float?
+  heroImageScale   Float?
+  /// Position of the headline/subhead/CTA text block within the hero
+  /// canvas — same fraction convention, no independent scale (heroTitleSize
+  /// already controls text size).
+  heroTextOffsetX  Float?
+  heroTextOffsetY  Float?
+  /// Same two layers, positioned independently for the mobile canvas
+  /// (Ola, 2026-08-19: "hero mogłoby być dostosowalne do mobile") — what
+  /// reads well as image-beside-text on a wide desktop canvas often needs
+  /// a different arrangement once the canvas is a tall phone strip, not
+  /// just the same layout scaled down.
+  heroImageOffsetXMobile Float?
+  heroImageOffsetYMobile Float?
+  heroImageScaleMobile   Float?
+  heroTextOffsetXMobile  Float?
+  heroTextOffsetYMobile  Float?
   /// Only set when access = password. Never exposed to any client — see
   /// store/campaigns.ts's toDomainCampaign, which deliberately omits it,
   /// same pattern as Credential.passwordHash vs. the User domain type.

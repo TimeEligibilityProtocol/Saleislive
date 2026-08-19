@@ -308,10 +308,30 @@ function HomeView({ brand, campaign, products, onAddToBag }: { brand: Brand; cam
   // original navy-on-light-negative-space styling, which only works
   // because that specific photo was composed for it.
   const customHeroUrl = campaign?.heroDesktopUrl ? apiClient.resolveAssetUrl(campaign.heroDesktopUrl) : null;
+  const customHeroUrlMobile = campaign?.heroMobileUrl ? apiClient.resolveAssetUrl(campaign.heroMobileUrl) : customHeroUrl;
   const colorPreset = campaign?.heroColorPreset ? HERO_COLOR_PRESETS[campaign.heroColorPreset] : null;
   const heroFont = campaign?.heroFontPreset || undefined;
   const hasCustomHero = !!(customHeroUrl || colorPreset || campaign?.headline);
   const titleSize = HERO_TITLE_SIZE_PX[campaign?.heroTitleSize ?? "medium"];
+  const showCta = campaign?.showHeroCta !== false;
+  const heroTextColor = customHeroUrl ? "#fff" : colorPreset ? colorPreset.text : styles.heroTitle.color;
+  const ctaStyle = {
+    ...styles.heroCta,
+    // The button's own navy default sits invisibly on a navy hero — real
+    // bug, 2026-08-18. Once a colour preset is active, invert its own
+    // background/text pair for the button instead: that pair was already
+    // chosen for contrast against itself, so it's guaranteed readable.
+    ...(colorPreset ? { background: colorPreset.text, color: colorPreset.background } : {}),
+  };
+  // Drag-positioned layers (Ola, 2026-08-19) — same fraction-of-canvas
+  // convention as the admin's HeroComposer and product photo compositing,
+  // so what she drags there is exactly what renders here. Desktop values
+  // are the base inline style; the <style> block below overrides them for
+  // mobile, same mechanism already used for hero-title's font-size.
+  const imgPos = { x: campaign?.heroImageOffsetX ?? 0.7, y: campaign?.heroImageOffsetY ?? 0.5, scale: campaign?.heroImageScale ?? 0.9 };
+  const imgPosMobile = { x: campaign?.heroImageOffsetXMobile ?? 0.5, y: campaign?.heroImageOffsetYMobile ?? 0.32, scale: campaign?.heroImageScaleMobile ?? 0.85 };
+  const textPos = { x: campaign?.heroTextOffsetX ?? 0.28, y: campaign?.heroTextOffsetY ?? 0.5 };
+  const textPosMobile = { x: campaign?.heroTextOffsetXMobile ?? 0.5, y: campaign?.heroTextOffsetYMobile ?? 0.72 };
 
   return (
     <>
@@ -328,27 +348,52 @@ function HomeView({ brand, campaign, products, onAddToBag }: { brand: Brand; cam
         @media (max-width: 700px) { .hero-image { object-position: 35% center !important; } }
         @media (max-width: 700px) { .hero-title { font-size: ${titleSize.mobile}px !important; } }
         @media (max-width: 700px) { .hero-copy { padding: 0 6.5% !important; } }
+        @media (max-width: 700px) {
+          .hero-photo-layer { left: ${imgPosMobile.x * 100}% !important; top: ${imgPosMobile.y * 100}% !important; width: ${imgPosMobile.scale * 100}% !important; height: ${imgPosMobile.scale * 100}% !important; }
+          .hero-text-layer { left: ${textPosMobile.x * 100}% !important; top: ${textPosMobile.y * 100}% !important; }
+        }
       `}</style>
       <section style={{ background: !hasCustomHero ? colors.background : colorPreset ? colorPreset.background : colors.ink }}>
-        <div className="hero-frame" style={styles.hero}>
-          <img
-            src={customHeroUrl ?? "/images/hero-clean.png"}
-            alt="Products staged for a branded sale"
-            className="hero-image"
-            style={{ ...styles.heroImage, opacity: hasCustomHero && !customHeroUrl ? 0 : 1 }}
-          />
-          {customHeroUrl ? <div style={{ position: "absolute", inset: 0, background: "rgba(17,17,17,0.35)" }} /> : null}
-          <div className="hero-copy" style={{ ...styles.heroCopy, zIndex: 2 }}>
-            <div style={{ maxWidth: 480 }}>
-              <h1
-                className="hero-title"
-                style={{
-                  ...styles.heroTitle,
-                  fontSize: titleSize.desktop,
-                  ...(heroFont ? { fontFamily: heroFont } : {}),
-                  ...(hasCustomHero ? { color: customHeroUrl ? "#fff" : colorPreset ? colorPreset.text : styles.heroTitle.color } : {}),
-                }}
+        {!hasCustomHero ? (
+          // Untouched hero — the platform's own demo look, byte-identical to
+          // before the drag-positioned layout below existed.
+          <div className="hero-frame" style={styles.hero}>
+            <img src="/images/hero-clean.png" alt="Products staged for a branded sale" className="hero-image" style={styles.heroImage} />
+            <div className="hero-copy" style={{ ...styles.heroCopy, zIndex: 2 }}>
+              <div style={{ maxWidth: 480 }}>
+                <h1 className="hero-title" style={{ ...styles.heroTitle, fontSize: titleSize.desktop }}>
+                  Stock in.
+                  <br />
+                  Sale live.
+                </h1>
+                <p style={styles.heroSub}>A new AI-powered way to turn your catalogue into a complete branded sale.</p>
+                <a href="#products-grid" className="hero-shop-cta" style={ctaStyle}>
+                  Shop the sale
+                </a>
+              </div>
+            </div>
+          </div>
+        ) : (
+          // Customised hero — the photo and the headline/copy/CTA block are
+          // two independently positioned layers, set from Store design's
+          // HeroComposer (drag-to-move / drag-the-dot-to-resize).
+          <div className="hero-frame" style={styles.hero}>
+            {customHeroUrl ? (
+              <div
+                className="hero-photo-layer"
+                style={{ position: "absolute", left: `${imgPos.x * 100}%`, top: `${imgPos.y * 100}%`, width: `${imgPos.scale * 100}%`, height: `${imgPos.scale * 100}%`, transform: "translate(-50%, -50%)" }}
               >
+                <picture>
+                  <source media="(max-width: 700px)" srcSet={customHeroUrlMobile ?? customHeroUrl} />
+                  <img src={customHeroUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }} />
+                </picture>
+              </div>
+            ) : null}
+            <div
+              className="hero-copy hero-text-layer"
+              style={{ position: "absolute", left: `${textPos.x * 100}%`, top: `${textPos.y * 100}%`, transform: "translate(-50%, -50%)", zIndex: 2, maxWidth: "70%", padding: "0 16px" }}
+            >
+              <h1 className="hero-title" style={{ ...styles.heroTitle, fontSize: titleSize.desktop, color: heroTextColor, ...(heroFont ? { fontFamily: heroFont } : {}) }}>
                 {campaign?.headline || (
                   <>
                     Stock in.
@@ -357,32 +402,16 @@ function HomeView({ brand, campaign, products, onAddToBag }: { brand: Brand; cam
                   </>
                 )}
               </h1>
-              {/* Short description is optional (Ola, 2026-08-12) — a merchant who deliberately left it blank shouldn't see the platform's own demo copy fill in instead; that fallback only applies when nothing about the hero has been customized at all. */}
-              {hasCustomHero ? (
-                campaign?.shortDescription ? (
-                  <p style={{ ...styles.heroSub, color: customHeroUrl ? "#fff" : colorPreset ? colorPreset.text : styles.heroSub.color, opacity: 0.85 }}>{campaign.shortDescription}</p>
-                ) : null
-              ) : (
-                <p style={styles.heroSub}>A new AI-powered way to turn your catalogue into a complete branded sale.</p>
-              )}
-              <a
-                href="#products-grid"
-                className="hero-shop-cta"
-                style={{
-                  ...styles.heroCta,
-                  // The button's own navy default sits invisibly on a navy
-                  // hero — real bug, 2026-08-18. Once a colour preset is
-                  // active, invert its own background/text pair for the
-                  // button instead: that pair was already chosen for
-                  // contrast against itself, so it's guaranteed readable.
-                  ...(colorPreset ? { background: colorPreset.text, color: colorPreset.background } : {}),
-                }}
-              >
-                Shop the sale
-              </a>
+              {/* Short description is optional (Ola, 2026-08-12) — a merchant who deliberately left it blank shouldn't see the platform's own demo copy fill in instead. */}
+              {campaign?.shortDescription ? <p style={{ ...styles.heroSub, color: heroTextColor, opacity: 0.85 }}>{campaign.shortDescription}</p> : null}
+              {showCta ? (
+                <a href="#products-grid" className="hero-shop-cta" style={ctaStyle}>
+                  Shop the sale
+                </a>
+              ) : null}
             </div>
           </div>
-        </div>
+        )}
       </section>
 
       <div style={styles.pillRow}>

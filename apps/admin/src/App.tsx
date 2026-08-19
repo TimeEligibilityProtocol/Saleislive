@@ -2086,6 +2086,141 @@ function BackgroundPositioner({
   );
 }
 
+/** Fraction-of-canvas position, same convention as product photo compositing (BackgroundPositioner above). */
+interface HeroLayerPos {
+  offsetX: number;
+  offsetY: number;
+}
+
+/**
+ * A real WYSIWYG hero editor, not a decorative mockup — same rendering
+ * (colours, font, CTA visibility) the real storefront uses, so what Ola
+ * drags here is what customers actually see (a "preview looked right but
+ * the real site didn't" bug already bit this exact hero once, 2026-08-18 —
+ * not repeating that by building a second, diverging render path).
+ * Two independently draggable layers on one canvas: the hero photo
+ * (drag to move, drag its dot to resize) and the headline/copy/CTA text
+ * block (drag to move only — size comes from the Headline size picker).
+ */
+function HeroComposer({
+  aspectRatio,
+  backgroundColor,
+  textColor,
+  imageUrl,
+  headline,
+  shortDescription,
+  showCta,
+  fontFamily,
+  titleSizePx,
+  image,
+  text,
+  onImageChange,
+  onTextChange,
+}: {
+  aspectRatio: string;
+  backgroundColor: string;
+  textColor: string;
+  imageUrl: string | null;
+  headline: string;
+  shortDescription: string;
+  showCta: boolean;
+  fontFamily: string;
+  titleSizePx: number;
+  image: HeroLayerPos & { scale: number };
+  text: HeroLayerPos;
+  onImageChange: (next: HeroLayerPos & { scale: number }) => void;
+  onTextChange: (next: HeroLayerPos) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ layer: "image" | "text"; mode: "move" | "resize"; startX: number; startY: number; startOffsetX: number; startOffsetY: number; startScale: number } | null>(null);
+  const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
+
+  const beginDrag = (layer: "image" | "text", mode: "move" | "resize") => (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    const pos = layer === "image" ? image : text;
+    dragRef.current = { layer, mode, startX: e.clientX, startY: e.clientY, startOffsetX: pos.offsetX, startOffsetY: pos.offsetY, startScale: layer === "image" ? image.scale : 1 };
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    const drag = dragRef.current;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!drag || !rect) return;
+    const dx = (e.clientX - drag.startX) / rect.width;
+    const dy = (e.clientY - drag.startY) / rect.height;
+    if (drag.mode === "resize") {
+      onImageChange({ offsetX: image.offsetX, offsetY: image.offsetY, scale: clamp(drag.startScale + (dx + dy) / 2, 0.15, 2) });
+      return;
+    }
+    const next = { offsetX: clamp(drag.startOffsetX + dx, 0.05, 0.95), offsetY: clamp(drag.startOffsetY + dy, 0.05, 0.95) };
+    if (drag.layer === "image") onImageChange({ ...next, scale: image.scale });
+    else onTextChange(next);
+  };
+
+  const onPointerUp = () => {
+    dragRef.current = null;
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerLeave={onPointerUp}
+      style={{ position: "relative", width: "100%", aspectRatio, borderRadius: 10, border: `1px solid ${colors.border}`, overflow: "hidden", background: backgroundColor }}
+    >
+      {imageUrl ? (
+        <div
+          onPointerDown={beginDrag("image", "move")}
+          title="Drag to move the photo"
+          style={{
+            position: "absolute",
+            left: `${image.offsetX * 100}%`,
+            top: `${image.offsetY * 100}%`,
+            width: `${image.scale * 100}%`,
+            height: `${image.scale * 100}%`,
+            transform: "translate(-50%, -50%)",
+            cursor: "move",
+            touchAction: "none",
+          }}
+        >
+          <img src={imageUrl} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none", borderRadius: 4 }} />
+          <div
+            onPointerDown={beginDrag("image", "resize")}
+            title="Drag to resize the photo"
+            style={{ position: "absolute", right: -7, bottom: -7, width: 16, height: 16, borderRadius: 999, background: colors.navy, border: `2px solid ${colors.white}`, cursor: "nwse-resize", touchAction: "none" }}
+          />
+        </div>
+      ) : null}
+      <div
+        onPointerDown={beginDrag("text", "move")}
+        title="Drag to move the headline/copy"
+        style={{
+          position: "absolute",
+          left: `${text.offsetX * 100}%`,
+          top: `${text.offsetY * 100}%`,
+          transform: "translate(-50%, -50%)",
+          cursor: "move",
+          touchAction: "none",
+          maxWidth: "70%",
+          padding: 8,
+          border: `1px dashed ${colors.border}`,
+          borderRadius: 6,
+        }}
+      >
+        <p style={{ fontFamily, fontSize: titleSizePx * 0.3, fontWeight: 500, color: textColor, margin: "0 0 6px", lineHeight: 1.05, pointerEvents: "none" }}>{headline || "Your headline"}</p>
+        {shortDescription ? <p style={{ fontSize: 12, color: textColor, opacity: 0.85, margin: "0 0 8px", pointerEvents: "none" }}>{shortDescription}</p> : null}
+        {showCta ? <span style={{ display: "inline-block", padding: "6px 12px", borderRadius: 6, background: textColor, color: backgroundColor, fontSize: 11, fontWeight: 600, pointerEvents: "none" }}>Shop the sale</span> : null}
+      </div>
+    </div>
+  );
+}
+
 /** Mirrors apps/api's PRODUCT_CATEGORY_OPTIONS (routes/analyzeProduct.ts) — the fixed department list "Suggest with AI" is now constrained to, kept in sync manually since this is a plain admin-only UI constant, not a shared package export. */
 const CATEGORY_OPTIONS = ["Men", "Women", "Kids", "Home", "Jewellery", "Beauty"];
 
@@ -3146,6 +3281,12 @@ function LaunchStudioPage() {
   const [heroColorPreset, setHeroColorPreset] = useState<HeroColorPresetId | null>(null);
   const [heroFontPreset, setHeroFontPreset] = useState<string | null>(null);
   const [heroTitleSize, setHeroTitleSize] = useState<HeroTitleSizeId | null>(null);
+  const [showHeroCta, setShowHeroCta] = useState(true);
+  const [heroComposerMode, setHeroComposerMode] = useState<"desktop" | "mobile">("desktop");
+  const [heroImagePos, setHeroImagePos] = useState({ offsetX: 0.7, offsetY: 0.5, scale: 0.9 });
+  const [heroTextPos, setHeroTextPos] = useState({ offsetX: 0.28, offsetY: 0.5 });
+  const [heroImagePosMobile, setHeroImagePosMobile] = useState({ offsetX: 0.5, offsetY: 0.32, scale: 0.85 });
+  const [heroTextPosMobile, setHeroTextPosMobile] = useState({ offsetX: 0.5, offsetY: 0.72 });
   const [uploadingHero, setUploadingHero] = useState<"desktop" | "mobile" | null>(null);
   const heroDesktopInputRef = useRef<HTMLInputElement>(null);
   const heroMobileInputRef = useRef<HTMLInputElement>(null);
@@ -3177,6 +3318,11 @@ function LaunchStudioPage() {
         setHeroColorPreset(c.heroColorPreset);
         setHeroFontPreset(c.heroFontPreset);
         setHeroTitleSize(c.heroTitleSize);
+        setShowHeroCta(c.showHeroCta !== false);
+        setHeroImagePos({ offsetX: c.heroImageOffsetX ?? 0.7, offsetY: c.heroImageOffsetY ?? 0.5, scale: c.heroImageScale ?? 0.9 });
+        setHeroTextPos({ offsetX: c.heroTextOffsetX ?? 0.28, offsetY: c.heroTextOffsetY ?? 0.5 });
+        setHeroImagePosMobile({ offsetX: c.heroImageOffsetXMobile ?? 0.5, offsetY: c.heroImageOffsetYMobile ?? 0.32, scale: c.heroImageScaleMobile ?? 0.85 });
+        setHeroTextPosMobile({ offsetX: c.heroTextOffsetXMobile ?? 0.5, offsetY: c.heroTextOffsetYMobile ?? 0.72 });
         setProducts(p);
         setProductIds(new Set(c.productIds));
       })
@@ -3262,6 +3408,17 @@ function LaunchStudioPage() {
         heroColorPreset,
         heroFontPreset,
         heroTitleSize,
+        showHeroCta,
+        heroImageOffsetX: heroImagePos.offsetX,
+        heroImageOffsetY: heroImagePos.offsetY,
+        heroImageScale: heroImagePos.scale,
+        heroTextOffsetX: heroTextPos.offsetX,
+        heroTextOffsetY: heroTextPos.offsetY,
+        heroImageOffsetXMobile: heroImagePosMobile.offsetX,
+        heroImageOffsetYMobile: heroImagePosMobile.offsetY,
+        heroImageScaleMobile: heroImagePosMobile.scale,
+        heroTextOffsetXMobile: heroTextPosMobile.offsetX,
+        heroTextOffsetYMobile: heroTextPosMobile.offsetY,
       });
       setCampaign(updated);
       setSaved(true);
@@ -3709,36 +3866,45 @@ function LaunchStudioPage() {
             </div>
           </div>
 
-          <div style={{ ...styles.sectionCard, width: 340, flexShrink: 0 }}>
-            <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 16 }}>Live preview</h2>
-            <div
-              style={{
-                borderRadius: 12,
-                padding: 28,
-                textAlign: "center",
-                background: heroDesktopUrl ? `url(${apiClient.resolveAssetUrl(heroDesktopUrl)}) center/cover` : (heroColorPreset ? HERO_COLOR_PRESETS[heroColorPreset].background : colors.background),
-                position: "relative",
-                overflow: "hidden",
-              }}
-            >
-              {heroDesktopUrl ? <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} /> : null}
-              <div style={{ position: "relative" }}>
-                <p
-                  style={{
-                    fontFamily: heroFontPreset ?? DEFAULT_HERO_FONT,
-                    fontSize: (heroTitleSize ?? "medium") === "small" ? 20 : (heroTitleSize ?? "medium") === "large" ? 32 : 26,
-                    margin: "0 0 12px",
-                    color: heroDesktopUrl ? colors.white : heroColorPreset ? HERO_COLOR_PRESETS[heroColorPreset].text : colors.ink,
-                  }}
-                >
-                  {headline || "Your headline here"}
-                </p>
-                <p style={{ fontSize: 13, margin: "0 0 16px", color: heroDesktopUrl ? colors.white : heroColorPreset ? HERO_COLOR_PRESETS[heroColorPreset].text : colors.muted, opacity: 0.85 }}>
-                  {shortDescription || "Your short description here"}
-                </p>
-                <span style={{ ...styles.pill, background: colors.navy, color: colors.white, padding: "8px 20px" }}>Shop now</span>
+          <div style={{ ...styles.sectionCard, width: 380, flexShrink: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <h2 style={{ ...styles.h1, fontSize: 16, margin: 0 }}>Hero layout</h2>
+              <div style={{ display: "flex", gap: 4 }}>
+                {(["desktop", "mobile"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setHeroComposerMode(m)}
+                    style={{ ...styles.pillButton, padding: "6px 12px", fontSize: 11, ...(heroComposerMode === m ? styles.pillButtonActive : {}) }}
+                  >
+                    {m === "desktop" ? "Desktop" : "Mobile"}
+                  </button>
+                ))}
               </div>
             </div>
+            <p style={{ fontSize: 11, color: colors.muted, marginTop: 0, marginBottom: 10 }}>Drag the photo to move it, drag its dot to resize. Drag the headline block to reposition it.</p>
+            <HeroComposer
+              aspectRatio={heroComposerMode === "desktop" ? "1600 / 620" : "1080 / 1290"}
+              backgroundColor={heroColorPreset ? HERO_COLOR_PRESETS[heroColorPreset].background : colors.background}
+              textColor={heroColorPreset ? HERO_COLOR_PRESETS[heroColorPreset].text : colors.ink}
+              imageUrl={
+                heroComposerMode === "desktop" ? (heroDesktopUrl ? apiClient.resolveAssetUrl(heroDesktopUrl) : null) : heroMobileUrl ? apiClient.resolveAssetUrl(heroMobileUrl) : null
+              }
+              headline={headline}
+              shortDescription={shortDescription}
+              showCta={showHeroCta}
+              fontFamily={heroFontPreset ?? DEFAULT_HERO_FONT}
+              titleSizePx={HERO_TITLE_SIZE_PX[heroTitleSize ?? "medium"][heroComposerMode]}
+              image={heroComposerMode === "desktop" ? heroImagePos : heroImagePosMobile}
+              text={heroComposerMode === "desktop" ? heroTextPos : heroTextPosMobile}
+              onImageChange={heroComposerMode === "desktop" ? setHeroImagePos : setHeroImagePosMobile}
+              onTextChange={heroComposerMode === "desktop" ? setHeroTextPos : setHeroTextPosMobile}
+            />
+            <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, cursor: "pointer" }}>
+              <input type="checkbox" checked={showHeroCta} onChange={(e) => setShowHeroCta(e.target.checked)} />
+              <span style={{ fontSize: 12 }}>Show the "Shop the sale" button</span>
+            </label>
+            <p style={{ fontSize: 11, color: colors.muted, marginTop: 4 }}>Turn this off if your own hero photo already has a call-to-action baked in.</p>
           </div>
         </div>
       ) : null}

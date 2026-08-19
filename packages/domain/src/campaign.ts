@@ -49,6 +49,28 @@ export interface Campaign {
   heroColorPreset: HeroColorPresetId | null;
   heroFontPreset: string | null;
   heroTitleSize: HeroTitleSizeId | null;
+  /** Null/true = show the platform's own "Shop the sale" CTA over the hero. False = hide it — a merchant whose uploaded hero photo already has its own call-to-action baked in doesn't want a second, redundant one on top. */
+  showHeroCta: boolean | null;
+  /**
+   * Where the hero photo and the headline/copy/CTA text block sit within
+   * the hero canvas — drag-to-move, drag-the-dot-to-resize (image only;
+   * text size comes from heroTitleSize), same fraction-of-canvas (0-1)
+   * convention as product photo composite positioning. Desktop and mobile
+   * are positioned independently — Ola, 2026-08-19: what reads well as
+   * image-beside-text on a wide canvas often needs a different
+   * arrangement on a tall phone strip. Null = today's existing fixed
+   * layout (image full-bleed behind negative-space text).
+   */
+  heroImageOffsetX: number | null;
+  heroImageOffsetY: number | null;
+  heroImageScale: number | null;
+  heroTextOffsetX: number | null;
+  heroTextOffsetY: number | null;
+  heroImageOffsetXMobile: number | null;
+  heroImageOffsetYMobile: number | null;
+  heroImageScaleMobile: number | null;
+  heroTextOffsetXMobile: number | null;
+  heroTextOffsetYMobile: number | null;
   /** Whether a password is currently set for `access: "password"` — never the password/hash itself, just enough for the admin UI to show "Password set" vs "No password yet" without round-tripping anything secret. */
   hasAccessPassword: boolean;
   createdAt: string;
