@@ -3856,9 +3856,56 @@ function LaunchStudioPage() {
             <StoreDesignSection title="Hero">
               <label style={styles.label}>Headline</label>
               <input style={styles.input} value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="e.g. The private sale is live." />
-              <label style={{ ...styles.label, marginTop: 10 }}>Short description (optional)</label>
-              <input style={styles.input} value={shortDescription} onChange={(e) => setShortDescription(e.target.value)} placeholder="e.g. Selected pieces. Limited time." />
-              <label style={{ ...styles.label, marginTop: 10 }}>Headline size</label>
+
+              <label style={{ ...styles.label, marginTop: 12 }}>Font</label>
+              {HERO_FONT_GROUPS.map((g) => (
+                <div key={g.group} style={{ marginTop: 6 }}>
+                  <p style={{ fontSize: 10, fontWeight: 700, color: colors.muted, textTransform: "uppercase", margin: "0 0 4px" }}>{g.group}</p>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {g.fonts.map((f) => (
+                      <button
+                        key={f}
+                        type="button"
+                        onClick={() => setHeroFontPreset(f)}
+                        style={{
+                          ...styles.pillButton,
+                          ...((heroFontPreset ?? DEFAULT_HERO_FONT) === f ? styles.pillButtonActive : {}),
+                          fontFamily: f,
+                        }}
+                      >
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <label style={{ ...styles.label, marginTop: 10 }}>Or search Google Fonts</label>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input
+                  list="google-font-options"
+                  style={{ ...styles.input, flex: 1 }}
+                  placeholder="Type a font name, e.g. Cormorant Garamond"
+                  defaultValue={heroFontPreset && !(APPROVED_FONTS as readonly string[]).includes(heroFontPreset) ? heroFontPreset : ""}
+                  onChange={(e) => {
+                    const value = e.target.value.trim();
+                    if (GOOGLE_FONT_FAMILIES.includes(value as (typeof GOOGLE_FONT_FAMILIES)[number])) setHeroFontPreset(value);
+                  }}
+                />
+                <datalist id="google-font-options">
+                  {GOOGLE_FONT_FAMILIES.map((f) => (
+                    <option key={f} value={f} />
+                  ))}
+                </datalist>
+              </div>
+              {heroFontPreset && !(APPROVED_FONTS as readonly string[]).includes(heroFontPreset) ? (
+                <p style={{ fontSize: 11, color: colors.muted, margin: "6px 0 0", fontFamily: heroFontPreset }}>Using "{heroFontPreset}" — The quick brown fox jumps.</p>
+              ) : null}
+
+              <FieldRow>
+                <ColorPickerRow label="Font colour" value={heroTextColor} onChange={setHeroTextColor} fallback="#173B8F" />
+              </FieldRow>
+
+              <label style={{ ...styles.label, marginTop: 16 }}>Headline size</label>
               <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
                 {(["small", "medium", "large"] as const).map((s) => (
                   <button
@@ -3871,6 +3918,9 @@ function LaunchStudioPage() {
                   </button>
                 ))}
               </div>
+
+              <label style={{ ...styles.label, marginTop: 16 }}>Short description (optional)</label>
+              <input style={styles.input} value={shortDescription} onChange={(e) => setShortDescription(e.target.value)} placeholder="e.g. Selected pieces. Limited time." />
 
               <label style={{ ...styles.label, marginTop: 16 }}>Layout</label>
               <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
@@ -3938,54 +3988,6 @@ function LaunchStudioPage() {
                 {heroCustomColor ? `Custom colour ${heroCustomColor}` : heroColorPreset ? HERO_COLOR_PRESETS[heroColorPreset].label : "Default hero colour — no override set."}
               </p>
 
-              <label style={{ ...styles.label, marginTop: 16 }}>Font</label>
-              {HERO_FONT_GROUPS.map((g) => (
-                <div key={g.group} style={{ marginTop: 6 }}>
-                  <p style={{ fontSize: 10, fontWeight: 700, color: colors.muted, textTransform: "uppercase", margin: "0 0 4px" }}>{g.group}</p>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {g.fonts.map((f) => (
-                      <button
-                        key={f}
-                        type="button"
-                        onClick={() => setHeroFontPreset(f)}
-                        style={{
-                          ...styles.pillButton,
-                          ...((heroFontPreset ?? DEFAULT_HERO_FONT) === f ? styles.pillButtonActive : {}),
-                          fontFamily: f,
-                        }}
-                      >
-                        {f}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              <label style={{ ...styles.label, marginTop: 10 }}>Or search Google Fonts</label>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <input
-                  list="google-font-options"
-                  style={{ ...styles.input, flex: 1 }}
-                  placeholder="Type a font name, e.g. Cormorant Garamond"
-                  defaultValue={heroFontPreset && !(APPROVED_FONTS as readonly string[]).includes(heroFontPreset) ? heroFontPreset : ""}
-                  onChange={(e) => {
-                    const value = e.target.value.trim();
-                    if (GOOGLE_FONT_FAMILIES.includes(value as (typeof GOOGLE_FONT_FAMILIES)[number])) setHeroFontPreset(value);
-                  }}
-                />
-                <datalist id="google-font-options">
-                  {GOOGLE_FONT_FAMILIES.map((f) => (
-                    <option key={f} value={f} />
-                  ))}
-                </datalist>
-              </div>
-              {heroFontPreset && !(APPROVED_FONTS as readonly string[]).includes(heroFontPreset) ? (
-                <p style={{ fontSize: 11, color: colors.muted, margin: "6px 0 0", fontFamily: heroFontPreset }}>Using "{heroFontPreset}" — The quick brown fox jumps.</p>
-              ) : null}
-
-              <FieldRow>
-                <ColorPickerRow label="Font colour" value={heroTextColor} onChange={setHeroTextColor} fallback="#173B8F" />
-              </FieldRow>
-
               <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 16, cursor: "pointer" }}>
                 <input type="checkbox" checked={showHeroCta} onChange={(e) => setShowHeroCta(e.target.checked)} />
                 <span style={{ fontSize: 12 }}>Show the "Shop the sale" button</span>
@@ -3998,8 +4000,20 @@ function LaunchStudioPage() {
                   <ColorPickerRow label="Button font colour" value={heroButtonTextColor} onChange={setHeroButtonTextColor} fallback="#FFFFFF" />
                 </FieldRow>
               ) : null}
+            </StoreDesignSection>
 
-              <label style={{ ...styles.label, marginTop: 16 }}>Hero image (optional — overrides the colour above when set)</label>
+            <StoreDesignSection title="Store">
+              <FieldRow>
+                <ColorPickerRow label="Background colour" value={productAreaBackgroundColor} onChange={setProductAreaBackgroundColor} fallback="#F5F2EB" />
+                <ColorPickerRow label="Text colour (product names, prices, descriptions)" value={bodyTextColor} onChange={setBodyTextColor} fallback="#111111" />
+              </FieldRow>
+              <FieldRow>
+                <ColorPickerRow label="Add to bag button colour" value={buyButtonColor} onChange={setBuyButtonColor} fallback="#173B8F" />
+                <ColorPickerRow label="Add to bag button font colour" value={buyButtonTextColor} onChange={setBuyButtonTextColor} fallback="#FFFFFF" />
+              </FieldRow>
+            </StoreDesignSection>
+
+            <StoreDesignSection title="Hero image">
               <input
                 ref={heroDesktopInputRef}
                 type="file"
@@ -4022,7 +4036,8 @@ function LaunchStudioPage() {
                   void onHeroFilePicked("mobile", file);
                 }}
               />
-              <div style={{ display: "flex", gap: 16, marginTop: 4 }}>
+              <p style={{ fontSize: 11, color: colors.muted, margin: "0 0 10px" }}>Optional — overrides the Hero background colour above when set.</p>
+              <div style={{ display: "flex", gap: 16 }}>
                 <div style={{ flex: 1 }}>
                   <div
                     style={{
@@ -4079,17 +4094,6 @@ function LaunchStudioPage() {
                   <strong>1920 × 1080px (desktop)</strong> / <strong>1080 × 1350px (mobile)</strong> in whatever tool you like, then upload it above.
                 </p>
               </div>
-            </StoreDesignSection>
-
-            <StoreDesignSection title="Store">
-              <FieldRow>
-                <ColorPickerRow label="Background colour" value={productAreaBackgroundColor} onChange={setProductAreaBackgroundColor} fallback="#F5F2EB" />
-                <ColorPickerRow label="Text colour (product names, prices, descriptions)" value={bodyTextColor} onChange={setBodyTextColor} fallback="#111111" />
-              </FieldRow>
-              <FieldRow>
-                <ColorPickerRow label="Add to bag button colour" value={buyButtonColor} onChange={setBuyButtonColor} fallback="#173B8F" />
-                <ColorPickerRow label="Add to bag button font colour" value={buyButtonTextColor} onChange={setBuyButtonTextColor} fallback="#FFFFFF" />
-              </FieldRow>
             </StoreDesignSection>
 
             {error ? <p style={styles.error}>{error}</p> : null}
