@@ -7,6 +7,9 @@ import {
   FulfilmentStatus,
   HttpIntegrationConfig,
   APPROVED_FONTS,
+  contrastTextColor,
+  GOOGLE_FONT_FAMILIES,
+  googleFontCssUrl,
   HERO_COLOR_PRESETS,
   HERO_TITLE_SIZE_PX,
   HeroColorPresetId,
@@ -2106,6 +2109,8 @@ function HeroComposer({
   aspectRatio,
   backgroundColor,
   textColor,
+  ctaBackground,
+  ctaText,
   imageUrl,
   headline,
   shortDescription,
@@ -2120,6 +2125,9 @@ function HeroComposer({
   aspectRatio: string;
   backgroundColor: string;
   textColor: string;
+  /** Defaults to inverting textColor/backgroundColor when not set — same "guaranteed contrast" fallback as the real storefront's ctaStyle. */
+  ctaBackground?: string;
+  ctaText?: string;
   imageUrl: string | null;
   headline: string;
   shortDescription: string;
@@ -2215,7 +2223,11 @@ function HeroComposer({
       >
         <p style={{ fontFamily, fontSize: titleSizePx * 0.3, fontWeight: 500, color: textColor, margin: "0 0 6px", lineHeight: 1.05, pointerEvents: "none" }}>{headline || "Your headline"}</p>
         {shortDescription ? <p style={{ fontSize: 12, color: textColor, opacity: 0.85, margin: "0 0 8px", pointerEvents: "none" }}>{shortDescription}</p> : null}
-        {showCta ? <span style={{ display: "inline-block", padding: "6px 12px", borderRadius: 6, background: textColor, color: backgroundColor, fontSize: 11, fontWeight: 600, pointerEvents: "none" }}>Shop the sale</span> : null}
+        {showCta ? (
+          <span style={{ display: "inline-block", padding: "6px 12px", borderRadius: 6, background: ctaBackground ?? textColor, color: ctaText ?? backgroundColor, fontSize: 11, fontWeight: 600, pointerEvents: "none" }}>
+            Shop the sale
+          </span>
+        ) : null}
       </div>
     </div>
   );
@@ -3251,6 +3263,22 @@ const HERO_FONT_GROUPS: { group: string; fonts: (typeof APPROVED_FONTS)[number][
   { group: "Elegant", fonts: ["Instrument Serif", "Playfair Display"] },
 ];
 const DEFAULT_HERO_FONT = "Instrument Serif";
+
+/** Loads a Google Fonts family on demand for the Store design preview — mirrors the storefront's own loader (apps/storefront/src/App.tsx) so a merchant's font search here previews exactly what the real storefront will render. */
+function useGoogleFontLoader(family: string | null | undefined): void {
+  useEffect(() => {
+    if (!family || (APPROVED_FONTS as readonly string[]).includes(family)) return;
+    const id = "google-font-link";
+    let link = document.getElementById(id) as HTMLLinkElement | null;
+    if (!link) {
+      link = document.createElement("link");
+      link.id = id;
+      link.rel = "stylesheet";
+      document.head.appendChild(link);
+    }
+    link.href = googleFontCssUrl(family);
+  }, [family]);
+}
 const HERO_COLOR_OPTIONS = Object.entries(HERO_COLOR_PRESETS) as [HeroColorPresetId, (typeof HERO_COLOR_PRESETS)[HeroColorPresetId]][];
 
 function LaunchStudioPage() {
@@ -3279,6 +3307,10 @@ function LaunchStudioPage() {
   const [heroMobileUrl, setHeroMobileUrl] = useState("");
   const [themePreset, setThemePreset] = useState<ThemePresetId>("editorial");
   const [heroColorPreset, setHeroColorPreset] = useState<HeroColorPresetId | null>(null);
+  const [heroCustomColor, setHeroCustomColor] = useState<string | null>(null);
+  const [heroButtonColor, setHeroButtonColor] = useState<string | null>(null);
+  const [buyButtonColor, setBuyButtonColor] = useState<string | null>(null);
+  const [productAreaBackgroundColor, setProductAreaBackgroundColor] = useState<string | null>(null);
   const [heroFontPreset, setHeroFontPreset] = useState<string | null>(null);
   const [heroTitleSize, setHeroTitleSize] = useState<HeroTitleSizeId | null>(null);
   const [showHeroCta, setShowHeroCta] = useState(true);
@@ -3294,6 +3326,8 @@ function LaunchStudioPage() {
   const [savingLogoSize, setSavingLogoSize] = useState(false);
   const [savingShowPlatformLogo, setSavingShowPlatformLogo] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
+
+  useGoogleFontLoader(heroFontPreset);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [productIds, setProductIds] = useState<Set<string>>(new Set());
@@ -3317,6 +3351,10 @@ function LaunchStudioPage() {
         setHeroMobileUrl(c.heroMobileUrl ?? "");
         setThemePreset(c.themePreset);
         setHeroColorPreset(c.heroColorPreset);
+        setHeroCustomColor(c.heroCustomColor);
+        setHeroButtonColor(c.heroButtonColor);
+        setBuyButtonColor(c.buyButtonColor);
+        setProductAreaBackgroundColor(c.productAreaBackgroundColor);
         setHeroFontPreset(c.heroFontPreset);
         setHeroTitleSize(c.heroTitleSize);
         setShowHeroCta(c.showHeroCta !== false);
@@ -3407,6 +3445,10 @@ function LaunchStudioPage() {
         heroMobileUrl: heroMobileUrl || null,
         themePreset,
         heroColorPreset,
+        heroCustomColor,
+        heroButtonColor,
+        buyButtonColor,
+        productAreaBackgroundColor,
         heroFontPreset,
         heroTitleSize,
         showHeroCta,
@@ -3753,23 +3795,50 @@ function LaunchStudioPage() {
             <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", color: colors.muted, margin: "0 0 4px" }}>Hero visual</p>
 
             <label style={styles.label}>Background colour</label>
-            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+            <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center" }}>
               {HERO_COLOR_OPTIONS.map(([key, preset]) => (
                 <button
                   key={key}
                   type="button"
                   title={preset.label}
-                  onClick={() => setHeroColorPreset(key)}
+                  onClick={() => {
+                    setHeroColorPreset(key);
+                    setHeroCustomColor(null);
+                  }}
                   style={{
                     width: 36,
                     height: 36,
                     borderRadius: 999,
-                    border: heroColorPreset === key ? `2px solid ${colors.navy}` : `1px solid ${colors.border}`,
+                    border: heroColorPreset === key && !heroCustomColor ? `2px solid ${colors.navy}` : `1px solid ${colors.border}`,
                     background: preset.background,
                     cursor: "pointer",
                   }}
                 />
               ))}
+              <span style={{ width: 1, height: 24, background: colors.border, margin: "0 4px" }} />
+              <input
+                type="color"
+                title="Custom colour"
+                value={heroCustomColor ?? "#F5F2EB"}
+                onChange={(e) => {
+                  setHeroCustomColor(e.target.value);
+                  setHeroColorPreset(null);
+                }}
+                style={{
+                  width: 36,
+                  height: 36,
+                  padding: 0,
+                  border: heroCustomColor ? `2px solid ${colors.navy}` : `1px solid ${colors.border}`,
+                  borderRadius: 999,
+                  cursor: "pointer",
+                  background: "none",
+                }}
+              />
+              {heroCustomColor ? (
+                <button type="button" onClick={() => setHeroCustomColor(null)} style={{ ...styles.pillButton, padding: "6px 10px", fontSize: 11 }}>
+                  Clear custom colour
+                </button>
+              ) : null}
             </div>
 
             <label style={{ ...styles.label, marginTop: 16 }}>Layout</label>
@@ -3800,6 +3869,57 @@ function LaunchStudioPage() {
                       {f}
                     </button>
                   ))}
+                </div>
+              </div>
+            ))}
+            <label style={{ ...styles.label, marginTop: 10 }}>Or search Google Fonts</label>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                list="google-font-options"
+                style={{ ...styles.input, flex: 1 }}
+                placeholder="Type a font name, e.g. Cormorant Garamond"
+                defaultValue={heroFontPreset && !(APPROVED_FONTS as readonly string[]).includes(heroFontPreset) ? heroFontPreset : ""}
+                onChange={(e) => {
+                  const value = e.target.value.trim();
+                  if (GOOGLE_FONT_FAMILIES.includes(value as (typeof GOOGLE_FONT_FAMILIES)[number])) setHeroFontPreset(value);
+                }}
+              />
+              <datalist id="google-font-options">
+                {GOOGLE_FONT_FAMILIES.map((f) => (
+                  <option key={f} value={f} />
+                ))}
+              </datalist>
+            </div>
+            {heroFontPreset && !(APPROVED_FONTS as readonly string[]).includes(heroFontPreset) ? (
+              <p style={{ fontSize: 11, color: colors.muted, margin: "6px 0 0", fontFamily: heroFontPreset }}>Using "{heroFontPreset}" — The quick brown fox jumps.</p>
+            ) : null}
+
+            <hr style={{ border: "none", borderTop: `1px solid ${colors.line}`, margin: "20px 0 16px" }} />
+            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase", color: colors.muted, margin: "0 0 4px" }}>Buttons &amp; background</p>
+            <p style={{ fontSize: 11, color: colors.muted, margin: "0 0 10px" }}>Set independently — the hero button, the "Add to bag" buttons, and the background behind your products can each be their own colour.</p>
+
+            {(
+              [
+                { label: "Hero button colour", value: heroButtonColor, set: setHeroButtonColor, fallback: "#173B8F" },
+                { label: "Add to bag button colour", value: buyButtonColor, set: setBuyButtonColor, fallback: "#173B8F" },
+                { label: "Store background colour", value: productAreaBackgroundColor, set: setProductAreaBackgroundColor, fallback: "#F5F2EB" },
+              ] as const
+            ).map((row) => (
+              <div key={row.label} style={{ marginTop: 10 }}>
+                <label style={styles.label}>{row.label}</label>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
+                  <input
+                    type="color"
+                    value={row.value ?? row.fallback}
+                    onChange={(e) => row.set(e.target.value)}
+                    style={{ width: 36, height: 36, padding: 0, border: row.value ? `2px solid ${colors.navy}` : `1px solid ${colors.border}`, borderRadius: 999, cursor: "pointer", background: "none" }}
+                  />
+                  <span style={{ fontSize: 12, color: colors.muted }}>{row.value ? row.value : "Default"}</span>
+                  {row.value ? (
+                    <button type="button" onClick={() => row.set(null)} style={{ ...styles.pillButton, padding: "6px 10px", fontSize: 11 }}>
+                      Reset to default
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -3913,8 +4033,10 @@ function LaunchStudioPage() {
             <p style={{ fontSize: 11, color: colors.muted, marginTop: 0, marginBottom: 10 }}>Drag the photo to move it, drag its dot to resize. Drag the headline block to reposition it.</p>
             <HeroComposer
               aspectRatio={heroComposerMode === "desktop" ? "1600 / 620" : "1080 / 1290"}
-              backgroundColor={heroColorPreset ? HERO_COLOR_PRESETS[heroColorPreset].background : colors.background}
-              textColor={heroColorPreset ? HERO_COLOR_PRESETS[heroColorPreset].text : colors.ink}
+              backgroundColor={heroCustomColor || (heroColorPreset ? HERO_COLOR_PRESETS[heroColorPreset].background : colors.background)}
+              textColor={heroCustomColor ? contrastTextColor(heroCustomColor) : heroColorPreset ? HERO_COLOR_PRESETS[heroColorPreset].text : colors.ink}
+              ctaBackground={heroButtonColor ?? undefined}
+              ctaText={heroButtonColor ? contrastTextColor(heroButtonColor) : undefined}
               imageUrl={
                 heroComposerMode === "desktop" ? (heroDesktopUrl ? apiClient.resolveAssetUrl(heroDesktopUrl) : null) : heroMobileUrl ? apiClient.resolveAssetUrl(heroMobileUrl) : null
               }

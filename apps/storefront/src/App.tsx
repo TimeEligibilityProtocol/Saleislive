@@ -1,9 +1,49 @@
 import { colors, typography } from "@saleis-live/ui";
-import { Brand, Campaign, CampaignAccess, DeliveryMethod, HERO_COLOR_PRESETS, HERO_TITLE_SIZE_PX, LOGO_SIZE_PX, Money, Order, Product } from "@saleis-live/domain";
+import { APPROVED_FONTS, Brand, Campaign, CampaignAccess, DeliveryMethod, HERO_COLOR_PRESETS, HERO_TITLE_SIZE_PX, LOGO_SIZE_PX, Money, Order, Product, contrastTextColor, googleFontCssUrl } from "@saleis-live/domain";
 import { ApiError } from "@saleis-live/api-client";
-import { SyntheticEvent, useCallback, useEffect, useState } from "react";
+import { SyntheticEvent, createContext, useCallback, useContext, useEffect, useState } from "react";
 import { Logo } from "./components/Logo";
 import { apiClient, storeStorefrontUnlockToken } from "./config/apiClient";
+
+/**
+ * "Add to bag"/primary-button colour is set once per campaign but read by
+ * many leaf components (product card, product detail, bag, checkout,
+ * confirmation) that don't otherwise share a campaign prop chain — a
+ * context avoids threading it through every intermediate component.
+ */
+const StoreThemeContext = createContext<{ buyButtonBackground: string; buyButtonText: string }>({
+  buyButtonBackground: colors.navy,
+  buyButtonText: colors.white,
+});
+function useStoreTheme() {
+  return useContext(StoreThemeContext);
+}
+function useBuyButtonStyle(): React.CSSProperties {
+  const theme = useStoreTheme();
+  return { ...styles.buyButton, background: theme.buyButtonBackground, color: theme.buyButtonText };
+}
+
+/**
+ * Loads a Google Fonts family on demand via a <link> tag — only reached
+ * when a merchant picked a hero font outside the 5 self-hosted
+ * APPROVED_FONTS (see googleFontCssUrl's own comment on why these aren't
+ * bundled). Keyed by family name so switching fonts replaces the link
+ * instead of accumulating one per choice ever picked.
+ */
+function useGoogleFontLoader(family: string | null | undefined): void {
+  useEffect(() => {
+    if (!family || (APPROVED_FONTS as readonly string[]).includes(family)) return;
+    const id = "google-font-link";
+    let link = document.getElementById(id) as HTMLLinkElement | null;
+    if (!link) {
+      link = document.createElement("link");
+      link.id = id;
+      link.rel = "stylesheet";
+      document.head.appendChild(link);
+    }
+    link.href = googleFontCssUrl(family);
+  }, [family]);
+}
 
 // Flat demo delivery fee — not a real courier rate lookup (no adapter is
 // connected, see Launch Studio's honest "Payments/Delivery: Not connected").
@@ -85,6 +125,7 @@ export function App() {
   const [checkoutInfo, setCheckoutInfo] = useState<CheckoutInfo>({ name: "", phone: "", location: "", deliveryMethod: "courier" });
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
   const hash = useHashRoute();
+  useGoogleFontLoader(campaign?.heroFontPreset);
 
   const load = useCallback(() => {
     setState("loading");
@@ -197,7 +238,11 @@ export function App() {
     body = <HomeView brand={brand} campaign={campaign} products={products} onAddToBag={addToBag} />;
   }
 
+  const buyButtonBackground = campaign?.buyButtonColor || colors.navy;
+  const buyButtonText = campaign?.buyButtonColor ? contrastTextColor(campaign.buyButtonColor) : colors.white;
+
   return (
+    <StoreThemeContext.Provider value={{ buyButtonBackground, buyButtonText }}>
     <div style={styles.page}>
       <style>{`
         .storefront-brand-placeholder-short { display: none; }
@@ -245,6 +290,7 @@ export function App() {
         </a>
       </footer>
     </div>
+    </StoreThemeContext.Provider>
   );
 }
 
@@ -257,6 +303,7 @@ function PasswordGateView({ brand, onUnlocked }: { brand: Brand; onUnlocked: () 
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
+  const buyButtonStyle = useBuyButtonStyle();
 
   const submit = async () => {
     if (!password.trim()) return;
@@ -294,7 +341,7 @@ function PasswordGateView({ brand, onUnlocked }: { brand: Brand; onUnlocked: () 
           autoFocus
         />
         {error ? <p style={{ color: "#B3261E", fontSize: 12, marginTop: 8 }}>{error}</p> : null}
-        <button type="button" style={{ ...styles.buyButton, width: "100%", padding: "14px 16px", fontSize: 14, marginTop: 16, opacity: checking ? 0.6 : 1 }} disabled={checking} onClick={() => void submit()}>
+        <button type="button" style={{ ...buyButtonStyle, width: "100%", padding: "14px 16px", fontSize: 14, marginTop: 16, opacity: checking ? 0.6 : 1 }} disabled={checking} onClick={() => void submit()}>
           {checking ? "Checking…" : "Unlock"}
         </button>
       </div>
@@ -317,18 +364,29 @@ function HomeView({ brand, campaign, products, onAddToBag }: { brand: Brand; cam
   const customHeroUrl = campaign?.heroDesktopUrl ? apiClient.resolveAssetUrl(campaign.heroDesktopUrl) : null;
   const customHeroUrlMobile = campaign?.heroMobileUrl ? apiClient.resolveAssetUrl(campaign.heroMobileUrl) : customHeroUrl;
   const colorPreset = campaign?.heroColorPreset ? HERO_COLOR_PRESETS[campaign.heroColorPreset] : null;
+  // A free hex colour (colour input, not one of the 4 curated presets)
+  // always wins over a preset — the admin UI keeps the two mutually
+  // exclusive, but this priority order is what makes that safe even if
+  // both were ever set at once.
+  const heroBg = campaign?.heroCustomColor || (colorPreset ? colorPreset.background : null);
   const heroFont = campaign?.heroFontPreset || undefined;
-  const hasCustomHero = !!(customHeroUrl || colorPreset || campaign?.headline);
+  const hasCustomHero = !!(customHeroUrl || heroBg || campaign?.headline);
   const titleSize = HERO_TITLE_SIZE_PX[campaign?.heroTitleSize ?? "medium"];
   const showCta = campaign?.showHeroCta !== false;
-  const heroTextColor = customHeroUrl ? "#fff" : colorPreset ? colorPreset.text : styles.heroTitle.color;
+  const heroTextColor = customHeroUrl ? "#fff" : campaign?.heroCustomColor ? contrastTextColor(campaign.heroCustomColor) : colorPreset ? colorPreset.text : styles.heroTitle.color;
   const ctaStyle = {
     ...styles.heroCta,
-    // The button's own navy default sits invisibly on a navy hero — real
-    // bug, 2026-08-18. Once a colour preset is active, invert its own
-    // background/text pair for the button instead: that pair was already
-    // chosen for contrast against itself, so it's guaranteed readable.
-    ...(colorPreset ? { background: colorPreset.text, color: colorPreset.background } : {}),
+    ...(campaign?.heroButtonColor
+      ? // An explicit hero-button colour (Ola, 2026-08-19: independent of
+        // the hero background) always wins.
+        { background: campaign.heroButtonColor, color: contrastTextColor(campaign.heroButtonColor) }
+      : heroBg
+        ? // No explicit button colour: invert the hero's own bg/text pair —
+          // guaranteed contrast, since that pair already contrasts against
+          // itself. The button's navy default otherwise sits invisibly on
+          // a navy hero — real bug, 2026-08-18.
+          { background: heroTextColor, color: heroBg }
+        : {}),
   };
   // Drag-positioned layers (Ola, 2026-08-19) — same fraction-of-canvas
   // convention as the admin's HeroComposer and product photo compositing,
@@ -360,7 +418,7 @@ function HomeView({ brand, campaign, products, onAddToBag }: { brand: Brand; cam
           .hero-text-layer { left: ${textPosMobile.x * 100}% !important; top: ${textPosMobile.y * 100}% !important; }
         }
       `}</style>
-      <section style={{ background: !hasCustomHero ? colors.background : colorPreset ? colorPreset.background : colors.ink }}>
+      <section style={{ background: !hasCustomHero ? colors.background : heroBg || colors.ink }}>
         {!hasCustomHero ? (
           // Untouched hero — the platform's own demo look, byte-identical to
           // before the drag-positioned layout below existed.
@@ -421,23 +479,25 @@ function HomeView({ brand, campaign, products, onAddToBag }: { brand: Brand; cam
         )}
       </section>
 
-      <div style={styles.pillRow}>
-        <button type="button" style={{ ...styles.pill, ...(activeCategory === null ? styles.pillActive : {}) }} onClick={() => setActiveCategory(null)}>
-          All
-        </button>
-        {categories.map((c) => (
-          <button key={c} type="button" style={{ ...styles.pill, ...(activeCategory === c ? styles.pillActive : {}) }} onClick={() => setActiveCategory(c)}>
-            {c}
+      <div style={{ background: campaign?.productAreaBackgroundColor || undefined }}>
+        <div style={styles.pillRow}>
+          <button type="button" style={{ ...styles.pill, ...(activeCategory === null ? styles.pillActive : {}) }} onClick={() => setActiveCategory(null)}>
+            All
           </button>
-        ))}
-      </div>
+          {categories.map((c) => (
+            <button key={c} type="button" style={{ ...styles.pill, ...(activeCategory === c ? styles.pillActive : {}) }} onClick={() => setActiveCategory(c)}>
+              {c}
+            </button>
+          ))}
+        </div>
 
-      <section id="products-grid" style={styles.grid}>
-        {visible.map((p) => (
-          <ProductCard key={p.id} product={p} onAddToBag={() => onAddToBag(p.id)} />
-        ))}
-      </section>
-      <p style={{ padding: "0 32px 32px", fontSize: 11, color: "#8A8578" }}>Sold and fulfilled by {brand.name}.</p>
+        <section id="products-grid" style={styles.grid}>
+          {visible.map((p) => (
+            <ProductCard key={p.id} product={p} onAddToBag={() => onAddToBag(p.id)} />
+          ))}
+        </section>
+        <p style={{ padding: "0 32px 32px", fontSize: 11, color: "#8A8578" }}>Sold and fulfilled by {brand.name}.</p>
+      </div>
     </>
   );
 }
@@ -445,6 +505,7 @@ function HomeView({ brand, campaign, products, onAddToBag }: { brand: Brand; cam
 function ProductCard({ product, onAddToBag }: { product: Product; onAddToBag: () => void }) {
   const pct = discountPercent(product.price, product.salePrice);
   const soldOut = product.stock <= 0;
+  const buyButtonStyle = useBuyButtonStyle();
   return (
     <div style={styles.card}>
       <a href={`#/product/${encodeURIComponent(product.id)}`} style={{ textDecoration: "none", color: "inherit" }}>
@@ -458,7 +519,7 @@ function ProductCard({ product, onAddToBag }: { product: Product; onAddToBag: ()
         <span style={styles.cardPrice}>{formatMoney(product.salePrice)}</span>
         {pct > 0 ? <span style={styles.cardPct}>−{pct}%</span> : null}
       </p>
-      <button type="button" style={{ ...styles.buyButton, opacity: soldOut ? 0.4 : 1 }} disabled={soldOut} onClick={onAddToBag}>
+      <button type="button" style={{ ...buyButtonStyle, opacity: soldOut ? 0.4 : 1 }} disabled={soldOut} onClick={onAddToBag}>
         {soldOut ? "Sold out" : "Add to bag"}
       </button>
     </div>
@@ -470,6 +531,7 @@ function ProductDetailView({ product, onAddToBag }: { product: Product; onAddToB
   const pct = discountPercent(product.price, product.salePrice);
   const soldOut = product.stock <= 0;
   const availability = soldOut ? "Out of stock" : product.stock <= 5 ? `Only ${product.stock} left` : "In stock";
+  const buyButtonStyle = useBuyButtonStyle();
 
   return (
     <section style={{ maxWidth: 640, margin: "0 auto", padding: "0 32px 56px" }}>
@@ -497,7 +559,7 @@ function ProductDetailView({ product, onAddToBag }: { product: Product; onAddToB
 
       <button
         type="button"
-        style={{ ...styles.buyButton, width: "100%", padding: "14px 16px", fontSize: 14, opacity: soldOut ? 0.4 : 1 }}
+        style={{ ...buyButtonStyle, width: "100%", padding: "14px 16px", fontSize: 14, opacity: soldOut ? 0.4 : 1 }}
         disabled={soldOut}
         onClick={() => {
           onAddToBag();
@@ -526,6 +588,7 @@ function BagView({
     .filter((i): i is { product: Product; qty: number } => !!i.product);
   const subtotal = items.reduce((sum, i) => sum + i.product.salePrice.amountMinor * i.qty, 0);
   const currency = items[0]?.product.salePrice.currency ?? "AED";
+  const buyButtonStyle = useBuyButtonStyle();
 
   return (
     <section style={{ maxWidth: 640, margin: "0 auto", padding: "0 32px 56px" }}>
@@ -578,7 +641,7 @@ function BagView({
             {brand.returnPolicy ? <p style={{ fontSize: 12, color: "#5C574C", margin: 0 }}>{brand.returnPolicy}</p> : null}
           </div>
 
-          <a href="#/checkout/delivery" style={{ ...styles.buyButton, display: "block", textAlign: "center", textDecoration: "none", marginTop: 24, padding: "14px 16px" }}>
+          <a href="#/checkout/delivery" style={{ ...buyButtonStyle, display: "block", textAlign: "center", textDecoration: "none", marginTop: 24, padding: "14px 16px" }}>
             Continue to checkout
           </a>
         </>
@@ -590,6 +653,7 @@ function BagView({
 function DeliveryView({ info, setInfo, hasItems }: { info: CheckoutInfo; setInfo: (i: CheckoutInfo) => void; hasItems: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const canContinue = hasItems && !!info.name.trim() && !!info.location.trim();
+  const buyButtonStyle = useBuyButtonStyle();
 
   return (
     <section style={{ maxWidth: 480, margin: "0 auto", padding: "0 32px 56px" }}>
@@ -634,7 +698,7 @@ function DeliveryView({ info, setInfo, hasItems }: { info: CheckoutInfo; setInfo
 
           <button
             type="button"
-            style={{ ...styles.buyButton, width: "100%", padding: "14px 16px", fontSize: 14, marginTop: 24, opacity: canContinue ? 1 : 0.4 }}
+            style={{ ...buyButtonStyle, width: "100%", padding: "14px 16px", fontSize: 14, marginTop: 24, opacity: canContinue ? 1 : 0.4 }}
             disabled={!canContinue}
             onClick={() => {
               if (!canContinue) {
@@ -667,6 +731,7 @@ function PaymentView({
 }) {
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const buyButtonStyle = useBuyButtonStyle();
 
   const items = Object.entries(cart)
     .map(([id, qty]) => ({ product: products.find((p) => p.id === id), qty }))
@@ -752,7 +817,7 @@ function PaymentView({
 
       <button
         type="button"
-        style={{ ...styles.buyButton, width: "100%", padding: "14px 16px", fontSize: 14, marginTop: 24, opacity: placing ? 0.5 : 1 }}
+        style={{ ...buyButtonStyle, width: "100%", padding: "14px 16px", fontSize: 14, marginTop: 24, opacity: placing ? 0.5 : 1 }}
         disabled={placing}
         onClick={onPay}
       >
@@ -763,6 +828,7 @@ function PaymentView({
 }
 
 function ConfirmationView({ brand, order }: { brand: Brand; order: Order | null }) {
+  const buyButtonStyle = useBuyButtonStyle();
   if (!order) {
     return (
       <section style={{ maxWidth: 480, margin: "0 auto", padding: "56px 32px", textAlign: "center" }}>
@@ -788,7 +854,7 @@ function ConfirmationView({ brand, order }: { brand: Brand; order: Order | null 
         <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>2-4 business days</p>
       </div>
 
-      <a href="#/" style={{ ...styles.buyButton, display: "block", textAlign: "center", textDecoration: "none", marginTop: 24, padding: "14px 16px" }}>
+      <a href="#/" style={{ ...buyButtonStyle, display: "block", textAlign: "center", textDecoration: "none", marginTop: 24, padding: "14px 16px" }}>
         Continue shopping
       </a>
     </section>

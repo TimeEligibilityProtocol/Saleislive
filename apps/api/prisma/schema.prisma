@@ -333,6 +333,11 @@ model Campaign {
   heroColorPreset  String?
   heroFontPreset   String?
   heroTitleSize    String?
+  /// Free hex colour overrides, independent of the fixed hero-preset system above — Ola, 2026-08-19: full colour control from admin, not just presets. Text colours are never stored; always derived via domain's contrastTextColor.
+  heroCustomColor             String?
+  heroButtonColor             String?
+  buyButtonColor               String?
+  productAreaBackgroundColor  String?
   showHeroCta      Boolean?
   /// Position/scale of the hero photo within the hero canvas (drag-to-move,
   /// drag-the-dot-to-resize, same mechanism as product photo positioning).

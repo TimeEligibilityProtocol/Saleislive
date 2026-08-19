@@ -48,6 +48,10 @@ export function campaignsRouter(): Router {
         heroColorPreset: HeroColorPresetId | null;
         heroFontPreset: string | null;
         heroTitleSize: HeroTitleSizeId | null;
+        heroCustomColor: string | null;
+        heroButtonColor: string | null;
+        buyButtonColor: string | null;
+        productAreaBackgroundColor: string | null;
         showHeroCta: boolean | null;
         heroImageOffsetX: number | null;
         heroImageOffsetY: number | null;

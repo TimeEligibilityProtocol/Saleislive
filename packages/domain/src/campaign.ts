@@ -27,6 +27,57 @@ export const HERO_TITLE_SIZE_PX = {
 } as const;
 export type HeroTitleSizeId = keyof typeof HERO_TITLE_SIZE_PX;
 
+/**
+ * Given a background hex colour, returns the readable text colour (near-
+ * black or white) against it — WCAG relative-luminance threshold, same
+ * idea as the hero CTA's old "invert the preset's own pair" trick but
+ * works for any arbitrary colour a merchant picks with a colour input,
+ * not just the 4 curated presets. Used everywhere a merchant sets a free
+ * colour (hero, hero button, add-to-bag button, product-area background)
+ * so a colour choice can never produce invisible text — the exact bug
+ * class that bit the hero CTA, 2026-08-18.
+ */
+export function contrastTextColor(hex: string): string {
+  const clean = hex.replace("#", "");
+  const full = clean.length === 3 ? clean.split("").map((c) => c + c).join("") : clean;
+  const r = parseInt(full.slice(0, 2), 16) / 255;
+  const g = parseInt(full.slice(2, 4), 16) / 255;
+  const b = parseInt(full.slice(4, 6), 16) / 255;
+  const linear = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  const luminance = 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+  return luminance > 0.45 ? "#111111" : "#FFFFFF";
+}
+
+/**
+ * Curated list of real, popular Google Fonts families — the "search and
+ * pick any font, like in Word" Ola asked for (2026-08-18), beyond the 5
+ * self-hosted APPROVED_FONTS. Loaded on demand via Google Fonts' CSS2 API
+ * (see googleFontCssUrl) rather than self-hosted, since bundling hundreds
+ * of font files isn't practical — only ever used for a hero headline a
+ * merchant explicitly picked, so a slow/blocked font request degrades to
+ * a system-font fallback on that one headline, not a silent site-wide
+ * failure.
+ */
+export const GOOGLE_FONT_FAMILIES = [
+  "Abril Fatface", "Alegreya", "Archivo", "Archivo Black", "Arvo", "Assistant", "Barlow", "Barlow Condensed",
+  "Baskervville", "Bebas Neue", "Bitter", "Bodoni Moda", "Bricolage Grotesque", "Cabin", "Caveat", "Cinzel",
+  "Cormorant", "Cormorant Garamond", "Crimson Pro", "Crimson Text", "DM Sans", "DM Serif Display", "DM Serif Text",
+  "Domine", "EB Garamond", "Eczar", "Epilogue", "Fjalla One", "Fraunces", "Frank Ruhl Libre", "Georama", "Georgia Pro",
+  "Gloock", "Grenze Gotisch", "Halant", "Hanken Grotesk", "Ibarra Real Nova", "Inconsolata", "Inknut Antiqua",
+  "Instrument Sans", "Jost", "Josefin Sans", "Josefin Slab", "Karla", "Kanit", "Lato", "Lexend", "Libre Baskerville",
+  "Libre Caslon Display", "Libre Caslon Text", "Libre Franklin", "Literata", "Lora", "Marcellus", "Merriweather",
+  "Montserrat", "Mulish", "Newsreader", "Noto Serif", "Nunito", "Old Standard TT", "Oswald", "Outfit", "Overpass",
+  "Petrona", "Piazzolla", "Playfair", "Plus Jakarta Sans", "Poppins", "Prata", "PT Sans", "PT Serif", "Public Sans",
+  "Quattrocento", "Quicksand", "Rajdhani", "Raleway", "Red Hat Display", "Red Hat Text", "Roboto", "Roboto Condensed",
+  "Roboto Serif", "Rubik", "Sora", "Source Sans 3", "Source Serif 4", "Spectral", "Syne", "Tenor Sans", "Urbanist",
+  "Vollkorn", "Work Sans", "Yeseva One", "Zilla Slab",
+] as const;
+
+/** Google Fonts' CSS2 API, requesting the specific weights the storefront/admin actually use (400 body, 500/600/700 headings/buttons) — swap-on-load so text is never invisible while the font downloads. */
+export function googleFontCssUrl(family: string): string {
+  return `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family).replace(/%20/g, "+")}:wght@400;500;600;700&display=swap`;
+}
+
 export interface Campaign {
   id: string;
   tenantId: string;
@@ -49,6 +100,22 @@ export interface Campaign {
   heroColorPreset: HeroColorPresetId | null;
   heroFontPreset: string | null;
   heroTitleSize: HeroTitleSizeId | null;
+  /**
+   * Free hex colour picker for the hero background — takes priority over
+   * heroColorPreset when set (mutually exclusive in the admin UI: picking
+   * one clears the other). Text colour is derived automatically via
+   * contrastTextColor, never a second field to set, so a colour choice
+   * can't accidentally produce invisible text. Ola, 2026-08-19: "w
+   * zasadzie wszędzie od strony admin" — full colour control, not just
+   * the 4 curated presets.
+   */
+  heroCustomColor: string | null;
+  /** Free hex colour for the hero's "Shop the sale" button — independent of the hero background colour (Ola: "nie może być jedno"). Null = the existing default (invert the active hero colour, or navy). Text colour auto-derives via contrastTextColor. */
+  heroButtonColor: string | null;
+  /** Free hex colour for every "Add to bag" / primary action button across the storefront (product card, product detail, checkout, confirmation) — one shared colour, since they're all the same button role. Null = platform default navy. Text colour auto-derives via contrastTextColor. */
+  buyButtonColor: string | null;
+  /** Free hex colour for the page area behind the product grid (category pills through the product cards) — independent of the hero background. Null = platform default ivory. */
+  productAreaBackgroundColor: string | null;
   /** Null/true = show the platform's own "Shop the sale" CTA over the hero. False = hide it — a merchant whose uploaded hero photo already has its own call-to-action baked in doesn't want a second, redundant one on top. */
   showHeroCta: boolean | null;
   /**
