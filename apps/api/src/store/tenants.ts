@@ -1,4 +1,4 @@
-import { Brand, HttpIntegrationConfig, Tenant } from "@saleis-live/domain";
+import { Brand, HttpIntegrationConfig, LogoSizeId, Tenant } from "@saleis-live/domain";
 import { randomUUID } from "node:crypto";
 import { prisma } from "../lib/prisma.js";
 import { Brand as PrismaBrand, Prisma, Tenant as PrismaTenant } from "../generated/prisma/client.js";
@@ -28,6 +28,7 @@ function toDomainBrand(row: PrismaBrand): Brand {
     slugVerified: row.slugVerified,
     customDomain: row.customDomain,
     logoUrl: row.logoUrl,
+    logoSize: row.logoSize as LogoSizeId | null,
     returnPolicy: row.returnPolicy,
     shippingPolicy: row.shippingPolicy,
     paymentIntegration: row.paymentIntegration as HttpIntegrationConfig | null,
@@ -88,7 +89,7 @@ export async function isSlugAvailable(slug: string): Promise<boolean> {
 }
 
 export async function createBrand(
-  input: Omit<Brand, "id" | "createdAt" | "status" | "slugVerified" | "customDomain" | "logoUrl" | "returnPolicy" | "shippingPolicy" | "paymentIntegration" | "deliveryIntegration">,
+  input: Omit<Brand, "id" | "createdAt" | "status" | "slugVerified" | "customDomain" | "logoUrl" | "logoSize" | "returnPolicy" | "shippingPolicy" | "paymentIntegration" | "deliveryIntegration">,
 ): Promise<Brand> {
   const row = await prisma.brand.create({
     data: {
@@ -144,6 +145,16 @@ export async function updateBrandPolicies(id: string, patch: Partial<{ returnPol
 export async function setBrandLogo(id: string, logoUrl: string): Promise<Brand | undefined> {
   try {
     const row = await prisma.brand.update({ where: { id }, data: { logoUrl } });
+    return toDomainBrand(row);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Store design's logo-size picker — Ola, 2026-08-18: the fixed header size read as too small once a real logo was uploaded. */
+export async function setBrandLogoSize(id: string, logoSize: LogoSizeId): Promise<Brand | undefined> {
+  try {
+    const row = await prisma.brand.update({ where: { id }, data: { logoSize } });
     return toDomainBrand(row);
   } catch {
     return undefined;

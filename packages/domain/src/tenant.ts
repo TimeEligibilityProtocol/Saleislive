@@ -16,6 +16,10 @@ export interface Tenant {
 
 export type BrandStatus = "draft" | "active" | "suspended";
 
+/** Header logo display height — Ola, 2026-08-18: the fixed 32px default read as too small once a real logo was uploaded. "Medium" is that same 32px so nobody's storefront changes unless they pick something else. */
+export type LogoSizeId = "small" | "medium" | "large";
+export const LOGO_SIZE_PX: Record<LogoSizeId, number> = { small: 24, medium: 32, large: 48 };
+
 /** A single brand workspace — the unit that owns a catalog, theme, campaigns, and a subdomain slug. */
 export interface Brand {
   id: string;
@@ -34,6 +38,8 @@ export interface Brand {
   customDomain: string | null;
   /** Shown in the storefront header in place of the "Your brand goes here" placeholder — set from Launch Studio's "Store design" tab. Null means the brand hasn't uploaded one yet. */
   logoUrl: string | null;
+  /** Null means "medium" (24/32/48px small/medium/large — medium matches the header's original fixed size, so a brand that never touches this sees zero visual change). */
+  logoSize: LogoSizeId | null;
   /** Store-wide policy text shown on the storefront (screen 06's "Policies" tab) — plain text, no template engine. */
   returnPolicy: string | null;
   shippingPolicy: string | null;

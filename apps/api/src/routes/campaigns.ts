@@ -1,4 +1,4 @@
-import { CampaignAccess, CampaignStatus, HeroColorPresetId, ThemePresetId } from "@saleis-live/domain";
+import { CampaignAccess, CampaignStatus, HeroColorPresetId, HeroTitleSizeId, LogoSizeId, ThemePresetId } from "@saleis-live/domain";
 import { Router } from "express";
 import multer from "multer";
 import { asyncHandler } from "../lib/asyncHandler.js";
@@ -6,7 +6,7 @@ import { saveUploadedAsset } from "../lib/assetStorage.js";
 import { requireAuth } from "../middleware/auth.js";
 import { logAudit } from "../store/auditLog.js";
 import { getCampaignById, getOrCreateCurrentCampaign, setCampaignAccessPassword, updateCampaign } from "../store/campaigns.js";
-import { getBrandById, publishBrand, setBrandLogo, updateBrandPolicies } from "../store/tenants.js";
+import { getBrandById, publishBrand, setBrandLogo, setBrandLogoSize, updateBrandPolicies } from "../store/tenants.js";
 
 const heroUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -47,6 +47,7 @@ export function campaignsRouter(): Router {
         themePreset: ThemePresetId;
         heroColorPreset: HeroColorPresetId | null;
         heroFontPreset: string | null;
+        heroTitleSize: HeroTitleSizeId | null;
         /// Plaintext, write-only — never round-tripped back on reads (see
         /// store/campaigns.ts's toDomainCampaign, which never selects the
         /// hash). Handled separately from the rest of the patch below since
@@ -102,6 +103,21 @@ export function campaignsRouter(): Router {
       const updated = await setBrandLogo(brand.id, url);
       if (!updated) return res.status(500).json({ error: "update_failed" });
       res.status(201).json({ brand: updated });
+    }),
+  );
+
+  /** Store design's logo-size picker (small/medium/large) — separate from the upload above so choosing a size doesn't require re-uploading the file. */
+  router.patch(
+    "/api/brands/:brandId/logo-size",
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const brand = await getBrandById(req.params.brandId);
+      if (!brand) return res.status(400).json({ error: "unknown_brand" });
+      const { logoSize } = req.body as { logoSize?: LogoSizeId };
+      if (logoSize !== "small" && logoSize !== "medium" && logoSize !== "large") return res.status(400).json({ error: "invalid_size" });
+      const updated = await setBrandLogoSize(brand.id, logoSize);
+      if (!updated) return res.status(500).json({ error: "update_failed" });
+      res.json({ brand: updated });
     }),
   );
 

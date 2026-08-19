@@ -49,6 +49,7 @@ model Brand {
   slugVerified      Boolean     @default(false)
   customDomain      String?
   logoUrl           String?
+  logoSize          String?
   returnPolicy      String?
   shippingPolicy    String?
   /// HttpIntegrationConfig — packages/domain/src/adapters.ts
@@ -330,6 +331,7 @@ model Campaign {
   themePreset      String
   heroColorPreset  String?
   heroFontPreset   String?
+  heroTitleSize    String?
   /// Only set when access = password. Never exposed to any client — see
   /// store/campaigns.ts's toDomainCampaign, which deliberately omits it,
   /// same pattern as Credential.passwordHash vs. the User domain type.

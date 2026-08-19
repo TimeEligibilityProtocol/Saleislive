@@ -28,6 +28,7 @@ function toDomainCampaign(row: PrismaCampaign): Campaign {
     themePreset: row.themePreset as Campaign["themePreset"],
     heroColorPreset: row.heroColorPreset as Campaign["heroColorPreset"],
     heroFontPreset: row.heroFontPreset,
+    heroTitleSize: row.heroTitleSize as Campaign["heroTitleSize"],
     hasAccessPassword: !!row.accessPasswordHash,
     createdAt: row.createdAt.toISOString(),
   };

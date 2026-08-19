@@ -1,5 +1,5 @@
 import { colors, typography } from "@saleis-live/ui";
-import { Brand, Campaign, CampaignAccess, DeliveryMethod, HERO_COLOR_PRESETS, Money, Order, Product } from "@saleis-live/domain";
+import { Brand, Campaign, CampaignAccess, DeliveryMethod, HERO_COLOR_PRESETS, HERO_TITLE_SIZE_PX, LOGO_SIZE_PX, Money, Order, Product } from "@saleis-live/domain";
 import { ApiError } from "@saleis-live/api-client";
 import { SyntheticEvent, useCallback, useEffect, useState } from "react";
 import { Logo } from "./components/Logo";
@@ -218,7 +218,7 @@ export function App() {
             <Logo height={55} />
           </span>
           {brand.logoUrl ? (
-            <img src={apiClient.resolveAssetUrl(brand.logoUrl)} alt={brand.name} style={{ height: 32, width: "auto", objectFit: "contain" }} />
+            <img src={apiClient.resolveAssetUrl(brand.logoUrl)} alt={brand.name} style={{ height: LOGO_SIZE_PX[brand.logoSize ?? "medium"], width: "auto", objectFit: "contain" }} />
           ) : (
             <>
               <span className="storefront-brand-placeholder-full" style={styles.brandPlaceholder}>
@@ -311,6 +311,7 @@ function HomeView({ brand, campaign, products, onAddToBag }: { brand: Brand; cam
   const colorPreset = campaign?.heroColorPreset ? HERO_COLOR_PRESETS[campaign.heroColorPreset] : null;
   const heroFont = campaign?.heroFontPreset || undefined;
   const hasCustomHero = !!(customHeroUrl || colorPreset || campaign?.headline);
+  const titleSize = HERO_TITLE_SIZE_PX[campaign?.heroTitleSize ?? "medium"];
 
   return (
     <>
@@ -325,7 +326,7 @@ function HomeView({ brand, campaign, products, onAddToBag }: { brand: Brand; cam
            desktop crop, or the diagonal silk sweep drapes straight across the
            headline instead of framing it. */
         @media (max-width: 700px) { .hero-image { object-position: 35% center !important; } }
-        @media (max-width: 700px) { .hero-title { font-size: 40px !important; } }
+        @media (max-width: 700px) { .hero-title { font-size: ${titleSize.mobile}px !important; } }
         @media (max-width: 700px) { .hero-copy { padding: 0 6.5% !important; } }
       `}</style>
       <section style={{ background: !hasCustomHero ? colors.background : colorPreset ? colorPreset.background : colors.ink }}>
@@ -343,6 +344,7 @@ function HomeView({ brand, campaign, products, onAddToBag }: { brand: Brand; cam
                 className="hero-title"
                 style={{
                   ...styles.heroTitle,
+                  fontSize: titleSize.desktop,
                   ...(heroFont ? { fontFamily: heroFont } : {}),
                   ...(hasCustomHero ? { color: customHeroUrl ? "#fff" : colorPreset ? colorPreset.text : styles.heroTitle.color } : {}),
                 }}
@@ -776,7 +778,12 @@ const styles: Record<string, React.CSSProperties> = {
   bagLink: { fontSize: 13, fontWeight: 700, color: colors.navy, textDecoration: "none" },
   backLink: { display: "inline-block", fontSize: 13, fontWeight: 600, color: "#5C574C", textDecoration: "none", margin: "24px 0 0" },
 
-  hero: { position: "relative", overflow: "hidden", background: colors.background },
+  // No background here — the outer <section> (App.tsx's HomeView) is the
+  // single source of truth for hero colour (default ivory, or the
+  // merchant's chosen colour preset/custom photo). A hardcoded background
+  // here used to sit on top of it and mask any colour that wasn't ivory —
+  // real bug, 2026-08-18: a merchant picked "Navy" and it never showed.
+  hero: { position: "relative", overflow: "hidden" },
   heroImage: { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "68% center" },
   heroCopy: { position: "absolute", inset: 0, zIndex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 4.5%" },
   heroTitle: { fontFamily: "'Cormorant Garamond', 'Instrument Serif', Georgia, serif", fontWeight: 500, fontSize: 88, color: colors.navy, margin: "0 0 22px", lineHeight: 1.02, maxWidth: 560 },

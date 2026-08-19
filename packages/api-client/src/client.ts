@@ -1,4 +1,4 @@
-import { Brand, BrandMembership, Campaign, DeliveryMethod, ImportBatch, IntakeMethod, MatchMethod, Order, ParsedImportRow, PhotoTreatment, Product, Role, User } from "@saleis-live/domain";
+import { Brand, BrandMembership, Campaign, DeliveryMethod, ImportBatch, IntakeMethod, LogoSizeId, MatchMethod, Order, ParsedImportRow, PhotoTreatment, Product, Role, User } from "@saleis-live/domain";
 
 export interface ApiClientConfig {
   baseUrl: string;
@@ -360,6 +360,11 @@ export class ApiClient {
     const res = await fetch(`${this.config.baseUrl}/api/brands/${brandId}/logo`, { method: "POST", body: form, headers });
     if (!res.ok) throw new ApiError(res.status, await res.text());
     const { brand } = (await res.json()) as { brand: Brand };
+    return brand;
+  }
+
+  async setBrandLogoSize(brandId: string, logoSize: LogoSizeId): Promise<Brand> {
+    const { brand } = await this.request<{ brand: Brand }>(`/api/brands/${brandId}/logo-size`, { method: "PATCH", body: JSON.stringify({ logoSize }) });
     return brand;
   }
 

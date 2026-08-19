@@ -19,6 +19,14 @@ export const HERO_COLOR_PRESETS = {
 } as const;
 export type HeroColorPresetId = keyof typeof HERO_COLOR_PRESETS;
 
+/** Headline size — "medium" matches the hero's original fixed size (88px desktop / 40px mobile), so a sale that never touches this looks exactly as before. Same preset drives both breakpoints together, not set independently, per Ola's ask that a size choice hold consistently on the phone too. */
+export const HERO_TITLE_SIZE_PX = {
+  small: { desktop: 64, mobile: 32 },
+  medium: { desktop: 88, mobile: 40 },
+  large: { desktop: 112, mobile: 52 },
+} as const;
+export type HeroTitleSizeId = keyof typeof HERO_TITLE_SIZE_PX;
+
 export interface Campaign {
   id: string;
   tenantId: string;
@@ -40,6 +48,7 @@ export interface Campaign {
   /** Null means "use the platform default" (ivory bg / Instrument Serif) — these only apply to this sale's own hero, not the whole brand. */
   heroColorPreset: HeroColorPresetId | null;
   heroFontPreset: string | null;
+  heroTitleSize: HeroTitleSizeId | null;
   /** Whether a password is currently set for `access: "password"` — never the password/hash itself, just enough for the admin UI to show "Password set" vs "No password yet" without round-tripping anything secret. */
   hasAccessPassword: boolean;
   createdAt: string;

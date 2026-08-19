@@ -8,10 +8,14 @@ import {
   HttpIntegrationConfig,
   APPROVED_FONTS,
   HERO_COLOR_PRESETS,
+  HERO_TITLE_SIZE_PX,
   HeroColorPresetId,
+  HeroTitleSizeId,
   ImportBatch,
   ImportRowDiff,
   isCatalogueReady,
+  LOGO_SIZE_PX,
+  LogoSizeId,
   Order,
   OrderStatus,
   ParsedImportRow,
@@ -3141,10 +3145,12 @@ function LaunchStudioPage() {
   const [themePreset, setThemePreset] = useState<ThemePresetId>("editorial");
   const [heroColorPreset, setHeroColorPreset] = useState<HeroColorPresetId | null>(null);
   const [heroFontPreset, setHeroFontPreset] = useState<string | null>(null);
+  const [heroTitleSize, setHeroTitleSize] = useState<HeroTitleSizeId | null>(null);
   const [uploadingHero, setUploadingHero] = useState<"desktop" | "mobile" | null>(null);
   const heroDesktopInputRef = useRef<HTMLInputElement>(null);
   const heroMobileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [savingLogoSize, setSavingLogoSize] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -3170,6 +3176,7 @@ function LaunchStudioPage() {
         setThemePreset(c.themePreset);
         setHeroColorPreset(c.heroColorPreset);
         setHeroFontPreset(c.heroFontPreset);
+        setHeroTitleSize(c.heroTitleSize);
         setProducts(p);
         setProductIds(new Set(c.productIds));
       })
@@ -3254,6 +3261,7 @@ function LaunchStudioPage() {
         themePreset,
         heroColorPreset,
         heroFontPreset,
+        heroTitleSize,
       });
       setCampaign(updated);
       setSaved(true);
@@ -3293,6 +3301,21 @@ function LaunchStudioPage() {
       setError("Couldn't upload that logo.");
     } finally {
       setUploadingLogo(false);
+    }
+  };
+
+  // Same immediate-commit reasoning as the upload above — a size pick is a
+  // one-click decision, not something that belongs behind the tab's
+  // general Save.
+  const onLogoSizePicked = async (size: LogoSizeId) => {
+    setSavingLogoSize(true);
+    setError(null);
+    try {
+      setBrand(await apiClient.setBrandLogoSize(brandId, size));
+    } catch {
+      setError("Couldn't change the logo size.");
+    } finally {
+      setSavingLogoSize(false);
     }
   };
 
@@ -3478,10 +3501,41 @@ function LaunchStudioPage() {
               </button>
             </div>
             <p style={{ fontSize: 11, color: colors.muted, marginTop: 6 }}>Shown on your storefront's header. Best results: a transparent PNG, roughly 400 × 160px.</p>
+            {brand?.logoUrl ? (
+              <>
+                <label style={{ ...styles.label, marginTop: 10 }}>Logo size</label>
+                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                  {(["small", "medium", "large"] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      disabled={savingLogoSize}
+                      onClick={() => void onLogoSizePicked(s)}
+                      style={{ ...styles.pillButton, padding: "8px 14px", fontSize: 12, ...((brand.logoSize ?? "medium") === s ? styles.pillButtonActive : {}) }}
+                    >
+                      {s === "small" ? "Small" : s === "medium" ? "Medium" : "Large"}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : null}
 
             <label style={{ ...styles.label, marginTop: 16 }}>Headline</label>
             <input style={styles.input} value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="e.g. The private sale is live." />
-            <label style={styles.label}>Short description (optional)</label>
+            <label style={{ ...styles.label, marginTop: 4 }}>Headline size</label>
+            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              {(["small", "medium", "large"] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setHeroTitleSize(s)}
+                  style={{ ...styles.pillButton, padding: "8px 14px", fontSize: 12, ...((heroTitleSize ?? "medium") === s ? styles.pillButtonActive : {}) }}
+                >
+                  {s === "small" ? "Small" : s === "medium" ? "Medium" : "Large"}
+                </button>
+              ))}
+            </div>
+            <label style={{ ...styles.label, marginTop: 10 }}>Short description (optional)</label>
             <input style={styles.input} value={shortDescription} onChange={(e) => setShortDescription(e.target.value)} placeholder="e.g. Selected pieces. Limited time." />
 
             <label style={{ ...styles.label, marginTop: 16 }}>Hero image</label>
@@ -3645,7 +3699,7 @@ function LaunchStudioPage() {
                 <p
                   style={{
                     fontFamily: heroFontPreset ?? DEFAULT_HERO_FONT,
-                    fontSize: 26,
+                    fontSize: (heroTitleSize ?? "medium") === "small" ? 20 : (heroTitleSize ?? "medium") === "large" ? 32 : 26,
                     margin: "0 0 12px",
                     color: heroDesktopUrl ? colors.white : heroColorPreset ? HERO_COLOR_PRESETS[heroColorPreset].text : colors.ink,
                   }}
