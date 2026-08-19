@@ -3,7 +3,7 @@ import { APPROVED_FONTS, Brand, Campaign, CampaignAccess, DeliveryMethod, HERO_C
 import { ApiError } from "@saleis-live/api-client";
 import { SyntheticEvent, createContext, useCallback, useContext, useEffect, useState } from "react";
 import { Logo } from "./components/Logo";
-import { apiClient, storeStorefrontUnlockToken } from "./config/apiClient";
+import { apiClient, resolveAdminBaseUrl, storeStorefrontUnlockToken } from "./config/apiClient";
 
 /**
  * "Add to bag"/primary-button colour is set once per campaign but read by
@@ -313,6 +313,10 @@ export function App() {
       <footer style={styles.platformFooter}>
         <a href="https://saleis.live" target="_blank" rel="noreferrer" style={styles.platformFooterLink}>
           Powered by saleis.live
+        </a>
+        <span style={{ ...styles.platformFooterLink, margin: "0 8px" }}>·</span>
+        <a href={`${resolveAdminBaseUrl()}/#/launch-studio`} target="_blank" rel="noreferrer" style={styles.platformFooterLink}>
+          Store owner? Edit this store →
         </a>
       </footer>
     </div>

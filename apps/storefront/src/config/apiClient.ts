@@ -31,6 +31,26 @@ function resolveBrandSlugOverride(): string | null {
   return new URLSearchParams(window.location.search).get("brand");
 }
 
+/**
+ * Where the admin app lives — used for the storefront footer's "Store
+ * owner? Edit this store" link. Ola, 2026-08-19: looking straight at the
+ * live storefront with no idea where to go to change anything ("gdzie
+ * niby ja mogę coś zmienić?") — this is a plain, always-visible link
+ * (no auth detection needed; it just opens admin's own login) rather than
+ * conditionally showing it only to an already-authenticated owner, which
+ * the storefront has no reliable way to detect on a normal page load
+ * (see PREVIEW_TOKEN_KEY below — that's only ever set via a one-time
+ * admin-generated preview link, not a persistent cross-app session).
+ */
+export function resolveAdminBaseUrl(): string {
+  const override = import.meta.env.VITE_ADMIN_BASE_URL;
+  if (override) return override;
+  if (typeof window !== "undefined" && (window.location?.hostname === "localhost" || window.location?.hostname?.endsWith(".localhost"))) {
+    return `http://${window.location.hostname}:5273`;
+  }
+  return "https://saleislive-admin.onrender.com";
+}
+
 const PREVIEW_TOKEN_KEY = "saleislive:previewToken";
 
 /**
