@@ -61,7 +61,12 @@ export function storefrontRouter(): Router {
       // visitor, never as "enter the password" — the password gate only
       // makes sense once there's an actual live storefront behind it.
       const locked = req.brand!.status === "active" && (await isLocked(req, campaign, previewAuthorized));
-      res.json({ brand: req.brand, previewing, access: campaign.access, locked });
+      // Unlike `previewing` (only true pre-publish, gating the "coming
+      // soon" page), edit mode should be available to an authorized team
+      // member on an already-live store too — that's the normal case once
+      // a sale is running. Ola, 2026-08-19: fine-tuning hero photo/text
+      // position and logo size directly on the real page, not just admin.
+      res.json({ brand: req.brand, previewing, canEdit: previewAuthorized, access: campaign.access, locked });
     }),
   );
   /**

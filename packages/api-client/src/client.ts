@@ -138,8 +138,8 @@ export class ApiClient {
    * instead of calling listStorefrontProducts/getCurrentStorefrontCampaign,
    * both of which 401 while locked.
    */
-  async getCurrentStorefrontBrand(): Promise<{ brand: Brand; previewing: boolean; access: Campaign["access"]; locked: boolean }> {
-    return this.request<{ brand: Brand; previewing: boolean; access: Campaign["access"]; locked: boolean }>("/api/storefront/me");
+  async getCurrentStorefrontBrand(): Promise<{ brand: Brand; previewing: boolean; canEdit: boolean; access: Campaign["access"]; locked: boolean }> {
+    return this.request<{ brand: Brand; previewing: boolean; canEdit: boolean; access: Campaign["access"]; locked: boolean }>("/api/storefront/me");
   }
 
   /** The password for a "password"-access sale, checked against the hash set via updateCampaign's accessPassword field. On success, the returned token unlocks listStorefrontProducts/getCurrentStorefrontCampaign for ~30 days — the caller is responsible for storing it and threading it back through getAuthToken. */
@@ -370,6 +370,12 @@ export class ApiClient {
 
   async setBrandLogoSize(brandId: string, logoSize: LogoSizeId): Promise<Brand> {
     const { brand } = await this.request<{ brand: Brand }>(`/api/brands/${brandId}/logo-size`, { method: "PATCH", body: JSON.stringify({ logoSize }) });
+    return brand;
+  }
+
+  /** The live storefront's own logo resize handle (edit mode). */
+  async setBrandLogoScale(brandId: string, logoScale: number | null): Promise<Brand> {
+    const { brand } = await this.request<{ brand: Brand }>(`/api/brands/${brandId}/logo-scale`, { method: "PATCH", body: JSON.stringify({ logoScale }) });
     return brand;
   }
 

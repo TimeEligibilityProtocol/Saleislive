@@ -29,6 +29,7 @@ function toDomainBrand(row: PrismaBrand): Brand {
     customDomain: row.customDomain,
     logoUrl: row.logoUrl,
     logoSize: row.logoSize as LogoSizeId | null,
+    logoScale: row.logoScale,
     showPlatformLogo: row.showPlatformLogo,
     returnPolicy: row.returnPolicy,
     shippingPolicy: row.shippingPolicy,
@@ -90,7 +91,7 @@ export async function isSlugAvailable(slug: string): Promise<boolean> {
 }
 
 export async function createBrand(
-  input: Omit<Brand, "id" | "createdAt" | "status" | "slugVerified" | "customDomain" | "logoUrl" | "logoSize" | "showPlatformLogo" | "returnPolicy" | "shippingPolicy" | "paymentIntegration" | "deliveryIntegration">,
+  input: Omit<Brand, "id" | "createdAt" | "status" | "slugVerified" | "customDomain" | "logoUrl" | "logoSize" | "logoScale" | "showPlatformLogo" | "returnPolicy" | "shippingPolicy" | "paymentIntegration" | "deliveryIntegration">,
 ): Promise<Brand> {
   const row = await prisma.brand.create({
     data: {
@@ -166,6 +167,16 @@ export async function clearBrandLogo(id: string): Promise<Brand | undefined> {
 export async function setBrandLogoSize(id: string, logoSize: LogoSizeId): Promise<Brand | undefined> {
   try {
     const row = await prisma.brand.update({ where: { id }, data: { logoSize } });
+    return toDomainBrand(row);
+  } catch {
+    return undefined;
+  }
+}
+
+/** The live storefront's own logo-resize handle (edit mode) — Ola, 2026-08-19: fine-tuning the logo's exact size belongs on the real page, not the admin's size-category picker. Passing null clears back to logoSize alone (scale 1.0). */
+export async function setBrandLogoScale(id: string, logoScale: number | null): Promise<Brand | undefined> {
+  try {
+    const row = await prisma.brand.update({ where: { id }, data: { logoScale } });
     return toDomainBrand(row);
   } catch {
     return undefined;

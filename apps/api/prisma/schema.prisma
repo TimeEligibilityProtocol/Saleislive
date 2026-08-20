@@ -50,6 +50,7 @@ model Brand {
   customDomain      String?
   logoUrl           String?
   logoSize          String?
+  logoScale         Float?
   showPlatformLogo  Boolean?
   returnPolicy      String?
   shippingPolicy    String?

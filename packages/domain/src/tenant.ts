@@ -38,8 +38,16 @@ export interface Brand {
   customDomain: string | null;
   /** Shown in the storefront header in place of the "Your brand goes here" placeholder — set from Launch Studio's "Store design" tab. Null means the brand hasn't uploaded one yet. */
   logoUrl: string | null;
-  /** Null means "medium" (24/32/48px small/medium/large — medium matches the header's original fixed size, so a brand that never touches this sees zero visual change). */
+  /** Null means "medium" (24/32/48px small/medium/large — medium matches the header's original fixed size, so a brand that never touches this sees zero visual change). Set from the admin's Store design tab — the rough size category. */
   logoSize: LogoSizeId | null;
+  /**
+   * Fine-tune multiplier on top of logoSize's px value (1.0 = no change) —
+   * set by dragging the logo's own resize handle directly on the live
+   * storefront, not from admin. Ola, 2026-08-19: admin sets the rough
+   * options (upload, size category), the live page is where you correct
+   * exactly how it fits. Null = 1.0, zero visual change from logoSize alone.
+   */
+  logoScale: number | null;
   /** Null/true = storefront header shows the saleis.live wordmark beside the brand's own logo (today's default). False = hide it — a "Powered by saleis.live" note still appears in the footer either way, so the platform stays credited even when a brand goes fully white-label up top. Ola, 2026-08-19: "logo saleis.live - mozliwe do usuniecia z przodu... na dole powinno sie pokazac powered by saleis.live". */
   showPlatformLogo: boolean | null;
   /** Store-wide policy text shown on the storefront (screen 06's "Policies" tab) — plain text, no template engine. */

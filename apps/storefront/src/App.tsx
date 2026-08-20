@@ -1,7 +1,7 @@
 import { colors, typography } from "@saleis-live/ui";
 import { APPROVED_FONTS, Brand, Campaign, CampaignAccess, DeliveryMethod, HERO_COLOR_PRESETS, HERO_TITLE_SIZE_PX, LOGO_SIZE_PX, Money, Order, Product, contrastTextColor, googleFontCssUrl } from "@saleis-live/domain";
 import { ApiError } from "@saleis-live/api-client";
-import { SyntheticEvent, createContext, useCallback, useContext, useEffect, useState } from "react";
+import { SyntheticEvent, createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Logo } from "./components/Logo";
 import { apiClient, resolveAdminBaseUrl, storeStorefrontUnlockToken } from "./config/apiClient";
 
@@ -43,6 +43,106 @@ function useGoogleFontLoader(family: string | null | undefined): void {
     }
     link.href = googleFontCssUrl(family);
   }, [family]);
+}
+
+/**
+ * Fine-tuning hero photo/text position+size and logo size directly on the
+ * live storefront (Ola, 2026-08-19: "chcę żeby można było edytować,
+ * powiększać, pomniejszać zdjęcie... prawie na żywo" — admin stays the
+ * place to upload/pick colours & fonts, the real page is where the exact
+ * fit gets corrected). Same drag math as admin's HeroComposer
+ * (apps/admin/src/App.tsx) — fraction-of-container offsets, a resize dot
+ * for scale — so what's dragged here means the same thing there.
+ */
+type DragPos = { x: number; y: number; scale?: number };
+
+function useLiveDrag(editMode: boolean, containerRef: React.RefObject<HTMLElement>, initial: DragPos, onCommit: (pos: DragPos) => void) {
+  const [pos, setPos] = useState(initial);
+  const posRef = useRef(pos);
+  posRef.current = pos;
+  const initialKey = `${initial.x}:${initial.y}:${initial.scale}`;
+  useEffect(() => setPos(initial), [initialKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dragRef = useRef<{ mode: "move" | "resize"; startX: number; startY: number; startPos: DragPos } | null>(null);
+  const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
+
+  const beginDrag = (mode: "move" | "resize") => (e: React.PointerEvent) => {
+    if (!editMode) return;
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    dragRef.current = { mode, startX: e.clientX, startY: e.clientY, startPos: posRef.current };
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    const drag = dragRef.current;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!drag || !rect) return;
+    const dx = (e.clientX - drag.startX) / rect.width;
+    const dy = (e.clientY - drag.startY) / rect.height;
+    if (drag.mode === "resize") {
+      setPos({ ...drag.startPos, scale: clamp((drag.startPos.scale ?? 1) + (dx + dy) / 2, 0.15, 2.5) });
+    } else {
+      setPos({ x: clamp(drag.startPos.x + dx, 0.05, 0.95), y: clamp(drag.startPos.y + dy, 0.05, 0.95), scale: drag.startPos.scale });
+    }
+  };
+  const onPointerUp = () => {
+    if (dragRef.current) onCommit(posRef.current);
+    dragRef.current = null;
+  };
+  return { pos, beginDrag, onPointerMove, onPointerUp };
+}
+
+/** Debounces a save-to-server call so rapid drag updates don't fire a PATCH per pixel — only once movement settles. */
+function useDebouncedSave<T>(save: (value: T) => void, delayMs = 400): (value: T) => void {
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  return useCallback(
+    (value: T) => {
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => save(value), delayMs);
+    },
+    [save, delayMs],
+  );
+}
+
+/** Drag-to-resize the logo directly on the page — simpler than useLiveDrag (no move, no container-relative fraction; just a pixel delta converted to a scale multiplier). */
+function useLogoResize(editMode: boolean, initialScale: number, onCommit: (scale: number) => void) {
+  const [scale, setScale] = useState(initialScale);
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
+  useEffect(() => setScale(initialScale), [initialScale]);
+  const dragRef = useRef<{ startX: number; startY: number; startScale: number } | null>(null);
+  const clamp = (v: number) => Math.min(3, Math.max(0.4, v));
+
+  const beginDrag = (e: React.PointerEvent) => {
+    if (!editMode) return;
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    dragRef.current = { startX: e.clientX, startY: e.clientY, startScale: scaleRef.current };
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const delta = e.clientX - drag.startX + (e.clientY - drag.startY);
+    setScale(clamp(drag.startScale + delta / 160));
+  };
+  const onPointerUp = () => {
+    if (dragRef.current) onCommit(scaleRef.current);
+    dragRef.current = null;
+  };
+  return { scale, beginDrag, onPointerMove, onPointerUp };
+}
+
+/** Desktop vs mobile field set to write drag changes to — matches the .hero-photo-layer/.hero-text-layer media query breakpoint below, so whichever layout you're actually looking at while dragging is the one that gets saved. */
+function isMobileViewport(): boolean {
+  return typeof window !== "undefined" && window.innerWidth <= 700;
 }
 
 // Flat demo delivery fee — not a real courier rate lookup (no adapter is
@@ -120,20 +220,28 @@ export function App() {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [access, setAccess] = useState<CampaignAccess | null>(null);
   const [previewing, setPreviewing] = useState(false);
+  const [canEdit, setCanEdit] = useState(false);
+  const [editMode, setEditMode] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<Record<string, number>>({});
   const [checkoutInfo, setCheckoutInfo] = useState<CheckoutInfo>({ name: "", phone: "", location: "", deliveryMethod: "courier" });
   const [lastOrder, setLastOrder] = useState<Order | null>(null);
   const hash = useHashRoute();
   useGoogleFontLoader(campaign?.heroFontPreset);
+  const saveLogoScale = useDebouncedSave<number>((scale) => {
+    if (!brand) return;
+    void apiClient.setBrandLogoScale(brand.id, scale).then(setBrand);
+  });
+  const logoResize = useLogoResize(editMode && canEdit && !!brand?.logoUrl, brand?.logoScale ?? 1, saveLogoScale);
 
   const load = useCallback(() => {
     setState("loading");
     apiClient
       .getCurrentStorefrontBrand()
-      .then(({ brand: b, previewing: p, access: a, locked }) => {
+      .then(({ brand: b, previewing: p, canEdit: ce, access: a, locked }) => {
         setBrand(b);
         setPreviewing(p);
+        setCanEdit(ce);
         setAccess(a);
         if (locked) {
           setState("locked");
@@ -235,13 +343,14 @@ export function App() {
   } else if (hash.startsWith("#/order/")) {
     body = <ConfirmationView brand={brand} order={lastOrder} />;
   } else {
-    body = <HomeView brand={brand} campaign={campaign} products={products} onAddToBag={addToBag} />;
+    body = <HomeView brand={brand} campaign={campaign} products={products} onAddToBag={addToBag} editMode={editMode && canEdit} onCampaignUpdate={setCampaign} />;
   }
 
   const buyButtonBackground = campaign?.buyButtonColor || colors.navy;
   // An explicit buyButtonTextColor override always wins; otherwise the
   // existing safe auto-contrast fallback.
   const buyButtonText = campaign?.buyButtonTextColor || (campaign?.buyButtonColor ? contrastTextColor(campaign.buyButtonColor) : colors.white);
+  const logoEditMode = editMode && canEdit && !!brand?.logoUrl;
 
   // Set once, page-wide (not just behind the product grid, and not just
   // background) — a colour picked here must look the same on every route
@@ -291,7 +400,36 @@ export function App() {
             </span>
           ) : null}
           {brand.logoUrl ? (
-            <img src={apiClient.resolveAssetUrl(brand.logoUrl)} alt={brand.name} style={{ height: LOGO_SIZE_PX[brand.logoSize ?? "medium"], width: "auto", objectFit: "contain" }} />
+            <span
+              style={{ position: "relative", display: "inline-flex", ...(logoEditMode ? { outline: `1px dashed ${colors.navy}`, outlineOffset: 4 } : {}) }}
+              onPointerMove={logoEditMode ? logoResize.onPointerMove : undefined}
+              onPointerUp={logoEditMode ? logoResize.onPointerUp : undefined}
+            >
+              <img
+                src={apiClient.resolveAssetUrl(brand.logoUrl)}
+                alt={brand.name}
+                style={{ height: LOGO_SIZE_PX[brand.logoSize ?? "medium"] * logoResize.scale, width: "auto", objectFit: "contain" }}
+              />
+              {logoEditMode ? (
+                <span
+                  onPointerDown={logoResize.beginDrag}
+                  onClick={(e) => e.preventDefault()}
+                  title="Drag to resize the logo"
+                  style={{
+                    position: "absolute",
+                    right: -8,
+                    bottom: -8,
+                    width: 16,
+                    height: 16,
+                    borderRadius: 999,
+                    background: colors.navy,
+                    border: `2px solid ${colors.white}`,
+                    cursor: "nwse-resize",
+                    touchAction: "none",
+                  }}
+                />
+              ) : null}
+            </span>
           ) : (
             <>
               <span className="storefront-brand-placeholder-full" style={{ ...styles.brandPlaceholder, ...(headerTextColor ? { color: headerTextColor } : {}) }}>
@@ -309,6 +447,30 @@ export function App() {
       </header>
 
       {body}
+
+      {canEdit ? (
+        <button
+          type="button"
+          onClick={() => setEditMode((v) => !v)}
+          style={{
+            position: "fixed",
+            right: 20,
+            bottom: 20,
+            zIndex: 50,
+            padding: "10px 18px",
+            borderRadius: 999,
+            border: "none",
+            background: editMode ? colors.navy : colors.ink,
+            color: colors.white,
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: "pointer",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
+          }}
+        >
+          {editMode ? "✓ Editing — drag the photo, text, or logo" : "✎ Edit mode"}
+        </button>
+      ) : null}
 
       <footer style={styles.platformFooter}>
         <a href="https://saleis.live" target="_blank" rel="noreferrer" style={styles.platformFooterLink}>
@@ -379,10 +541,40 @@ function PasswordGateView({ brand, onUnlocked }: { brand: Brand; onUnlocked: () 
   );
 }
 
-function HomeView({ brand, campaign, products, onAddToBag }: { brand: Brand; campaign: Campaign | null; products: Product[]; onAddToBag: (id: string) => void }) {
+function HomeView({
+  brand,
+  campaign,
+  products,
+  onAddToBag,
+  editMode,
+  onCampaignUpdate,
+}: {
+  brand: Brand;
+  campaign: Campaign | null;
+  products: Product[];
+  onAddToBag: (id: string) => void;
+  editMode: boolean;
+  onCampaignUpdate: (c: Campaign) => void;
+}) {
   const categories = Array.from(new Set(products.map((p) => p.category.value).filter((c): c is string => !!c)));
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const visible = activeCategory ? products.filter((p) => p.category.value === activeCategory) : products;
+  const heroFrameRef = useRef<HTMLDivElement>(null);
+  // Mobile has its own drag-positioned fields (heroImageOffsetXMobile etc.),
+  // but the CSS below applies them with !important, which an inline style
+  // set from a live drag can't override — so on-page dragging is
+  // desktop-width only for now; mobile fine-tuning stays in admin's Hero
+  // layout composer (its Desktop/Mobile toggle isn't bound to your actual
+  // viewport, so it doesn't hit this problem).
+  const heroDragEnabled = editMode && !isMobileViewport();
+  const saveImagePos = useDebouncedSave<DragPos>((pos) => {
+    if (!campaign) return;
+    void apiClient.updateCampaign(campaign.id, { heroImageOffsetX: pos.x, heroImageOffsetY: pos.y, heroImageScale: pos.scale }).then(onCampaignUpdate);
+  });
+  const saveTextPos = useDebouncedSave<DragPos>((pos) => {
+    if (!campaign) return;
+    void apiClient.updateCampaign(campaign.id, { heroTextOffsetX: pos.x, heroTextOffsetY: pos.y }).then(onCampaignUpdate);
+  });
 
   // A merchant who never touched Launch Studio's Store tab gets the
   // platform's own demo hero exactly as before (zero visual change) —
@@ -433,6 +625,10 @@ function HomeView({ brand, campaign, products, onAddToBag }: { brand: Brand; cam
   const imgPosMobile = { x: campaign?.heroImageOffsetXMobile ?? 0.5, y: campaign?.heroImageOffsetYMobile ?? 0.32, scale: campaign?.heroImageScaleMobile ?? 0.85 };
   const textPos = { x: campaign?.heroTextOffsetX ?? 0.28, y: campaign?.heroTextOffsetY ?? 0.5 };
   const textPosMobile = { x: campaign?.heroTextOffsetXMobile ?? 0.5, y: campaign?.heroTextOffsetYMobile ?? 0.72 };
+  const imgDrag = useLiveDrag(heroDragEnabled, heroFrameRef, imgPos, saveImagePos);
+  const textDrag = useLiveDrag(heroDragEnabled, heroFrameRef, textPos, saveTextPos);
+  const liveImgPos = heroDragEnabled ? imgDrag.pos : imgPos;
+  const liveTextPos = heroDragEnabled ? textDrag.pos : textPos;
 
   return (
     <>
@@ -490,25 +686,70 @@ function HomeView({ brand, campaign, products, onAddToBag }: { brand: Brand; cam
           </div>
         ) : (
           // Customised hero — the photo and the headline/copy/CTA block are
-          // two independently positioned layers, set from Store design's
-          // HeroComposer (drag-to-move / drag-the-dot-to-resize).
-          <div className="hero-frame" style={styles.hero}>
+          // two independently positioned layers. Position/size are always
+          // set from Store design's Hero layout composer (admin); when
+          // heroDragEnabled, the SAME layers are also directly draggable
+          // right here on the live page (Ola, 2026-08-19: fine-tuning the
+          // exact fit belongs on the real page, not a mini preview box).
+          <div
+            ref={heroFrameRef}
+            className="hero-frame"
+            style={styles.hero}
+            onPointerMove={(e) => {
+              imgDrag.onPointerMove(e);
+              textDrag.onPointerMove(e);
+            }}
+            onPointerUp={() => {
+              imgDrag.onPointerUp();
+              textDrag.onPointerUp();
+            }}
+            onPointerLeave={() => {
+              imgDrag.onPointerUp();
+              textDrag.onPointerUp();
+            }}
+          >
             {customHeroUrl ? (
               <div
                 className="hero-photo-layer"
-                style={{ position: "absolute", left: `${imgPos.x * 100}%`, top: `${imgPos.y * 100}%`, width: `${imgPos.scale * 100}%`, height: `${imgPos.scale * 100}%`, transform: "translate(-50%, -50%)" }}
+                onPointerDown={heroDragEnabled ? imgDrag.beginDrag("move") : undefined}
+                style={{
+                  position: "absolute",
+                  left: `${liveImgPos.x * 100}%`,
+                  top: `${liveImgPos.y * 100}%`,
+                  width: `${(liveImgPos.scale ?? imgPos.scale) * 100}%`,
+                  height: `${(liveImgPos.scale ?? imgPos.scale) * 100}%`,
+                  transform: "translate(-50%, -50%)",
+                  ...(heroDragEnabled ? { cursor: "move", touchAction: "none", outline: `1px dashed ${colors.white}`, outlineOffset: 6 } : {}),
+                }}
               >
                 <picture>
                   <source media="(max-width: 700px)" srcSet={customHeroUrlMobile ?? customHeroUrl} />
-                  <img src={customHeroUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4 }} />
+                  <img src={customHeroUrl} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4, pointerEvents: "none" }} />
                 </picture>
+                {heroDragEnabled ? (
+                  <span
+                    onPointerDown={imgDrag.beginDrag("resize")}
+                    title="Drag to resize the photo"
+                    style={{ position: "absolute", right: -8, bottom: -8, width: 18, height: 18, borderRadius: 999, background: colors.navy, border: `2px solid ${colors.white}`, cursor: "nwse-resize", touchAction: "none" }}
+                  />
+                ) : null}
               </div>
             ) : null}
             <div
               className="hero-copy hero-text-layer"
-              style={{ position: "absolute", left: `${textPos.x * 100}%`, top: `${textPos.y * 100}%`, transform: "translate(-50%, -50%)", zIndex: 2, maxWidth: "70%", padding: "0 16px" }}
+              onPointerDown={heroDragEnabled ? textDrag.beginDrag("move") : undefined}
+              style={{
+                position: "absolute",
+                left: `${liveTextPos.x * 100}%`,
+                top: `${liveTextPos.y * 100}%`,
+                transform: "translate(-50%, -50%)",
+                zIndex: 2,
+                maxWidth: "70%",
+                padding: "0 16px",
+                ...(heroDragEnabled ? { cursor: "move", touchAction: "none", outline: `1px dashed ${heroTextColor}`, outlineOffset: 6 } : {}),
+              }}
             >
-              <h1 className="hero-title" style={{ ...styles.heroTitle, fontSize: titleSize.desktop, color: heroTextColor, ...(heroFont ? { fontFamily: heroFont } : {}) }}>
+              <h1 className="hero-title" style={{ ...styles.heroTitle, fontSize: titleSize.desktop, color: heroTextColor, ...(heroFont ? { fontFamily: heroFont } : {}), ...(heroDragEnabled ? { pointerEvents: "none" } : {}) }}>
                 {campaign?.headline || (
                   <>
                     Stock in.
@@ -518,9 +759,11 @@ function HomeView({ brand, campaign, products, onAddToBag }: { brand: Brand; cam
                 )}
               </h1>
               {/* Short description is optional (Ola, 2026-08-12) — a merchant who deliberately left it blank shouldn't see the platform's own demo copy fill in instead. */}
-              {campaign?.shortDescription ? <p style={{ ...styles.heroSub, color: heroTextColor, opacity: 0.85 }}>{campaign.shortDescription}</p> : null}
+              {campaign?.shortDescription ? (
+                <p style={{ ...styles.heroSub, color: heroTextColor, opacity: 0.85, ...(heroDragEnabled ? { pointerEvents: "none" } : {}) }}>{campaign.shortDescription}</p>
+              ) : null}
               {showCta ? (
-                <a href="#products-grid" className="hero-shop-cta" style={ctaStyle}>
+                <a href="#products-grid" className="hero-shop-cta" style={{ ...ctaStyle, ...(heroDragEnabled ? { pointerEvents: "none" } : {}) }}>
                   Shop the sale
                 </a>
               ) : null}

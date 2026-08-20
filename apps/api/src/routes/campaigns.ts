@@ -6,7 +6,7 @@ import { saveUploadedAsset } from "../lib/assetStorage.js";
 import { requireAuth } from "../middleware/auth.js";
 import { logAudit } from "../store/auditLog.js";
 import { getCampaignById, getOrCreateCurrentCampaign, setCampaignAccessPassword, updateCampaign } from "../store/campaigns.js";
-import { clearBrandLogo, getBrandById, publishBrand, setBrandLogo, setBrandLogoSize, setBrandShowPlatformLogo, updateBrandPolicies } from "../store/tenants.js";
+import { clearBrandLogo, getBrandById, publishBrand, setBrandLogo, setBrandLogoScale, setBrandLogoSize, setBrandShowPlatformLogo, updateBrandPolicies } from "../store/tenants.js";
 
 const heroUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -149,6 +149,21 @@ export function campaignsRouter(): Router {
       const { logoSize } = req.body as { logoSize?: LogoSizeId };
       if (logoSize !== "small" && logoSize !== "medium" && logoSize !== "large") return res.status(400).json({ error: "invalid_size" });
       const updated = await setBrandLogoSize(brand.id, logoSize);
+      if (!updated) return res.status(500).json({ error: "update_failed" });
+      res.json({ brand: updated });
+    }),
+  );
+
+  /** The live storefront's own logo resize handle (edit mode) — see setBrandLogoScale's own doc comment. Passing null resets to logoSize alone. */
+  router.patch(
+    "/api/brands/:brandId/logo-scale",
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const brand = await getBrandById(req.params.brandId);
+      if (!brand) return res.status(400).json({ error: "unknown_brand" });
+      const { logoScale } = req.body as { logoScale?: number | null };
+      if (logoScale !== null && typeof logoScale !== "number") return res.status(400).json({ error: "invalid_value" });
+      const updated = await setBrandLogoScale(brand.id, logoScale);
       if (!updated) return res.status(500).json({ error: "update_failed" });
       res.json({ brand: updated });
     }),
