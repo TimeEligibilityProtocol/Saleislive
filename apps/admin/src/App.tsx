@@ -2197,12 +2197,18 @@ function HeroComposer({
     const drag = dragRef.current;
     const rect = containerRef.current?.getBoundingClientRect();
     if (!drag || !rect) return;
-    const dx = (e.clientX - drag.startX) / rect.width;
-    const dy = (e.clientY - drag.startY) / rect.height;
     if (drag.mode === "resize") {
-      onImageChange({ offsetX: image.offsetX, offsetY: image.offsetY, scale: clamp(drag.startScale + (dx + dy) / 2, 0.15, 2) });
+      // Raw pixel delta, not normalized by the container's own width/height
+      // — same fix as the real storefront's useLiveDrag (2026-08-20): this
+      // preview box is only ~380px wide, so a fraction-of-container delta
+      // made the dot barely respond to a real drag.
+      const dxPx = e.clientX - drag.startX;
+      const dyPx = e.clientY - drag.startY;
+      onImageChange({ offsetX: image.offsetX, offsetY: image.offsetY, scale: clamp(drag.startScale + (dxPx + dyPx) / 2 / 200, 0.15, 2) });
       return;
     }
+    const dx = (e.clientX - drag.startX) / rect.width;
+    const dy = (e.clientY - drag.startY) / rect.height;
     const next = { offsetX: clamp(drag.startOffsetX + dx, 0.05, 0.95), offsetY: clamp(drag.startOffsetY + dy, 0.05, 0.95) };
     if (drag.layer === "image") onImageChange({ ...next, scale: image.scale });
     else onTextChange(next);
@@ -2264,9 +2270,18 @@ function HeroComposer({
           borderRadius: 6,
         }}
       >
-        <p style={{ fontFamily, fontSize: titleSizePx * previewScale, fontWeight: 500, color: textColor, margin: "0 0 6px", lineHeight: 1.05, pointerEvents: "none" }}>{headline || "Your headline"}</p>
+        {/* Ola, 2026-08-20: margins here used to be fixed pixels (6px/8px)
+            while everything else scaled with previewScale — fine at a
+            roomy desktop preview width, but on a narrow phone this box's
+            aspect-ratio makes it very short, and those un-scaled margins
+            (plus the old font-size floors below) added up to a text block
+            taller than the box itself, clipped top and bottom regardless
+            of position. Scaling margins with previewScale too, and
+            lowering the floors, keeps the block's height proportional to
+            the box's height at every width, like the real storefront. */}
+        <p style={{ fontFamily, fontSize: titleSizePx * previewScale, fontWeight: 500, color: textColor, margin: `0 0 ${6 * previewScale}px`, lineHeight: 1.05, pointerEvents: "none" }}>{headline || "Your headline"}</p>
         {shortDescription ? (
-          <p style={{ fontSize: Math.max(9, 18 * previewScale), color: textColor, opacity: 0.85, margin: "0 0 8px", pointerEvents: "none" }}>{shortDescription}</p>
+          <p style={{ fontSize: Math.max(6, 18 * previewScale), color: textColor, opacity: 0.85, margin: `0 0 ${8 * previewScale}px`, pointerEvents: "none" }}>{shortDescription}</p>
         ) : null}
         {showCta ? (
           // Default (no explicit ctaBackground/ctaText) mirrors the real
@@ -2278,11 +2293,11 @@ function HeroComposer({
           <span
             style={{
               display: "inline-block",
-              padding: `${Math.max(4, 12 * previewScale)}px ${Math.max(8, 24 * previewScale)}px`,
+              padding: `${Math.max(2, 12 * previewScale)}px ${Math.max(4, 24 * previewScale)}px`,
               borderRadius: 6,
               background: ctaBackground ?? textColor,
               color: ctaText ?? contrastTextColor(textColor),
-              fontSize: Math.max(8, 14 * previewScale),
+              fontSize: Math.max(6, 14 * previewScale),
               fontWeight: 600,
               pointerEvents: "none",
             }}
@@ -2577,7 +2592,7 @@ function ProductStudioPage({ productId }: { productId: string }) {
       <hr style={styles.divider} />
 
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexWrap: "wrap" }}>
-        <div style={{ ...styles.sectionCard, width: 320, flexShrink: 0 }}>
+        <div style={{ ...styles.sectionCard, width: "100%", maxWidth: 320, flexShrink: 0 }}>
           <h2 style={{ ...styles.h1, fontSize: 15, marginBottom: 16 }}>Product media</h2>
           {mainImage ? (
             <div style={{ position: "relative" }}>
@@ -3809,6 +3824,15 @@ function LaunchStudioPage() {
 
       {tab === "store" ? (
         <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+          {/* Ola, 2026-08-20: on mobile the two cards below stack in DOM
+              order, which buried the live Hero preview under the entire
+              (long) Store design form — "ten podgląd... powinien być na
+              samej górze widoczny a nie nie wiadomo gdzie". order:-1 pulls
+              store-hero-preview to the top of the stack on narrow screens
+              only; desktop's side-by-side layout is untouched. */}
+          <style>{`
+            @media (max-width: 900px) { .store-hero-preview { order: -1; } }
+          `}</style>
           <div style={{ ...styles.sectionCard, flex: 1, minWidth: 320 }}>
             <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 4 }}>Store design</h2>
             <p style={{ fontSize: 11, color: colors.muted, margin: 0 }}>Header, hero, and store — organised the same way top to bottom: what it says, then how it looks.</p>
@@ -4161,7 +4185,7 @@ function LaunchStudioPage() {
             </div>
           </div>
 
-          <div style={{ ...styles.sectionCard, width: 380, flexShrink: 0 }}>
+          <div className="store-hero-preview" style={{ ...styles.sectionCard, width: "100%", maxWidth: 380, flexShrink: 0 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <h2 style={{ ...styles.h1, fontSize: 16, margin: 0 }}>Hero layout</h2>
               <div style={{ display: "flex", gap: 4 }}>
@@ -4673,7 +4697,7 @@ function PreviewPublishPage() {
           </p>
         </div>
 
-        <div style={{ ...styles.sectionCard, width: 320, flexShrink: 0 }}>
+        <div style={{ ...styles.sectionCard, width: "100%", maxWidth: 320, flexShrink: 0 }}>
           <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 16 }}>Ready to publish</h2>
           {checklist.map((row) => (
             <div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}>
@@ -4938,7 +4962,7 @@ function OrderDetailPage({ orderId }: { orderId: string }) {
           </p>
         </div>
 
-        <div style={{ ...styles.sectionCard, width: 320, flexShrink: 0 }}>
+        <div style={{ ...styles.sectionCard, width: "100%", maxWidth: 320, flexShrink: 0 }}>
           <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 16 }}>Timeline</h2>
           {order.timeline.map((t, i) => (
             <div key={i} style={{ display: "flex", gap: 12, padding: "6px 0" }}>
@@ -5089,7 +5113,7 @@ function DashboardPage() {
           </div>
         </div>
 
-        <div style={{ ...styles.sectionCard, width: 320, flexShrink: 0 }}>
+        <div style={{ ...styles.sectionCard, width: "100%", maxWidth: 320, flexShrink: 0 }}>
           <h2 style={{ ...styles.h1, fontSize: 16, marginBottom: 16 }}>Action queue</h2>
           {actionQueue.length === 0 ? (
             <p style={{ fontSize: 13, color: colors.muted }}>All caught up.</p>
