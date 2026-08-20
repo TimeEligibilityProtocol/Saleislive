@@ -80,8 +80,6 @@ function useLiveDrag(editMode: boolean, containerRef: React.RefObject<HTMLElemen
     const drag = dragRef.current;
     const rect = containerRef.current?.getBoundingClientRect();
     if (!drag || !rect) return;
-    const dx = (e.clientX - drag.startX) / rect.width;
-    const dy = (e.clientY - drag.startY) / rect.height;
     if (drag.mode === "resize") {
       // Same diagonal corner-drag as the photo/logo — Ola, 2026-08-19,
       // pointed out the earlier edge-only dot only really let her shrink
@@ -91,8 +89,21 @@ function useLiveDrag(editMode: boolean, containerRef: React.RefObject<HTMLElemen
       // own corner-dot usage below), same "resize a text box" feel as
       // Figma/Canva, and the reliable way to force long copy onto one
       // line — box-width-only resize couldn't always guarantee that.
-      setPos({ ...drag.startPos, scale: clamp((drag.startPos.scale ?? 1) + (dx + dy) / 2, 0.15, 2.5) });
+      //
+      // Ola, 2026-08-20: "sprawdź jak jest na picart albo canvie palcem
+      // sobie ustawiasz jak chcesz, ta kropka nie daje pełnych możliwości"
+      // — root cause was normalizing the drag delta by the WHOLE hero
+      // container's width/height (rect.width/rect.height, often
+      // 1200px+), so a full-arm drag barely moved the dot: dragging half
+      // the banner's width only nudged scale by ~0.25. Fixed to use raw
+      // pointer-movement pixels (like the logo's own resize handle
+      // already does below), so the dot actually tracks the finger.
+      const dxPx = e.clientX - drag.startX;
+      const dyPx = e.clientY - drag.startY;
+      setPos({ ...drag.startPos, scale: clamp((drag.startPos.scale ?? 1) + (dxPx + dyPx) / 2 / 200, 0.15, 2.5) });
     } else {
+      const dx = (e.clientX - drag.startX) / rect.width;
+      const dy = (e.clientY - drag.startY) / rect.height;
       setPos({ x: clamp(drag.startPos.x + dx, 0.05, 0.95), y: clamp(drag.startPos.y + dy, 0.05, 0.95), scale: drag.startPos.scale });
     }
   };
