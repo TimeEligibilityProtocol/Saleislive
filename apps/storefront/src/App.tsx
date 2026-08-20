@@ -62,10 +62,10 @@ function useLiveDrag(editMode: boolean, containerRef: React.RefObject<HTMLElemen
   posRef.current = pos;
   const initialKey = `${initial.x}:${initial.y}:${initial.scale}`;
   useEffect(() => setPos(initial), [initialKey]); // eslint-disable-line react-hooks/exhaustive-deps
-  const dragRef = useRef<{ mode: "move" | "resize" | "resize-width"; startX: number; startY: number; startPos: DragPos } | null>(null);
+  const dragRef = useRef<{ mode: "move" | "resize" | "resize-font"; startX: number; startY: number; startPos: DragPos } | null>(null);
   const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
-  const beginDrag = (mode: "move" | "resize" | "resize-width") => (e: React.PointerEvent) => {
+  const beginDrag = (mode: "move" | "resize" | "resize-font") => (e: React.PointerEvent) => {
     if (!editMode) return;
     e.preventDefault();
     e.stopPropagation();
@@ -84,12 +84,15 @@ function useLiveDrag(editMode: boolean, containerRef: React.RefObject<HTMLElemen
     const dy = (e.clientY - drag.startY) / rect.height;
     if (drag.mode === "resize") {
       setPos({ ...drag.startPos, scale: clamp((drag.startPos.scale ?? 1) + (dx + dy) / 2, 0.15, 2.5) });
-    } else if (drag.mode === "resize-width") {
-      // Width-only (headline/description) — dragging widens or narrows the
-      // text box, which changes wrapping (e.g. one line vs two), not font
-      // size. Ola, 2026-08-19: "poszerzam... żeby napis był z jednej
-      // linijce a nie dwóch".
-      setPos({ ...drag.startPos, scale: clamp((drag.startPos.scale ?? 0.4) + dx * 2, 0.12, 0.95) });
+    } else if (drag.mode === "resize-font") {
+      // Headline/description font SIZE — dragging the dot makes the text
+      // itself bigger or smaller, same as resizing a text box in Figma/
+      // Canva. This is also the reliable way to force long copy onto one
+      // line, which box-width-only resize couldn't always guarantee. Ola,
+      // 2026-08-19, after width-only resize didn't do what she meant:
+      // "czy da się zmniejszyć, powiększyć czcionkę? ... po rozciągnięciu
+      // na szerokość nadal jest w dwóch [liniach]".
+      setPos({ ...drag.startPos, scale: clamp((drag.startPos.scale ?? 1) + dx * 3, 0.4, 2.5) });
     } else {
       setPos({ x: clamp(drag.startPos.x + dx, 0.05, 0.95), y: clamp(drag.startPos.y + dy, 0.05, 0.95), scale: drag.startPos.scale });
     }
@@ -579,11 +582,11 @@ function HomeView({
   });
   const saveTextPos = useDebouncedSave<DragPos>((pos) => {
     if (!campaign) return;
-    void apiClient.updateCampaign(campaign.id, { heroTextOffsetX: pos.x, heroTextOffsetY: pos.y, heroTextWidth: pos.scale }).then(onCampaignUpdate);
+    void apiClient.updateCampaign(campaign.id, { heroTextOffsetX: pos.x, heroTextOffsetY: pos.y, heroTextScale: pos.scale }).then(onCampaignUpdate);
   });
   const saveDescPos = useDebouncedSave<DragPos>((pos) => {
     if (!campaign) return;
-    void apiClient.updateCampaign(campaign.id, { heroDescriptionOffsetX: pos.x, heroDescriptionOffsetY: pos.y, heroDescriptionWidth: pos.scale }).then(onCampaignUpdate);
+    void apiClient.updateCampaign(campaign.id, { heroDescriptionOffsetX: pos.x, heroDescriptionOffsetY: pos.y, heroDescriptionScale: pos.scale }).then(onCampaignUpdate);
   });
   const saveCtaPos = useDebouncedSave<DragPos>((pos) => {
     if (!campaign) return;
@@ -645,8 +648,8 @@ function HomeView({
   // actually works — see isMobileViewport's comment); at mobile widths
   // they fall back to stacking under the one legacy anchor point below,
   // reconstructing the original combined-block look without new schema.
-  const textPos = { x: campaign?.heroTextOffsetX ?? 0.28, y: campaign?.heroTextOffsetY ?? 0.5, scale: campaign?.heroTextWidth ?? 0.4 };
-  const descPos = { x: campaign?.heroDescriptionOffsetX ?? 0.28, y: campaign?.heroDescriptionOffsetY ?? 0.66, scale: campaign?.heroDescriptionWidth ?? 0.4 };
+  const textPos = { x: campaign?.heroTextOffsetX ?? 0.28, y: campaign?.heroTextOffsetY ?? 0.5, scale: campaign?.heroTextScale ?? 1 };
+  const descPos = { x: campaign?.heroDescriptionOffsetX ?? 0.28, y: campaign?.heroDescriptionOffsetY ?? 0.66, scale: campaign?.heroDescriptionScale ?? 1 };
   const ctaPos = { x: campaign?.heroCtaOffsetX ?? 0.28, y: campaign?.heroCtaOffsetY ?? 0.78 };
   const textPosMobile = { x: campaign?.heroTextOffsetXMobile ?? 0.5, y: campaign?.heroTextOffsetYMobile ?? 0.72 };
   // A complete, pre-made hero design uploaded at the exact recommended
@@ -830,7 +833,7 @@ function HomeView({
                     position: "absolute",
                     left: `${liveTextPos.x * 100}%`,
                     top: `${liveTextPos.y * 100}%`,
-                    width: `${(liveTextPos.scale ?? textPos.scale) * 100}%`,
+                    maxWidth: "min(720px, 65%)",
                     transform: "translate(-50%, -50%)",
                     zIndex: 2,
                     padding: "0 16px",
@@ -839,7 +842,15 @@ function HomeView({
                 >
                   <h1
                     className="hero-title"
-                    style={{ ...styles.heroTitle, fontSize: titleSize.desktop, color: heroTextColor, margin: 0, ...(heroFont ? { fontFamily: heroFont } : {}), ...(elementsDraggable ? { pointerEvents: "none" } : {}) }}
+                    style={{
+                      ...styles.heroTitle,
+                      fontSize: titleSize.desktop * (liveTextPos.scale ?? textPos.scale),
+                      color: heroTextColor,
+                      margin: 0,
+                      maxWidth: "none",
+                      ...(heroFont ? { fontFamily: heroFont } : {}),
+                      ...(elementsDraggable ? { pointerEvents: "none" } : {}),
+                    }}
                   >
                     {campaign?.headline || (
                       <>
@@ -851,8 +862,8 @@ function HomeView({
                   </h1>
                   {elementsDraggable ? (
                     <span
-                      onPointerDown={textDrag.beginDrag("resize-width")}
-                      title="Drag to widen or narrow the headline"
+                      onPointerDown={textDrag.beginDrag("resize-font")}
+                      title="Drag to shrink or enlarge the headline text"
                       style={{ position: "absolute", right: -12, top: "50%", transform: "translateY(-50%)", width: 26, height: 26, borderRadius: 999, background: colors.navy, border: `3px solid ${colors.white}`, cursor: "ew-resize", touchAction: "none", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" }}
                     />
                   ) : null}
@@ -866,7 +877,7 @@ function HomeView({
                       position: "absolute",
                       left: `${liveDescPos.x * 100}%`,
                       top: `${liveDescPos.y * 100}%`,
-                      width: `${(liveDescPos.scale ?? descPos.scale) * 100}%`,
+                      maxWidth: "min(560px, 55%)",
                       transform: "translate(-50%, -50%)",
                       zIndex: 2,
                       padding: "0 16px",
@@ -874,12 +885,24 @@ function HomeView({
                     }}
                   >
                     {campaign?.shortDescription ? (
-                      <p style={{ ...styles.heroSub, color: heroTextColor, opacity: 0.85, margin: 0, ...(elementsDraggable ? { pointerEvents: "none" } : {}) }}>{campaign.shortDescription}</p>
+                      <p
+                        style={{
+                          ...styles.heroSub,
+                          fontSize: 18 * (liveDescPos.scale ?? descPos.scale),
+                          color: heroTextColor,
+                          opacity: 0.85,
+                          margin: 0,
+                          maxWidth: "none",
+                          ...(elementsDraggable ? { pointerEvents: "none" } : {}),
+                        }}
+                      >
+                        {campaign.shortDescription}
+                      </p>
                     ) : null}
                     {elementsDraggable ? (
                       <span
-                        onPointerDown={descDrag.beginDrag("resize-width")}
-                        title="Drag to widen or narrow the description"
+                        onPointerDown={descDrag.beginDrag("resize-font")}
+                        title="Drag to shrink or enlarge the description text"
                         style={{ position: "absolute", right: -12, top: "50%", transform: "translateY(-50%)", width: 26, height: 26, borderRadius: 999, background: colors.navy, border: `3px solid ${colors.white}`, cursor: "ew-resize", touchAction: "none", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" }}
                       />
                     ) : null}

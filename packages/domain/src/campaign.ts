@@ -172,17 +172,21 @@ export interface Campaign {
    * 2026-08-19, rejecting the earlier one-block-moves-together design:
    * "nie zależy mi na czymś co można przesunąć jako całość, ta funkcja
    * jest bez sensu" — each of the three needs to move (and the headline/
-   * description also resize in width, e.g. to force one line instead of
-   * two) on its own. Width is a fraction of the hero's own width, same
-   * 0-1 convention as offsets; dragging it changes wrapping, not font
-   * size (font size stays heroTitleSize's job).
+   * description also resize their own FONT SIZE) on its own. Scale is a
+   * multiplier on the base size (heroTitleSize's px for the headline, a
+   * fixed base for the description) — dragging the resize dot makes the
+   * text itself bigger/smaller, same as resizing a text box in Figma/
+   * Canva, which is also the most reliable way to force long copy onto
+   * one line. Ola, 2026-08-19, after box-width-only resize didn't do
+   * what she meant: "czy da się zmniejszyć, powiększyć czcionkę? ...
+   * po rozciągnięciu na szerokość nadal jest w dwóch [liniach]".
    */
   heroTextOffsetX: number | null;
   heroTextOffsetY: number | null;
-  heroTextWidth: number | null;
+  heroTextScale: number | null;
   heroDescriptionOffsetX: number | null;
   heroDescriptionOffsetY: number | null;
-  heroDescriptionWidth: number | null;
+  heroDescriptionScale: number | null;
   heroCtaOffsetX: number | null;
   heroCtaOffsetY: number | null;
   heroImageOffsetXMobile: number | null;

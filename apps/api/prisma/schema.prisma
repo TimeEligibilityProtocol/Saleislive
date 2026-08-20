@@ -355,15 +355,16 @@ model Campaign {
   heroImageOffsetY Float?
   heroImageScale   Float?
   /// Headline, description, and CTA each independently positioned (and
-  /// headline/description independently width-resizable) — three separate
-  /// elements, not one combined block. Ola, 2026-08-19: rejected the
-  /// original one-block design outright.
+  /// headline/description independently font-size-resizable) — three
+  /// separate elements, not one combined block. Ola, 2026-08-19: rejected
+  /// the original one-block design outright, then the box-width-only
+  /// resize too ("czy da się zmniejszyć, powiększyć czcionkę?").
   heroTextOffsetX  Float?
   heroTextOffsetY  Float?
-  heroTextWidth    Float?
+  heroTextScale    Float?
   heroDescriptionOffsetX Float?
   heroDescriptionOffsetY Float?
-  heroDescriptionWidth   Float?
+  heroDescriptionScale   Float?
   heroCtaOffsetX   Float?
   heroCtaOffsetY   Float?
   /// Same two layers, positioned independently for the mobile canvas

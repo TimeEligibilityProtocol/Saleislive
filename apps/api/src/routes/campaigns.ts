@@ -64,10 +64,10 @@ export function campaignsRouter(): Router {
         heroImageScale: number | null;
         heroTextOffsetX: number | null;
         heroTextOffsetY: number | null;
-        heroTextWidth: number | null;
+        heroTextScale: number | null;
         heroDescriptionOffsetX: number | null;
         heroDescriptionOffsetY: number | null;
-        heroDescriptionWidth: number | null;
+        heroDescriptionScale: number | null;
         heroCtaOffsetX: number | null;
         heroCtaOffsetY: number | null;
         heroImageOffsetXMobile: number | null;
