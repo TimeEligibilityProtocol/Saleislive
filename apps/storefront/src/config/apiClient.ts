@@ -33,14 +33,12 @@ function resolveBrandSlugOverride(): string | null {
 
 /**
  * Where the admin app lives — used for the storefront footer's "Store
- * owner? Edit this store" link. Ola, 2026-08-19: looking straight at the
- * live storefront with no idea where to go to change anything ("gdzie
- * niby ja mogę coś zmienić?") — this is a plain, always-visible link
- * (no auth detection needed; it just opens admin's own login) rather than
- * conditionally showing it only to an already-authenticated owner, which
- * the storefront has no reliable way to detect on a normal page load
- * (see PREVIEW_TOKEN_KEY below — that's only ever set via a one-time
- * admin-generated preview link, not a persistent cross-app session).
+ * owner? Edit this store" link (the entry point for someone who has never
+ * signed in on this device yet). Ola, 2026-08-19: "jedno logowanie na
+ * admin i z tego wszystko ma się dziać — nie ma żadnych dodatkowych
+ * stron" — there is exactly one login (admin's), never a second one on
+ * the storefront itself; this link's only job is to route back to that
+ * one login.
  */
 export function resolveAdminBaseUrl(): string {
   const override = import.meta.env.VITE_ADMIN_BASE_URL;
@@ -54,25 +52,29 @@ export function resolveAdminBaseUrl(): string {
 const PREVIEW_TOKEN_KEY = "saleislive:previewToken";
 
 /**
- * The admin app's "Preview your store" link carries the owner's own
- * session token in the URL *fragment* (see resolveStorefrontPreviewUrl's
- * doc comment) — never in a query param, so it never reaches server
- * access logs. Read it once on load, stash it for the rest of this tab's
- * session, then scrub it from the visible URL so it doesn't linger in
- * browser history or get shared if the link is copied.
+ * Admin's "Open your store" link carries the owner's own already-
+ * authenticated session token in the URL *fragment* (see
+ * resolveStorefrontPreviewUrl's doc comment) — never in a query param, so
+ * it never reaches server access logs. Stored in localStorage, not
+ * sessionStorage — Ola, 2026-08-19: she shouldn't have to click that link
+ * every single visit ("dlaczego mam tak dziwnie robić"). One click from
+ * admin, once per device/browser, and edit access then stays available on
+ * direct visits to the real store URL from then on — same "log in once"
+ * shape as any normal login, just bridged over from the one place the
+ * actual login happens (admin), never a second login system here.
  */
 function capturePreviewToken(): void {
   if (typeof window === "undefined") return;
   const match = /(?:^|#)preview_token=([^&]+)/.exec(window.location.hash);
   if (!match) return;
-  window.sessionStorage.setItem(PREVIEW_TOKEN_KEY, decodeURIComponent(match[1]));
+  window.localStorage.setItem(PREVIEW_TOKEN_KEY, decodeURIComponent(match[1]));
   window.history.replaceState(null, "", window.location.pathname + window.location.search);
 }
 capturePreviewToken();
 
 const UNLOCK_TOKEN_KEY = "saleislive:unlockToken";
 
-/** Set once a visitor types the right password for a "password"-access sale (see unlockStorefrontAccess) — kept for the rest of this tab's session, same lifetime as the preview token. A stale token from a since-changed sale just fails server-side re-verification and re-locks, no special handling needed here. */
+/** Set once a visitor types the right password for a "password"-access sale (see unlockStorefrontAccess) — kept for the rest of this tab's session only (unlike the preview/edit token above, this deliberately does NOT persist: a password-gated sale should re-lock each new visit, not stay open forever). A stale token from a since-changed sale just fails server-side re-verification and re-locks, no special handling needed here. */
 export function storeStorefrontUnlockToken(token: string): void {
   window.sessionStorage.setItem(UNLOCK_TOKEN_KEY, token);
 }
@@ -84,5 +86,5 @@ export const apiClient = new ApiClient({
   // owner previewing their own password-protected sale shouldn't also
   // need to know its password.
   // eslint-disable-next-line @typescript-eslint/require-await
-  getAuthToken: async () => window.sessionStorage.getItem(PREVIEW_TOKEN_KEY) ?? window.sessionStorage.getItem(UNLOCK_TOKEN_KEY),
+  getAuthToken: async () => window.localStorage.getItem(PREVIEW_TOKEN_KEY) ?? window.sessionStorage.getItem(UNLOCK_TOKEN_KEY),
 });

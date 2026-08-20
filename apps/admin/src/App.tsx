@@ -4653,7 +4653,10 @@ function PreviewPublishPage() {
             Open your store →
           </a>
           <p style={{ fontSize: 12, color: colors.muted, marginTop: 12 }}>
-            Adapts automatically to phone screens — open the same link on your phone, or resize this browser window, to check the mobile layout.
+            Adapts automatically to phone screens — open the same link on your phone to check (and edit) the mobile layout.
+          </p>
+          <p style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>
+            One click is enough — this device stays signed in to your store after that, so you can just go back to it directly next time.
           </p>
           <p style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>
             {selectedProducts.length} product{selectedProducts.length === 1 ? "" : "s"} in this sale.
