@@ -56,6 +56,12 @@ function toDomainCampaign(row: PrismaCampaign): Campaign {
     heroImageScaleMobile: row.heroImageScaleMobile,
     heroTextOffsetXMobile: row.heroTextOffsetXMobile,
     heroTextOffsetYMobile: row.heroTextOffsetYMobile,
+    heroTextScaleMobile: row.heroTextScaleMobile,
+    heroDescriptionOffsetXMobile: row.heroDescriptionOffsetXMobile,
+    heroDescriptionOffsetYMobile: row.heroDescriptionOffsetYMobile,
+    heroDescriptionScaleMobile: row.heroDescriptionScaleMobile,
+    heroCtaOffsetXMobile: row.heroCtaOffsetXMobile,
+    heroCtaOffsetYMobile: row.heroCtaOffsetYMobile,
     hasAccessPassword: !!row.accessPasswordHash,
     createdAt: row.createdAt.toISOString(),
   };

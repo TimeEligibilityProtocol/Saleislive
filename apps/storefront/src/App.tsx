@@ -62,10 +62,10 @@ function useLiveDrag(editMode: boolean, containerRef: React.RefObject<HTMLElemen
   posRef.current = pos;
   const initialKey = `${initial.x}:${initial.y}:${initial.scale}`;
   useEffect(() => setPos(initial), [initialKey]); // eslint-disable-line react-hooks/exhaustive-deps
-  const dragRef = useRef<{ mode: "move" | "resize" | "resize-font"; startX: number; startY: number; startPos: DragPos } | null>(null);
+  const dragRef = useRef<{ mode: "move" | "resize"; startX: number; startY: number; startPos: DragPos } | null>(null);
   const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
-  const beginDrag = (mode: "move" | "resize" | "resize-font") => (e: React.PointerEvent) => {
+  const beginDrag = (mode: "move" | "resize") => (e: React.PointerEvent) => {
     if (!editMode) return;
     e.preventDefault();
     e.stopPropagation();
@@ -83,16 +83,15 @@ function useLiveDrag(editMode: boolean, containerRef: React.RefObject<HTMLElemen
     const dx = (e.clientX - drag.startX) / rect.width;
     const dy = (e.clientY - drag.startY) / rect.height;
     if (drag.mode === "resize") {
+      // Same diagonal corner-drag as the photo/logo — Ola, 2026-08-19,
+      // pointed out the earlier edge-only dot only really let her shrink
+      // to one line, not grow: "nie ma tu możliwości żeby pociągnięcia za
+      // róg żeby powiększyć lub zmniejszyć czcionkę". For the headline/
+      // description this scale multiplies the actual font size (see their
+      // own corner-dot usage below), same "resize a text box" feel as
+      // Figma/Canva, and the reliable way to force long copy onto one
+      // line — box-width-only resize couldn't always guarantee that.
       setPos({ ...drag.startPos, scale: clamp((drag.startPos.scale ?? 1) + (dx + dy) / 2, 0.15, 2.5) });
-    } else if (drag.mode === "resize-font") {
-      // Headline/description font SIZE — dragging the dot makes the text
-      // itself bigger or smaller, same as resizing a text box in Figma/
-      // Canva. This is also the reliable way to force long copy onto one
-      // line, which box-width-only resize couldn't always guarantee. Ola,
-      // 2026-08-19, after width-only resize didn't do what she meant:
-      // "czy da się zmniejszyć, powiększyć czcionkę? ... po rozciągnięciu
-      // na szerokość nadal jest w dwóch [liniach]".
-      setPos({ ...drag.startPos, scale: clamp((drag.startPos.scale ?? 1) + dx * 3, 0.4, 2.5) });
     } else {
       setPos({ x: clamp(drag.startPos.x + dx, 0.05, 0.95), y: clamp(drag.startPos.y + dy, 0.05, 0.95), scale: drag.startPos.scale });
     }
@@ -149,9 +148,31 @@ function useLogoResize(editMode: boolean, initialScale: number, onCommit: (scale
   return { scale, beginDrag, onPointerMove, onPointerUp };
 }
 
-/** Desktop vs mobile field set to write drag changes to — matches the .hero-photo-layer/.hero-text-layer media query breakpoint below, so whichever layout you're actually looking at while dragging is the one that gets saved. */
+/** Non-reactive check — safe to call inside a debounced save callback (not a hook), to decide which field set a drag commit should write to. */
 function isMobileViewport(): boolean {
   return typeof window !== "undefined" && window.innerWidth <= 700;
+}
+
+/**
+ * Reactive version of the same breakpoint, for RENDER decisions — Ola,
+ * 2026-08-19: live editing (drag + font-size resize) needs to actually
+ * work at mobile widths too, not just fall back to a static stacked
+ * layout. The old approach picked mobile values via a CSS `!important`
+ * media-query override, which a live inline-style drag can never win
+ * against; computing "am I on mobile" in JS instead means the inline
+ * style IS the mobile value directly, no CSS fight, no separate limited
+ * code path.
+ */
+function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState(isMobileViewport);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 700px)");
+    const handler = () => setIsMobile(mq.matches);
+    handler();
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return isMobile;
 }
 
 // Flat demo delivery fee — not a real courier rate lookup (no adapter is
@@ -569,28 +590,36 @@ function HomeView({
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const visible = activeCategory ? products.filter((p) => p.category.value === activeCategory) : products;
   const heroFrameRef = useRef<HTMLDivElement>(null);
-  // Mobile has its own drag-positioned fields (heroImageOffsetXMobile etc.),
-  // but the CSS below applies them with !important, which an inline style
-  // set from a live drag can't override — so on-page dragging is
-  // desktop-width only for now; mobile fine-tuning stays in admin's Hero
-  // layout composer (its Desktop/Mobile toggle isn't bound to your actual
-  // viewport, so it doesn't hit this problem).
-  const heroDragEnabled = editMode && !isMobileViewport();
+  // Reactive, not a one-time check — Ola, 2026-08-19: live editing needs to
+  // actually work at mobile widths too, not just fall back to a static
+  // stacked layout (see useIsMobile's own comment).
+  const isMobile = useIsMobile();
+  const heroDragEnabled = editMode;
   const saveImagePos = useDebouncedSave<DragPos>((pos) => {
     if (!campaign) return;
-    void apiClient.updateCampaign(campaign.id, { heroImageOffsetX: pos.x, heroImageOffsetY: pos.y, heroImageScale: pos.scale }).then(onCampaignUpdate);
+    const patch = isMobileViewport()
+      ? { heroImageOffsetXMobile: pos.x, heroImageOffsetYMobile: pos.y, heroImageScaleMobile: pos.scale }
+      : { heroImageOffsetX: pos.x, heroImageOffsetY: pos.y, heroImageScale: pos.scale };
+    void apiClient.updateCampaign(campaign.id, patch).then(onCampaignUpdate);
   });
   const saveTextPos = useDebouncedSave<DragPos>((pos) => {
     if (!campaign) return;
-    void apiClient.updateCampaign(campaign.id, { heroTextOffsetX: pos.x, heroTextOffsetY: pos.y, heroTextScale: pos.scale }).then(onCampaignUpdate);
+    const patch = isMobileViewport()
+      ? { heroTextOffsetXMobile: pos.x, heroTextOffsetYMobile: pos.y, heroTextScaleMobile: pos.scale }
+      : { heroTextOffsetX: pos.x, heroTextOffsetY: pos.y, heroTextScale: pos.scale };
+    void apiClient.updateCampaign(campaign.id, patch).then(onCampaignUpdate);
   });
   const saveDescPos = useDebouncedSave<DragPos>((pos) => {
     if (!campaign) return;
-    void apiClient.updateCampaign(campaign.id, { heroDescriptionOffsetX: pos.x, heroDescriptionOffsetY: pos.y, heroDescriptionScale: pos.scale }).then(onCampaignUpdate);
+    const patch = isMobileViewport()
+      ? { heroDescriptionOffsetXMobile: pos.x, heroDescriptionOffsetYMobile: pos.y, heroDescriptionScaleMobile: pos.scale }
+      : { heroDescriptionOffsetX: pos.x, heroDescriptionOffsetY: pos.y, heroDescriptionScale: pos.scale };
+    void apiClient.updateCampaign(campaign.id, patch).then(onCampaignUpdate);
   });
   const saveCtaPos = useDebouncedSave<DragPos>((pos) => {
     if (!campaign) return;
-    void apiClient.updateCampaign(campaign.id, { heroCtaOffsetX: pos.x, heroCtaOffsetY: pos.y }).then(onCampaignUpdate);
+    const patch = isMobileViewport() ? { heroCtaOffsetXMobile: pos.x, heroCtaOffsetYMobile: pos.y } : { heroCtaOffsetX: pos.x, heroCtaOffsetY: pos.y };
+    void apiClient.updateCampaign(campaign.id, patch).then(onCampaignUpdate);
   });
 
   // A merchant who never touched Launch Studio's Store tab gets the
@@ -634,24 +663,28 @@ function HomeView({
       : {}),
   };
   // Drag-positioned layers (Ola, 2026-08-19) — same fraction-of-canvas
-  // convention as the admin's HeroComposer and product photo compositing,
-  // so what she drags there is exactly what renders here. Desktop values
-  // are the base inline style; the <style> block below overrides them for
-  // mobile, same mechanism already used for hero-title's font-size.
-  const imgPos = { x: campaign?.heroImageOffsetX ?? 0.7, y: campaign?.heroImageOffsetY ?? 0.5, scale: campaign?.heroImageScale ?? 0.9 };
-  const imgPosMobile = { x: campaign?.heroImageOffsetXMobile ?? 0.5, y: campaign?.heroImageOffsetYMobile ?? 0.32, scale: campaign?.heroImageScaleMobile ?? 0.85 };
+  // convention as the admin's HeroComposer and product photo compositing.
+  // Desktop and mobile each have their own independent fields; `isMobile`
+  // (reactive) picks which set actually renders, so there's no CSS
+  // override fighting a live inline-style drag — see useIsMobile's comment.
+  const imgPos = isMobile
+    ? { x: campaign?.heroImageOffsetXMobile ?? 0.5, y: campaign?.heroImageOffsetYMobile ?? 0.32, scale: campaign?.heroImageScaleMobile ?? 0.85 }
+    : { x: campaign?.heroImageOffsetX ?? 0.7, y: campaign?.heroImageOffsetY ?? 0.5, scale: campaign?.heroImageScale ?? 0.9 };
   // Headline, description, and CTA each move (and headline/description
-  // resize in width) completely independently — Ola, 2026-08-19, rejecting
-  // the earlier single-block design outright: "nie zależy mi na czymś co
-  // można przesunąć jako całość". Mobile doesn't have its own fields for
-  // these yet (kept in scope to desktop, where live on-page dragging
-  // actually works — see isMobileViewport's comment); at mobile widths
-  // they fall back to stacking under the one legacy anchor point below,
-  // reconstructing the original combined-block look without new schema.
-  const textPos = { x: campaign?.heroTextOffsetX ?? 0.28, y: campaign?.heroTextOffsetY ?? 0.5, scale: campaign?.heroTextScale ?? 1 };
-  const descPos = { x: campaign?.heroDescriptionOffsetX ?? 0.28, y: campaign?.heroDescriptionOffsetY ?? 0.66, scale: campaign?.heroDescriptionScale ?? 1 };
-  const ctaPos = { x: campaign?.heroCtaOffsetX ?? 0.28, y: campaign?.heroCtaOffsetY ?? 0.78 };
-  const textPosMobile = { x: campaign?.heroTextOffsetXMobile ?? 0.5, y: campaign?.heroTextOffsetYMobile ?? 0.72 };
+  // resize their own font size) completely independently — Ola,
+  // 2026-08-19, rejecting the earlier single-block design outright: "nie
+  // zależy mi na czymś co można przesunąć jako całość" — then asking for
+  // the exact same independence on mobile too: "chcę żebyś zbudowała
+  // wersję na mobile".
+  const textPos = isMobile
+    ? { x: campaign?.heroTextOffsetXMobile ?? 0.5, y: campaign?.heroTextOffsetYMobile ?? 0.4, scale: campaign?.heroTextScaleMobile ?? 0.5 }
+    : { x: campaign?.heroTextOffsetX ?? 0.28, y: campaign?.heroTextOffsetY ?? 0.5, scale: campaign?.heroTextScale ?? 1 };
+  const descPos = isMobile
+    ? { x: campaign?.heroDescriptionOffsetXMobile ?? 0.5, y: campaign?.heroDescriptionOffsetYMobile ?? 0.58, scale: campaign?.heroDescriptionScaleMobile ?? 0.85 }
+    : { x: campaign?.heroDescriptionOffsetX ?? 0.28, y: campaign?.heroDescriptionOffsetY ?? 0.66, scale: campaign?.heroDescriptionScale ?? 1 };
+  const ctaPos = isMobile
+    ? { x: campaign?.heroCtaOffsetXMobile ?? 0.5, y: campaign?.heroCtaOffsetYMobile ?? 0.72 }
+    : { x: campaign?.heroCtaOffsetX ?? 0.28, y: campaign?.heroCtaOffsetY ?? 0.78 };
   // A complete, pre-made hero design uploaded at the exact recommended
   // size — rendered full-bleed behind the headline instead of positioned
   // in the free space beside it. Not draggable (Ola, 2026-08-19: "jak
@@ -683,18 +716,7 @@ function HomeView({
            desktop crop, or the diagonal silk sweep drapes straight across the
            headline instead of framing it. */
         @media (max-width: 700px) { .hero-image { object-position: 35% center !important; } }
-        @media (max-width: 700px) { .hero-title { font-size: ${titleSize.mobile}px !important; } }
         @media (max-width: 700px) { .hero-copy { padding: 0 6.5% !important; } }
-        @media (max-width: 700px) {
-          .hero-photo-layer { left: ${imgPosMobile.x * 100}% !important; top: ${imgPosMobile.y * 100}% !important; width: ${imgPosMobile.scale * 100}% !important; height: ${imgPosMobile.scale * 100}% !important; }
-          /* Headline/description/CTA don't have their own mobile fields yet
-             (desktop-only for now — see their own comment) — stack them
-             under the one legacy mobile anchor point instead, reconstructing
-             the original combined-block look. */
-          .hero-headline-layer { left: ${textPosMobile.x * 100}% !important; top: ${textPosMobile.y * 100}% !important; width: 68% !important; }
-          .hero-description-layer { left: ${textPosMobile.x * 100}% !important; top: calc(${textPosMobile.y * 100}% + 13%) !important; width: 68% !important; }
-          .hero-cta-layer { left: ${textPosMobile.x * 100}% !important; top: calc(${textPosMobile.y * 100}% + 24%) !important; }
-        }
       `}</style>
       <section
         style={{
@@ -718,7 +740,7 @@ function HomeView({
             <img src="/images/hero-clean.png" alt="Products staged for a branded sale" className="hero-image" style={styles.heroImage} />
             <div className="hero-copy" style={{ ...styles.heroCopy, zIndex: 2 }}>
               <div style={{ maxWidth: 480 }}>
-                <h1 className="hero-title" style={{ ...styles.heroTitle, fontSize: titleSize.desktop }}>
+                <h1 className="hero-title" style={{ ...styles.heroTitle, fontSize: isMobile ? titleSize.mobile : titleSize.desktop }}>
                   Stock in.
                   <br />
                   Sale live.
@@ -802,7 +824,7 @@ function HomeView({
               // against, since the photo behind them isn't positioned
               // either (Ola, 2026-08-19).
               <div className="hero-copy" style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", zIndex: 2, maxWidth: "70%", padding: "0 16px", textAlign: "center" }}>
-                <h1 className="hero-title" style={{ ...styles.heroTitle, fontSize: titleSize.desktop, color: heroTextColor, ...(heroFont ? { fontFamily: heroFont } : {}) }}>
+                <h1 className="hero-title" style={{ ...styles.heroTitle, fontSize: isMobile ? titleSize.mobile : titleSize.desktop, color: heroTextColor, ...(heroFont ? { fontFamily: heroFont } : {}) }}>
                   {campaign?.headline || (
                     <>
                       Stock in.
@@ -844,7 +866,7 @@ function HomeView({
                     className="hero-title"
                     style={{
                       ...styles.heroTitle,
-                      fontSize: titleSize.desktop * (liveTextPos.scale ?? textPos.scale),
+                      fontSize: (isMobile ? titleSize.mobile : titleSize.desktop) * (liveTextPos.scale ?? textPos.scale),
                       color: heroTextColor,
                       margin: 0,
                       maxWidth: "none",
@@ -862,9 +884,9 @@ function HomeView({
                   </h1>
                   {elementsDraggable ? (
                     <span
-                      onPointerDown={textDrag.beginDrag("resize-font")}
+                      onPointerDown={textDrag.beginDrag("resize")}
                       title="Drag to shrink or enlarge the headline text"
-                      style={{ position: "absolute", right: -12, top: "50%", transform: "translateY(-50%)", width: 26, height: 26, borderRadius: 999, background: colors.navy, border: `3px solid ${colors.white}`, cursor: "ew-resize", touchAction: "none", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" }}
+                      style={{ position: "absolute", right: -12, bottom: -12, width: 26, height: 26, borderRadius: 999, background: colors.navy, border: `3px solid ${colors.white}`, cursor: "nwse-resize", touchAction: "none", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" }}
                     />
                   ) : null}
                 </div>
@@ -901,9 +923,9 @@ function HomeView({
                     ) : null}
                     {elementsDraggable ? (
                       <span
-                        onPointerDown={descDrag.beginDrag("resize-font")}
+                        onPointerDown={descDrag.beginDrag("resize")}
                         title="Drag to shrink or enlarge the description text"
-                        style={{ position: "absolute", right: -12, top: "50%", transform: "translateY(-50%)", width: 26, height: 26, borderRadius: 999, background: colors.navy, border: `3px solid ${colors.white}`, cursor: "ew-resize", touchAction: "none", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" }}
+                        style={{ position: "absolute", right: -12, bottom: -12, width: 26, height: 26, borderRadius: 999, background: colors.navy, border: `3px solid ${colors.white}`, cursor: "nwse-resize", touchAction: "none", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" }}
                       />
                     ) : null}
                   </div>

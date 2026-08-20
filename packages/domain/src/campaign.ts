@@ -192,9 +192,22 @@ export interface Campaign {
   heroImageOffsetXMobile: number | null;
   heroImageOffsetYMobile: number | null;
   heroImageScaleMobile: number | null;
-  /** Mobile still positions the headline/description/CTA as a single combined block (today's original design) — the three-independent-elements model above is desktop-only for now, since mobile live-editing on the storefront doesn't work yet either (see the storefront's own isMobileViewport comment). */
+  /**
+   * Full mobile parity — headline, description, and CTA each independently
+   * positioned (and headline/description font-size-resizable) on mobile
+   * too, same as desktop. Ola, 2026-08-19: "chcę żebyś zbudowała wersję
+   * na mobile" after finding the admin's old single-anchor mobile preview
+   * inadequate. Live-edited directly on the storefront at a narrow
+   * viewport, same "Edit mode" as desktop — see useIsMobile's comment.
+   */
   heroTextOffsetXMobile: number | null;
   heroTextOffsetYMobile: number | null;
+  heroTextScaleMobile: number | null;
+  heroDescriptionOffsetXMobile: number | null;
+  heroDescriptionOffsetYMobile: number | null;
+  heroDescriptionScaleMobile: number | null;
+  heroCtaOffsetXMobile: number | null;
+  heroCtaOffsetYMobile: number | null;
   /** Whether a password is currently set for `access: "password"` — never the password/hash itself, just enough for the admin UI to show "Password set" vs "No password yet" without round-tripping anything secret. */
   hasAccessPassword: boolean;
   createdAt: string;

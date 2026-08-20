@@ -375,8 +375,16 @@ model Campaign {
   heroImageOffsetXMobile Float?
   heroImageOffsetYMobile Float?
   heroImageScaleMobile   Float?
+  /// Full mobile parity for the independent headline/description/CTA
+  /// model above — Ola, 2026-08-19: "chcę żebyś zbudowała wersję na mobile".
   heroTextOffsetXMobile  Float?
   heroTextOffsetYMobile  Float?
+  heroTextScaleMobile    Float?
+  heroDescriptionOffsetXMobile Float?
+  heroDescriptionOffsetYMobile Float?
+  heroDescriptionScaleMobile   Float?
+  heroCtaOffsetXMobile   Float?
+  heroCtaOffsetYMobile   Float?
   /// Only set when access = password. Never exposed to any client — see
   /// store/campaigns.ts's toDomainCampaign, which deliberately omits it,
   /// same pattern as Credential.passwordHash vs. the User domain type.

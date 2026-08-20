@@ -75,6 +75,12 @@ export function campaignsRouter(): Router {
         heroImageScaleMobile: number | null;
         heroTextOffsetXMobile: number | null;
         heroTextOffsetYMobile: number | null;
+        heroTextScaleMobile: number | null;
+        heroDescriptionOffsetXMobile: number | null;
+        heroDescriptionOffsetYMobile: number | null;
+        heroDescriptionScaleMobile: number | null;
+        heroCtaOffsetXMobile: number | null;
+        heroCtaOffsetYMobile: number | null;
         /// Plaintext, write-only — never round-tripped back on reads (see
         /// store/campaigns.ts's toDomainCampaign, which never selects the
         /// hash). Handled separately from the rest of the patch below since
