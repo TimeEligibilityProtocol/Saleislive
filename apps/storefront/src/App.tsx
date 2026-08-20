@@ -741,14 +741,20 @@ function HomeView({
             onPointerMove={(e) => {
               imgDrag.onPointerMove(e);
               textDrag.onPointerMove(e);
+              descDrag.onPointerMove(e);
+              ctaDrag.onPointerMove(e);
             }}
             onPointerUp={() => {
               imgDrag.onPointerUp();
               textDrag.onPointerUp();
+              descDrag.onPointerUp();
+              ctaDrag.onPointerUp();
             }}
             onPointerLeave={() => {
               imgDrag.onPointerUp();
               textDrag.onPointerUp();
+              descDrag.onPointerUp();
+              ctaDrag.onPointerUp();
             }}
           >
             {customHeroUrl ? (
@@ -847,7 +853,7 @@ function HomeView({
                     <span
                       onPointerDown={textDrag.beginDrag("resize-width")}
                       title="Drag to widen or narrow the headline"
-                      style={{ position: "absolute", right: -8, top: "50%", transform: "translateY(-50%)", width: 18, height: 18, borderRadius: 999, background: colors.navy, border: `2px solid ${colors.white}`, cursor: "ew-resize", touchAction: "none" }}
+                      style={{ position: "absolute", right: -12, top: "50%", transform: "translateY(-50%)", width: 26, height: 26, borderRadius: 999, background: colors.navy, border: `3px solid ${colors.white}`, cursor: "ew-resize", touchAction: "none", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" }}
                     />
                   ) : null}
                 </div>
@@ -874,7 +880,7 @@ function HomeView({
                       <span
                         onPointerDown={descDrag.beginDrag("resize-width")}
                         title="Drag to widen or narrow the description"
-                        style={{ position: "absolute", right: -8, top: "50%", transform: "translateY(-50%)", width: 18, height: 18, borderRadius: 999, background: colors.navy, border: `2px solid ${colors.white}`, cursor: "ew-resize", touchAction: "none" }}
+                        style={{ position: "absolute", right: -12, top: "50%", transform: "translateY(-50%)", width: 26, height: 26, borderRadius: 999, background: colors.navy, border: `3px solid ${colors.white}`, cursor: "ew-resize", touchAction: "none", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" }}
                       />
                     ) : null}
                   </div>
