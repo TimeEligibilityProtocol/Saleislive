@@ -823,22 +823,32 @@ function AdminShell({ active, children }: { active: (typeof NAV_ITEMS)[number]["
         @media (max-width: 700px) {
           /* !important required: these overlap React's inline style={styles.sidebar}
              (width/minHeight/flexDirection/padding), which otherwise wins over a
-             stylesheet media query regardless of specificity. */
+             stylesheet media query regardless of specificity.
+             Ola, 2026-08-20: with 9 tabs squeezed into one row via
+             justify-content:space-around + flex:1 each, every label got
+             ~40px and wrapped into unreadable stacked text ("nawet menu nie
+             można przeczytać"). Fixed to a single-line, horizontally
+             scrollable strip instead — each tab keeps its natural width
+             (flex: 0 0 auto), and if they don't all fit, the row scrolls
+             sideways rather than squeezing/wrapping. */
           .admin-sidebar {
             width: auto !important; position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
-            display: flex; flex-direction: row !important; justify-content: space-around;
+            display: flex; flex-direction: row !important; justify-content: flex-start;
+            overflow-x: auto; -webkit-overflow-scrolling: touch;
             padding: 6px 4px calc(6px + env(safe-area-inset-bottom)) !important;
             min-height: 0 !important; border-right: none; border-top: 1px solid ${colors.line};
+            background: ${colors.paper};
           }
-          .admin-sidebar > a, .admin-sidebar > span { flex: 1; }
+          .admin-sidebar > a, .admin-sidebar > span { flex: 0 0 auto; }
         }
 
         .admin-nav-item { flex-direction: row; }
         @media (max-width: 700px) {
           /* Same inline-style override issue as above (styles.navItem sets justifyContent/padding). */
           .admin-nav-item {
-            flex-direction: column !important; align-items: center; justify-content: center !important;
-            gap: 2px; padding: 6px 2px !important; font-size: 10px; text-align: center; border-radius: 10px;
+            flex-direction: row !important; align-items: center; justify-content: center !important;
+            gap: 4px; padding: 8px 12px !important; font-size: 13px; white-space: nowrap;
+            text-align: center; border-radius: 10px;
           }
         }
 
@@ -3741,12 +3751,12 @@ function LaunchStudioPage() {
             </div>
           ) : null}
 
-          <div style={{ display: "flex", gap: 16, marginTop: 16 }}>
-            <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", gap: 16, marginTop: 16, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 160 }}>
               <label style={styles.label}>Starts</label>
               <input type="datetime-local" style={styles.input} value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
             </div>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, minWidth: 160 }}>
               <label style={styles.label}>Ends (optional)</label>
               <input type="datetime-local" style={styles.input} value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
             </div>
@@ -5175,7 +5185,12 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: "inherit",
     background: colors.white,
   },
-  fieldGrid: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 24 },
+  // auto-fit + minmax(0,...) instead of a flat "1fr 1fr 1fr": with plain 1fr,
+  // a column can't shrink below its content's natural width, so on a phone
+  // three fields side by side just push each other off-screen instead of
+  // stacking. This collapses to 1 column on narrow screens and back up to 3
+  // on desktop, with no separate mobile media query needed.
+  fieldGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 24 },
   slugRow: { display: "flex", alignItems: "center", border: `1px solid ${colors.border}`, borderRadius: 8, overflow: "hidden", background: colors.white },
   slugInput: { flex: 1, border: "none", padding: "10px 12px", fontSize: 14, fontFamily: "inherit", outline: "none" },
   slugSuffix: { padding: "10px 12px", fontSize: 14, color: colors.muted, background: colors.background },
@@ -5205,7 +5220,9 @@ const styles: Record<string, React.CSSProperties> = {
   reassuranceBody: { fontSize: 13, color: colors.muted, lineHeight: 1.6, margin: 0 },
 
   // Screen 02's 2x3 source-method tiles
-  tileGrid: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 32 },
+  // Same auto-fit/minmax fix as fieldGrid above — this is the dashboard's
+  // 4-stat-card row that was overflowing off the right edge on phones.
+  tileGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 16, marginBottom: 32 },
   tile: {
     textAlign: "left",
     background: colors.white,

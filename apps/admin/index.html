@@ -14,6 +14,18 @@
     <meta name="apple-mobile-web-app-title" content="saleis.live" />
 
     <style>
+      /* Global reset — without this, every fixed/min pixel width in the app
+         (e.g. a 320px-min-width card with 28px padding) renders at its
+         width PLUS its own padding/border, silently overflowing narrow
+         viewports. Added 2026-08-20 after Ola found the whole admin app
+         "rozjeżdża się" on mobile — most of that traced back to this
+         missing reset, not individual per-page bugs. overflow-x:hidden is
+         a safety net on top: even a spot we miss can't force the whole
+         page to scroll sideways. */
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body { max-width: 100%; overflow-x: hidden; }
+      body { margin: 0; }
+
       /* Brand kit fonts, self-hosted from SALEIS.LIVE/assets/fonts & logotype — not a Google Fonts
          name-only reference, which silently falls back to a system font when unavailable. */
       @font-face {
