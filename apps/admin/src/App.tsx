@@ -2121,6 +2121,7 @@ function HeroComposer({
   text,
   onImageChange,
   onTextChange,
+  fullBleed,
 }: {
   aspectRatio: string;
   backgroundColor: string;
@@ -2138,6 +2139,8 @@ function HeroComposer({
   text: HeroLayerPos;
   onImageChange: (next: HeroLayerPos & { scale: number }) => void;
   onTextChange: (next: HeroLayerPos) => void;
+  /** A complete pre-made hero design — image fills the frame, text is centred and not draggable. Mirrors the storefront's isFullBleedHero branch. */
+  fullBleed?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ layer: "image" | "text"; mode: "move" | "resize"; startX: number; startY: number; startOffsetX: number; startOffsetY: number; startScale: number } | null>(null);
@@ -2208,41 +2211,46 @@ function HeroComposer({
       style={{ position: "relative", width: "100%", aspectRatio, borderRadius: 10, border: `1px solid ${colors.border}`, overflow: "hidden", background: backgroundColor }}
     >
       {imageUrl ? (
-        <div
-          onPointerDown={beginDrag("image", "move")}
-          title="Drag to move the photo"
-          style={{
-            position: "absolute",
-            left: `${image.offsetX * 100}%`,
-            top: `${image.offsetY * 100}%`,
-            width: `${image.scale * 100}%`,
-            height: `${image.scale * 100}%`,
-            transform: "translate(-50%, -50%)",
-            cursor: "move",
-            touchAction: "none",
-          }}
-        >
-          <img src={imageUrl} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none", borderRadius: 4 }} />
+        fullBleed ? (
+          <img src={imageUrl} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : (
           <div
-            onPointerDown={beginDrag("image", "resize")}
-            title="Drag to resize the photo"
-            style={{ position: "absolute", right: -7, bottom: -7, width: 16, height: 16, borderRadius: 999, background: colors.navy, border: `2px solid ${colors.white}`, cursor: "nwse-resize", touchAction: "none" }}
-          />
-        </div>
+            onPointerDown={beginDrag("image", "move")}
+            title="Drag to move the photo"
+            style={{
+              position: "absolute",
+              left: `${image.offsetX * 100}%`,
+              top: `${image.offsetY * 100}%`,
+              width: `${image.scale * 100}%`,
+              height: `${image.scale * 100}%`,
+              transform: "translate(-50%, -50%)",
+              cursor: "move",
+              touchAction: "none",
+            }}
+          >
+            <img src={imageUrl} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none", borderRadius: 4 }} />
+            <div
+              onPointerDown={beginDrag("image", "resize")}
+              title="Drag to resize the photo"
+              style={{ position: "absolute", right: -7, bottom: -7, width: 16, height: 16, borderRadius: 999, background: colors.navy, border: `2px solid ${colors.white}`, cursor: "nwse-resize", touchAction: "none" }}
+            />
+          </div>
+        )
       ) : null}
       <div
-        onPointerDown={beginDrag("text", "move")}
-        title="Drag to move the headline/copy"
+        onPointerDown={fullBleed ? undefined : beginDrag("text", "move")}
+        title={fullBleed ? undefined : "Drag to move the headline/copy"}
         style={{
           position: "absolute",
-          left: `${text.offsetX * 100}%`,
-          top: `${text.offsetY * 100}%`,
+          left: `${(fullBleed ? 0.5 : text.offsetX) * 100}%`,
+          top: `${(fullBleed ? 0.5 : text.offsetY) * 100}%`,
           transform: "translate(-50%, -50%)",
-          cursor: "move",
+          cursor: fullBleed ? "default" : "move",
           touchAction: "none",
           maxWidth: "70%",
+          textAlign: fullBleed ? "center" : undefined,
           padding: Math.max(2, 8 * previewScale),
-          border: `1px dashed ${colors.border}`,
+          border: fullBleed ? "none" : `1px dashed ${colors.border}`,
           borderRadius: 6,
         }}
       >
@@ -3393,6 +3401,7 @@ function LaunchStudioPage() {
   const [shortDescription, setShortDescription] = useState("");
   const [heroDesktopUrl, setHeroDesktopUrl] = useState("");
   const [heroMobileUrl, setHeroMobileUrl] = useState("");
+  const [heroImageFullBleed, setHeroImageFullBleed] = useState(false);
   const [themePreset, setThemePreset] = useState<ThemePresetId>("editorial");
   const [heroColorPreset, setHeroColorPreset] = useState<HeroColorPresetId | null>(null);
   const [heroCustomColor, setHeroCustomColor] = useState<string | null>(null);
@@ -3441,6 +3450,7 @@ function LaunchStudioPage() {
         setHeadline(c.headline);
         setShortDescription(c.shortDescription);
         setHeroDesktopUrl(c.heroDesktopUrl ?? "");
+        setHeroImageFullBleed(c.heroImageFullBleed === true);
         setHeroMobileUrl(c.heroMobileUrl ?? "");
         setThemePreset(c.themePreset);
         setHeroColorPreset(c.heroColorPreset);
@@ -3540,6 +3550,7 @@ function LaunchStudioPage() {
         headline,
         shortDescription,
         heroDesktopUrl: heroDesktopUrl || null,
+        heroImageFullBleed,
         heroMobileUrl: heroMobileUrl || null,
         themePreset,
         heroColorPreset,
@@ -4040,9 +4051,21 @@ function LaunchStudioPage() {
               </FieldRow>
             </StoreDesignSection>
 
-            <StoreDesignSection title="Your own photo (beside the headline)">
-              <p style={{ fontSize: 11, color: colors.muted, margin: "0 0 10px" }}>
-                Optional — not a full hero design, just one photo that sits in the free space beside your headline text. Position and size are also adjustable directly on your live store (Edit mode).
+            <StoreDesignSection title="Hero image">
+              <label
+                style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setHeroImageFullBleed((v) => !v);
+                }}
+              >
+                <span style={{ ...styles.checkbox, ...(heroImageFullBleed ? styles.checkboxChecked : {}) }}>{heroImageFullBleed ? "✓" : ""}</span>
+                <span style={{ fontSize: 12 }}>This is a complete, pre-made hero design (fills the whole hero)</span>
+              </label>
+              <p style={{ fontSize: 11, color: colors.muted, margin: "6px 0 10px" }}>
+                {heroImageFullBleed
+                  ? "Uploaded at the exact recommended size below and shown full-width — position isn't adjustable. Headline, font, colour, and the \"Shop the sale\" button (or hiding it) still come from the settings above, rendered on top."
+                  : "Off (default) — the uploaded photo sits in the free space beside your headline text, not as a full background. Position and size are also adjustable directly on your live store (Edit mode)."}
               </p>
               <input
                 ref={heroDesktopInputRef}
@@ -4114,7 +4137,9 @@ function LaunchStudioPage() {
                   </button>
                 </div>
               </div>
-              <p style={{ fontSize: 11, color: colors.muted, marginTop: 6 }}>Best results: desktop 1920 × 1080px, mobile 1080 × 1350px, JPG or PNG.</p>
+              <p style={{ fontSize: 11, color: heroImageFullBleed ? colors.error : colors.muted, marginTop: 6, fontWeight: heroImageFullBleed ? 700 : 400 }}>
+                {heroImageFullBleed ? "Required size: exactly 1920 × 1080px (desktop), 1080 × 1350px (mobile) — it fills the hero edge to edge, so an off-size upload will crop." : "Best results: desktop 1920 × 1080px, mobile 1080 × 1350px, JPG or PNG."}
+              </p>
             </StoreDesignSection>
 
             {error ? <p style={styles.error}>{error}</p> : null}
@@ -4161,6 +4186,7 @@ function LaunchStudioPage() {
               text={heroComposerMode === "desktop" ? heroTextPos : heroTextPosMobile}
               onImageChange={heroComposerMode === "desktop" ? setHeroImagePos : setHeroImagePosMobile}
               onTextChange={heroComposerMode === "desktop" ? setHeroTextPos : setHeroTextPosMobile}
+              fullBleed={heroImageFullBleed}
             />
 
             <div style={{ ...styles.reassuranceCard, marginTop: 20 }}>

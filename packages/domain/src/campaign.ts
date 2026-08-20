@@ -95,6 +95,21 @@ export interface Campaign {
   shortDescription: string;
   heroDesktopUrl: string | null;
   heroMobileUrl: string | null;
+  /**
+   * False/null (default) = the uploaded photo sits positioned/scaled in
+   * the hero's free space beside the headline (drag-to-move/resize).
+   * True = a different mode — a complete, pre-made hero design uploaded
+   * at the exact recommended size (1920×1080 desktop / 1080×1350
+   * mobile), rendered full-bleed behind the headline instead. Position
+   * isn't draggable in this mode — Ola, 2026-08-19: "jak wiadomo jaka
+   * rozdzielczość i jest wgrywany na całą szerokość to chyba jasne że
+   * nie powinien [być przeciągalny]". Doesn't replace the colour/font
+   * settings below — headline colour, font, size, and the CTA
+   * toggle/colour all still apply on top of this image exactly as they
+   * do in the other two hero modes ("w kolorach nagłówka ludzie
+   * ustawiają, rozumiesz?").
+   */
+  heroImageFullBleed: boolean | null;
   themePreset: ThemePresetId;
   /** Null means "use the platform default" (ivory bg / Instrument Serif) — these only apply to this sale's own hero, not the whole brand. */
   heroColorPreset: HeroColorPresetId | null;
@@ -151,11 +166,29 @@ export interface Campaign {
   heroImageOffsetX: number | null;
   heroImageOffsetY: number | null;
   heroImageScale: number | null;
+  /**
+   * Headline's own position + width — independent of the description and
+   * the CTA button, each of which has its own position below. Ola,
+   * 2026-08-19, rejecting the earlier one-block-moves-together design:
+   * "nie zależy mi na czymś co można przesunąć jako całość, ta funkcja
+   * jest bez sensu" — each of the three needs to move (and the headline/
+   * description also resize in width, e.g. to force one line instead of
+   * two) on its own. Width is a fraction of the hero's own width, same
+   * 0-1 convention as offsets; dragging it changes wrapping, not font
+   * size (font size stays heroTitleSize's job).
+   */
   heroTextOffsetX: number | null;
   heroTextOffsetY: number | null;
+  heroTextWidth: number | null;
+  heroDescriptionOffsetX: number | null;
+  heroDescriptionOffsetY: number | null;
+  heroDescriptionWidth: number | null;
+  heroCtaOffsetX: number | null;
+  heroCtaOffsetY: number | null;
   heroImageOffsetXMobile: number | null;
   heroImageOffsetYMobile: number | null;
   heroImageScaleMobile: number | null;
+  /** Mobile still positions the headline/description/CTA as a single combined block (today's original design) — the three-independent-elements model above is desktop-only for now, since mobile live-editing on the storefront doesn't work yet either (see the storefront's own isMobileViewport comment). */
   heroTextOffsetXMobile: number | null;
   heroTextOffsetYMobile: number | null;
   /** Whether a password is currently set for `access: "password"` — never the password/hash itself, just enough for the admin UI to show "Password set" vs "No password yet" without round-tripping anything secret. */

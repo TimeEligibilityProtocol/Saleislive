@@ -330,6 +330,7 @@ model Campaign {
   shortDescription String
   heroDesktopUrl   String?
   heroMobileUrl    String?
+  heroImageFullBleed Boolean?
   themePreset      String
   heroColorPreset  String?
   heroFontPreset   String?
@@ -353,11 +354,18 @@ model Campaign {
   heroImageOffsetX Float?
   heroImageOffsetY Float?
   heroImageScale   Float?
-  /// Position of the headline/subhead/CTA text block within the hero
-  /// canvas — same fraction convention, no independent scale (heroTitleSize
-  /// already controls text size).
+  /// Headline, description, and CTA each independently positioned (and
+  /// headline/description independently width-resizable) — three separate
+  /// elements, not one combined block. Ola, 2026-08-19: rejected the
+  /// original one-block design outright.
   heroTextOffsetX  Float?
   heroTextOffsetY  Float?
+  heroTextWidth    Float?
+  heroDescriptionOffsetX Float?
+  heroDescriptionOffsetY Float?
+  heroDescriptionWidth   Float?
+  heroCtaOffsetX   Float?
+  heroCtaOffsetY   Float?
   /// Same two layers, positioned independently for the mobile canvas
   /// (Ola, 2026-08-19: "hero mogłoby być dostosowalne do mobile") — what
   /// reads well as image-beside-text on a wide desktop canvas often needs

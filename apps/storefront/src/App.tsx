@@ -62,10 +62,10 @@ function useLiveDrag(editMode: boolean, containerRef: React.RefObject<HTMLElemen
   posRef.current = pos;
   const initialKey = `${initial.x}:${initial.y}:${initial.scale}`;
   useEffect(() => setPos(initial), [initialKey]); // eslint-disable-line react-hooks/exhaustive-deps
-  const dragRef = useRef<{ mode: "move" | "resize"; startX: number; startY: number; startPos: DragPos } | null>(null);
+  const dragRef = useRef<{ mode: "move" | "resize" | "resize-width"; startX: number; startY: number; startPos: DragPos } | null>(null);
   const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
-  const beginDrag = (mode: "move" | "resize") => (e: React.PointerEvent) => {
+  const beginDrag = (mode: "move" | "resize" | "resize-width") => (e: React.PointerEvent) => {
     if (!editMode) return;
     e.preventDefault();
     e.stopPropagation();
@@ -84,6 +84,12 @@ function useLiveDrag(editMode: boolean, containerRef: React.RefObject<HTMLElemen
     const dy = (e.clientY - drag.startY) / rect.height;
     if (drag.mode === "resize") {
       setPos({ ...drag.startPos, scale: clamp((drag.startPos.scale ?? 1) + (dx + dy) / 2, 0.15, 2.5) });
+    } else if (drag.mode === "resize-width") {
+      // Width-only (headline/description) — dragging widens or narrows the
+      // text box, which changes wrapping (e.g. one line vs two), not font
+      // size. Ola, 2026-08-19: "poszerzam... żeby napis był z jednej
+      // linijce a nie dwóch".
+      setPos({ ...drag.startPos, scale: clamp((drag.startPos.scale ?? 0.4) + dx * 2, 0.12, 0.95) });
     } else {
       setPos({ x: clamp(drag.startPos.x + dx, 0.05, 0.95), y: clamp(drag.startPos.y + dy, 0.05, 0.95), scale: drag.startPos.scale });
     }
@@ -573,7 +579,15 @@ function HomeView({
   });
   const saveTextPos = useDebouncedSave<DragPos>((pos) => {
     if (!campaign) return;
-    void apiClient.updateCampaign(campaign.id, { heroTextOffsetX: pos.x, heroTextOffsetY: pos.y }).then(onCampaignUpdate);
+    void apiClient.updateCampaign(campaign.id, { heroTextOffsetX: pos.x, heroTextOffsetY: pos.y, heroTextWidth: pos.scale }).then(onCampaignUpdate);
+  });
+  const saveDescPos = useDebouncedSave<DragPos>((pos) => {
+    if (!campaign) return;
+    void apiClient.updateCampaign(campaign.id, { heroDescriptionOffsetX: pos.x, heroDescriptionOffsetY: pos.y, heroDescriptionWidth: pos.scale }).then(onCampaignUpdate);
+  });
+  const saveCtaPos = useDebouncedSave<DragPos>((pos) => {
+    if (!campaign) return;
+    void apiClient.updateCampaign(campaign.id, { heroCtaOffsetX: pos.x, heroCtaOffsetY: pos.y }).then(onCampaignUpdate);
   });
 
   // A merchant who never touched Launch Studio's Store tab gets the
@@ -623,12 +637,35 @@ function HomeView({
   // mobile, same mechanism already used for hero-title's font-size.
   const imgPos = { x: campaign?.heroImageOffsetX ?? 0.7, y: campaign?.heroImageOffsetY ?? 0.5, scale: campaign?.heroImageScale ?? 0.9 };
   const imgPosMobile = { x: campaign?.heroImageOffsetXMobile ?? 0.5, y: campaign?.heroImageOffsetYMobile ?? 0.32, scale: campaign?.heroImageScaleMobile ?? 0.85 };
-  const textPos = { x: campaign?.heroTextOffsetX ?? 0.28, y: campaign?.heroTextOffsetY ?? 0.5 };
+  // Headline, description, and CTA each move (and headline/description
+  // resize in width) completely independently — Ola, 2026-08-19, rejecting
+  // the earlier single-block design outright: "nie zależy mi na czymś co
+  // można przesunąć jako całość". Mobile doesn't have its own fields for
+  // these yet (kept in scope to desktop, where live on-page dragging
+  // actually works — see isMobileViewport's comment); at mobile widths
+  // they fall back to stacking under the one legacy anchor point below,
+  // reconstructing the original combined-block look without new schema.
+  const textPos = { x: campaign?.heroTextOffsetX ?? 0.28, y: campaign?.heroTextOffsetY ?? 0.5, scale: campaign?.heroTextWidth ?? 0.4 };
+  const descPos = { x: campaign?.heroDescriptionOffsetX ?? 0.28, y: campaign?.heroDescriptionOffsetY ?? 0.66, scale: campaign?.heroDescriptionWidth ?? 0.4 };
+  const ctaPos = { x: campaign?.heroCtaOffsetX ?? 0.28, y: campaign?.heroCtaOffsetY ?? 0.78 };
   const textPosMobile = { x: campaign?.heroTextOffsetXMobile ?? 0.5, y: campaign?.heroTextOffsetYMobile ?? 0.72 };
-  const imgDrag = useLiveDrag(heroDragEnabled, heroFrameRef, imgPos, saveImagePos);
-  const textDrag = useLiveDrag(heroDragEnabled, heroFrameRef, textPos, saveTextPos);
-  const liveImgPos = heroDragEnabled ? imgDrag.pos : imgPos;
-  const liveTextPos = heroDragEnabled ? textDrag.pos : textPos;
+  // A complete, pre-made hero design uploaded at the exact recommended
+  // size — rendered full-bleed behind the headline instead of positioned
+  // in the free space beside it. Not draggable (Ola, 2026-08-19: "jak
+  // wiadomo jaka rozdzielczość i jest wgrywany na całą szerokość to
+  // chyba jasne że nie powinien [być przeciągalny]") — headline colour,
+  // font, size, and the CTA still apply exactly as in the other two hero
+  // modes, only what's behind them changes.
+  const isFullBleedHero = !!(customHeroUrl && campaign?.heroImageFullBleed);
+  const elementsDraggable = heroDragEnabled && !isFullBleedHero;
+  const imgDrag = useLiveDrag(elementsDraggable, heroFrameRef, imgPos, saveImagePos);
+  const textDrag = useLiveDrag(elementsDraggable, heroFrameRef, textPos, saveTextPos);
+  const descDrag = useLiveDrag(elementsDraggable, heroFrameRef, descPos, saveDescPos);
+  const ctaDrag = useLiveDrag(elementsDraggable, heroFrameRef, ctaPos, saveCtaPos);
+  const liveImgPos = elementsDraggable ? imgDrag.pos : imgPos;
+  const liveTextPos = elementsDraggable ? textDrag.pos : textPos;
+  const liveDescPos = elementsDraggable ? descDrag.pos : descPos;
+  const liveCtaPos = elementsDraggable ? ctaDrag.pos : ctaPos;
 
   return (
     <>
@@ -647,7 +684,13 @@ function HomeView({
         @media (max-width: 700px) { .hero-copy { padding: 0 6.5% !important; } }
         @media (max-width: 700px) {
           .hero-photo-layer { left: ${imgPosMobile.x * 100}% !important; top: ${imgPosMobile.y * 100}% !important; width: ${imgPosMobile.scale * 100}% !important; height: ${imgPosMobile.scale * 100}% !important; }
-          .hero-text-layer { left: ${textPosMobile.x * 100}% !important; top: ${textPosMobile.y * 100}% !important; }
+          /* Headline/description/CTA don't have their own mobile fields yet
+             (desktop-only for now — see their own comment) — stack them
+             under the one legacy mobile anchor point instead, reconstructing
+             the original combined-block look. */
+          .hero-headline-layer { left: ${textPosMobile.x * 100}% !important; top: ${textPosMobile.y * 100}% !important; width: 68% !important; }
+          .hero-description-layer { left: ${textPosMobile.x * 100}% !important; top: calc(${textPosMobile.y * 100}% + 13%) !important; width: 68% !important; }
+          .hero-cta-layer { left: ${textPosMobile.x * 100}% !important; top: calc(${textPosMobile.y * 100}% + 24%) !important; }
         }
       `}</style>
       <section
@@ -709,65 +752,155 @@ function HomeView({
             }}
           >
             {customHeroUrl ? (
-              <div
-                className="hero-photo-layer"
-                onPointerDown={heroDragEnabled ? imgDrag.beginDrag("move") : undefined}
-                style={{
-                  position: "absolute",
-                  left: `${liveImgPos.x * 100}%`,
-                  top: `${liveImgPos.y * 100}%`,
-                  width: `${(liveImgPos.scale ?? imgPos.scale) * 100}%`,
-                  height: `${(liveImgPos.scale ?? imgPos.scale) * 100}%`,
-                  transform: "translate(-50%, -50%)",
-                  ...(heroDragEnabled ? { cursor: "move", touchAction: "none", outline: `1px dashed ${colors.white}`, outlineOffset: 6 } : {}),
-                }}
-              >
+              isFullBleedHero ? (
+                // Complete pre-made hero design — fills the frame exactly,
+                // no positioning (see isFullBleedHero's own doc comment).
                 <picture>
                   <source media="(max-width: 700px)" srcSet={customHeroUrlMobile ?? customHeroUrl} />
-                  <img src={customHeroUrl} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4, pointerEvents: "none" }} />
+                  <img src={customHeroUrl} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
                 </picture>
-                {heroDragEnabled ? (
-                  <span
-                    onPointerDown={imgDrag.beginDrag("resize")}
-                    title="Drag to resize the photo"
-                    style={{ position: "absolute", right: -8, bottom: -8, width: 18, height: 18, borderRadius: 999, background: colors.navy, border: `2px solid ${colors.white}`, cursor: "nwse-resize", touchAction: "none" }}
-                  />
+              ) : (
+                <div
+                  className="hero-photo-layer"
+                  onPointerDown={heroDragEnabled ? imgDrag.beginDrag("move") : undefined}
+                  style={{
+                    position: "absolute",
+                    left: `${liveImgPos.x * 100}%`,
+                    top: `${liveImgPos.y * 100}%`,
+                    width: `${(liveImgPos.scale ?? imgPos.scale) * 100}%`,
+                    height: `${(liveImgPos.scale ?? imgPos.scale) * 100}%`,
+                    transform: "translate(-50%, -50%)",
+                    ...(heroDragEnabled ? { cursor: "move", touchAction: "none", outline: `1px dashed ${colors.white}`, outlineOffset: 6 } : {}),
+                  }}
+                >
+                  <picture>
+                    <source media="(max-width: 700px)" srcSet={customHeroUrlMobile ?? customHeroUrl} />
+                    <img src={customHeroUrl} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 4, pointerEvents: "none" }} />
+                  </picture>
+                  {heroDragEnabled ? (
+                    <span
+                      onPointerDown={imgDrag.beginDrag("resize")}
+                      title="Drag to resize the photo"
+                      style={{ position: "absolute", right: -8, bottom: -8, width: 18, height: 18, borderRadius: 999, background: colors.navy, border: `2px solid ${colors.white}`, cursor: "nwse-resize", touchAction: "none" }}
+                    />
+                  ) : null}
+                </div>
+              )
+            ) : null}
+            {isFullBleedHero ? (
+              // Full-bleed mode: headline/description/CTA still move as one
+              // centred block — there's nothing to independently position
+              // against, since the photo behind them isn't positioned
+              // either (Ola, 2026-08-19).
+              <div className="hero-copy" style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", zIndex: 2, maxWidth: "70%", padding: "0 16px", textAlign: "center" }}>
+                <h1 className="hero-title" style={{ ...styles.heroTitle, fontSize: titleSize.desktop, color: heroTextColor, ...(heroFont ? { fontFamily: heroFont } : {}) }}>
+                  {campaign?.headline || (
+                    <>
+                      Stock in.
+                      <br />
+                      Sale live.
+                    </>
+                  )}
+                </h1>
+                {campaign?.shortDescription ? <p style={{ ...styles.heroSub, color: heroTextColor, opacity: 0.85 }}>{campaign.shortDescription}</p> : null}
+                {showCta ? (
+                  <a href="#products-grid" className="hero-shop-cta" style={ctaStyle}>
+                    Shop the sale
+                  </a>
                 ) : null}
               </div>
-            ) : null}
-            <div
-              className="hero-copy hero-text-layer"
-              onPointerDown={heroDragEnabled ? textDrag.beginDrag("move") : undefined}
-              style={{
-                position: "absolute",
-                left: `${liveTextPos.x * 100}%`,
-                top: `${liveTextPos.y * 100}%`,
-                transform: "translate(-50%, -50%)",
-                zIndex: 2,
-                maxWidth: "70%",
-                padding: "0 16px",
-                ...(heroDragEnabled ? { cursor: "move", touchAction: "none", outline: `1px dashed ${heroTextColor}`, outlineOffset: 6 } : {}),
-              }}
-            >
-              <h1 className="hero-title" style={{ ...styles.heroTitle, fontSize: titleSize.desktop, color: heroTextColor, ...(heroFont ? { fontFamily: heroFont } : {}), ...(heroDragEnabled ? { pointerEvents: "none" } : {}) }}>
-                {campaign?.headline || (
-                  <>
-                    Stock in.
-                    <br />
-                    Sale live.
-                  </>
-                )}
-              </h1>
-              {/* Short description is optional (Ola, 2026-08-12) — a merchant who deliberately left it blank shouldn't see the platform's own demo copy fill in instead. */}
-              {campaign?.shortDescription ? (
-                <p style={{ ...styles.heroSub, color: heroTextColor, opacity: 0.85, ...(heroDragEnabled ? { pointerEvents: "none" } : {}) }}>{campaign.shortDescription}</p>
-              ) : null}
-              {showCta ? (
-                <a href="#products-grid" className="hero-shop-cta" style={{ ...ctaStyle, ...(heroDragEnabled ? { pointerEvents: "none" } : {}) }}>
-                  Shop the sale
-                </a>
-              ) : null}
-            </div>
+            ) : (
+              // Headline, description, and CTA are three fully independent
+              // elements — each moves on its own, and the headline/
+              // description also resize in width (changes wrapping, not
+              // font size). Ola, 2026-08-19, rejecting the earlier
+              // single-block design: "nie zależy mi na czymś co można
+              // przesunąć jako całość, ta funkcja jest bez sensu".
+              <>
+                <div
+                  className="hero-headline-layer"
+                  onPointerDown={elementsDraggable ? textDrag.beginDrag("move") : undefined}
+                  style={{
+                    position: "absolute",
+                    left: `${liveTextPos.x * 100}%`,
+                    top: `${liveTextPos.y * 100}%`,
+                    width: `${(liveTextPos.scale ?? textPos.scale) * 100}%`,
+                    transform: "translate(-50%, -50%)",
+                    zIndex: 2,
+                    padding: "0 16px",
+                    ...(elementsDraggable ? { cursor: "move", touchAction: "none", outline: `1px dashed ${heroTextColor}`, outlineOffset: 6 } : {}),
+                  }}
+                >
+                  <h1
+                    className="hero-title"
+                    style={{ ...styles.heroTitle, fontSize: titleSize.desktop, color: heroTextColor, margin: 0, ...(heroFont ? { fontFamily: heroFont } : {}), ...(elementsDraggable ? { pointerEvents: "none" } : {}) }}
+                  >
+                    {campaign?.headline || (
+                      <>
+                        Stock in.
+                        <br />
+                        Sale live.
+                      </>
+                    )}
+                  </h1>
+                  {elementsDraggable ? (
+                    <span
+                      onPointerDown={textDrag.beginDrag("resize-width")}
+                      title="Drag to widen or narrow the headline"
+                      style={{ position: "absolute", right: -8, top: "50%", transform: "translateY(-50%)", width: 18, height: 18, borderRadius: 999, background: colors.navy, border: `2px solid ${colors.white}`, cursor: "ew-resize", touchAction: "none" }}
+                    />
+                  ) : null}
+                </div>
+                {/* Short description is optional (Ola, 2026-08-12) — a merchant who deliberately left it blank shouldn't see the platform's own demo copy fill in instead. Still gets its own draggable/resizable layer even when empty, so it's there to position before typing something in. */}
+                {campaign?.shortDescription || elementsDraggable ? (
+                  <div
+                    className="hero-description-layer"
+                    onPointerDown={elementsDraggable ? descDrag.beginDrag("move") : undefined}
+                    style={{
+                      position: "absolute",
+                      left: `${liveDescPos.x * 100}%`,
+                      top: `${liveDescPos.y * 100}%`,
+                      width: `${(liveDescPos.scale ?? descPos.scale) * 100}%`,
+                      transform: "translate(-50%, -50%)",
+                      zIndex: 2,
+                      padding: "0 16px",
+                      ...(elementsDraggable ? { cursor: "move", touchAction: "none", outline: `1px dashed ${heroTextColor}`, outlineOffset: 6 } : {}),
+                    }}
+                  >
+                    {campaign?.shortDescription ? (
+                      <p style={{ ...styles.heroSub, color: heroTextColor, opacity: 0.85, margin: 0, ...(elementsDraggable ? { pointerEvents: "none" } : {}) }}>{campaign.shortDescription}</p>
+                    ) : null}
+                    {elementsDraggable ? (
+                      <span
+                        onPointerDown={descDrag.beginDrag("resize-width")}
+                        title="Drag to widen or narrow the description"
+                        style={{ position: "absolute", right: -8, top: "50%", transform: "translateY(-50%)", width: 18, height: 18, borderRadius: 999, background: colors.navy, border: `2px solid ${colors.white}`, cursor: "ew-resize", touchAction: "none" }}
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
+                {showCta || elementsDraggable ? (
+                  <div
+                    className="hero-cta-layer"
+                    onPointerDown={elementsDraggable ? ctaDrag.beginDrag("move") : undefined}
+                    style={{
+                      position: "absolute",
+                      left: `${liveCtaPos.x * 100}%`,
+                      top: `${liveCtaPos.y * 100}%`,
+                      transform: "translate(-50%, -50%)",
+                      zIndex: 2,
+                      ...(elementsDraggable ? { cursor: "move", touchAction: "none", outline: `1px dashed ${heroTextColor}`, outlineOffset: 6, padding: 4 } : {}),
+                    }}
+                  >
+                    {showCta ? (
+                      <a href="#products-grid" className="hero-shop-cta" style={{ ...ctaStyle, ...(elementsDraggable ? { pointerEvents: "none" } : {}) }}>
+                        Shop the sale
+                      </a>
+                    ) : null}
+                  </div>
+                ) : null}
+              </>
+            )}
           </div>
         )}
       </section>

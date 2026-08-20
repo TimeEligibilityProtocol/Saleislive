@@ -44,6 +44,7 @@ export function campaignsRouter(): Router {
         shortDescription: string;
         heroDesktopUrl: string | null;
         heroMobileUrl: string | null;
+        heroImageFullBleed: boolean | null;
         themePreset: ThemePresetId;
         heroColorPreset: HeroColorPresetId | null;
         heroFontPreset: string | null;
@@ -63,6 +64,12 @@ export function campaignsRouter(): Router {
         heroImageScale: number | null;
         heroTextOffsetX: number | null;
         heroTextOffsetY: number | null;
+        heroTextWidth: number | null;
+        heroDescriptionOffsetX: number | null;
+        heroDescriptionOffsetY: number | null;
+        heroDescriptionWidth: number | null;
+        heroCtaOffsetX: number | null;
+        heroCtaOffsetY: number | null;
         heroImageOffsetXMobile: number | null;
         heroImageOffsetYMobile: number | null;
         heroImageScaleMobile: number | null;
