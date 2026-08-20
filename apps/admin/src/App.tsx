@@ -2143,6 +2143,31 @@ function HeroComposer({
   const dragRef = useRef<{ layer: "image" | "text"; mode: "move" | "resize"; startX: number; startY: number; startOffsetX: number; startOffsetY: number; startScale: number } | null>(null);
   const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
+  // The real storefront hero renders up to 1600px (desktop) / 1080px
+  // (mobile) wide — this sidebar preview is a fixed ~380px box regardless.
+  // A flat 0.3 font-size multiplier ignored that gap: it rendered text
+  // proportionally LARGER relative to the preview's own width than the
+  // real page ever does, so a headline that fits comfortably on the real
+  // 1600px-wide hero pushed past this box's edges here. Real bug, caught
+  // from a live screenshot ("layout nie pokazuje całego layoutu").
+  // Measuring the container's actual rendered width and scaling text
+  // against the SAME real-vs-preview ratio the layout math itself uses
+  // keeps the two proportional, so nothing here can clip that doesn't
+  // also clip on the real page.
+  const [measuredWidth, setMeasuredWidth] = useState(380);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width;
+      if (width) setMeasuredWidth(width);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  const realWidth = parseFloat(aspectRatio.split("/")[0]) || 1600;
+  const previewScale = measuredWidth / realWidth;
+
   const beginDrag = (layer: "image" | "text", mode: "move" | "resize") => (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -2216,13 +2241,15 @@ function HeroComposer({
           cursor: "move",
           touchAction: "none",
           maxWidth: "70%",
-          padding: 8,
+          padding: Math.max(2, 8 * previewScale),
           border: `1px dashed ${colors.border}`,
           borderRadius: 6,
         }}
       >
-        <p style={{ fontFamily, fontSize: titleSizePx * 0.3, fontWeight: 500, color: textColor, margin: "0 0 6px", lineHeight: 1.05, pointerEvents: "none" }}>{headline || "Your headline"}</p>
-        {shortDescription ? <p style={{ fontSize: 12, color: textColor, opacity: 0.85, margin: "0 0 8px", pointerEvents: "none" }}>{shortDescription}</p> : null}
+        <p style={{ fontFamily, fontSize: titleSizePx * previewScale, fontWeight: 500, color: textColor, margin: "0 0 6px", lineHeight: 1.05, pointerEvents: "none" }}>{headline || "Your headline"}</p>
+        {shortDescription ? (
+          <p style={{ fontSize: Math.max(9, 18 * previewScale), color: textColor, opacity: 0.85, margin: "0 0 8px", pointerEvents: "none" }}>{shortDescription}</p>
+        ) : null}
         {showCta ? (
           // Default (no explicit ctaBackground/ctaText) mirrors the real
           // storefront: background = textColor, and the button's OWN text
@@ -2233,11 +2260,11 @@ function HeroComposer({
           <span
             style={{
               display: "inline-block",
-              padding: "6px 12px",
+              padding: `${Math.max(4, 12 * previewScale)}px ${Math.max(8, 24 * previewScale)}px`,
               borderRadius: 6,
               background: ctaBackground ?? textColor,
               color: ctaText ?? contrastTextColor(textColor),
-              fontSize: 11,
+              fontSize: Math.max(8, 14 * previewScale),
               fontWeight: 600,
               pointerEvents: "none",
             }}
@@ -4013,7 +4040,10 @@ function LaunchStudioPage() {
               </FieldRow>
             </StoreDesignSection>
 
-            <StoreDesignSection title="Hero image">
+            <StoreDesignSection title="Your own photo (beside the headline)">
+              <p style={{ fontSize: 11, color: colors.muted, margin: "0 0 10px" }}>
+                Optional — not a full hero design, just one photo that sits in the free space beside your headline text. Position and size are also adjustable directly on your live store (Edit mode).
+              </p>
               <input
                 ref={heroDesktopInputRef}
                 type="file"
@@ -4036,7 +4066,6 @@ function LaunchStudioPage() {
                   void onHeroFilePicked("mobile", file);
                 }}
               />
-              <p style={{ fontSize: 11, color: colors.muted, margin: "0 0 10px" }}>Optional — overrides the Hero background colour above when set.</p>
               <div style={{ display: "flex", gap: 16 }}>
                 <div style={{ flex: 1 }}>
                   <div
@@ -4086,14 +4115,6 @@ function LaunchStudioPage() {
                 </div>
               </div>
               <p style={{ fontSize: 11, color: colors.muted, marginTop: 6 }}>Best results: desktop 1920 × 1080px, mobile 1080 × 1350px, JPG or PNG.</p>
-
-              <div style={{ ...styles.reassuranceCard, marginTop: 20 }}>
-                <h2 style={styles.reassuranceTitle}>Design your hero (Canva / Figma)</h2>
-                <p style={styles.reassuranceBody}>
-                  Not connected yet — designing here and having it land at the right size automatically needs a Canva or Figma developer account with an app registered on their side first (their Connect/API program), which only you can set up since it's tied to your own Canva/Figma account. Once you have that, this is where we'd wire it in. For now: design at{" "}
-                  <strong>1920 × 1080px (desktop)</strong> / <strong>1080 × 1350px (mobile)</strong> in whatever tool you like, then upload it above.
-                </p>
-              </div>
             </StoreDesignSection>
 
             {error ? <p style={styles.error}>{error}</p> : null}
@@ -4141,6 +4162,14 @@ function LaunchStudioPage() {
               onImageChange={heroComposerMode === "desktop" ? setHeroImagePos : setHeroImagePosMobile}
               onTextChange={heroComposerMode === "desktop" ? setHeroTextPos : setHeroTextPosMobile}
             />
+
+            <div style={{ ...styles.reassuranceCard, marginTop: 20 }}>
+              <h2 style={styles.reassuranceTitle}>Design your hero (Canva / Figma)</h2>
+              <p style={styles.reassuranceBody}>
+                Not connected yet — designing here and having it land at the right size automatically needs a Canva or Figma developer account with an app registered on their side first (their Connect/API program), which only you can set up since it's tied to your own Canva/Figma account. Once you have that, this is where we'd wire it in. For now: design at{" "}
+                <strong>1920 × 1080px (desktop)</strong> / <strong>1080 × 1350px (mobile)</strong> in whatever tool you like, then upload it above.
+              </p>
+            </div>
           </div>
         </div>
       ) : null}
